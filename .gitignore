@@ -1,0 +1,25 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+export_presets.cfg
+/build/
+/export/
+
+# Python (tools/)
+__pycache__/
+*.py[cod]
+.venv/
+.uv-cache/
+
+# Аудио-промежуточные файлы (в репо кладём только .ogg)
+tools/**/*.wav
+tools/**/out/
+
+# ОС и редакторы
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code — локальные переопределения
+.claude/settings.local.json

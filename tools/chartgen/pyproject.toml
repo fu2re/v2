@@ -1,0 +1,25 @@
+[project]
+name = "beatroot-chartgen"
+version = "0.1.0"
+description = "Синтез треков, анализ аудио и генерация карт нот для BEATROOT"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# Анализ внешних mp3/wav. Ставится отдельно: uv sync --extra analyze
+analyze = [
+    "librosa>=0.10",
+    "soundfile>=0.12",
+]
+
+[project.scripts]
+chartgen = "beatroot_chartgen.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["beatroot_chartgen"]
