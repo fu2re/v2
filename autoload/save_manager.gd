@@ -53,6 +53,7 @@ func mark_dirty() -> void:
 func _collect() -> Dictionary:
 	var data := GameState.to_dict()
 	data["farm"] = FarmState.to_dict()
+	data["shop"] = ShopState.to_dict()
 	return data
 
 
@@ -105,6 +106,8 @@ func _load_from(path: String) -> bool:
 	GameState.from_dict(data)
 	if data.has("farm"):
 		FarmState.from_dict(data["farm"])
+	if data.has("shop"):
+		ShopState.from_dict(data["shop"])
 	return true
 
 
@@ -118,6 +121,7 @@ func delete_save() -> void:
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	GameState.reset()
 	FarmState.reset()
+	ShopState.reset()
 
 
 func _notification(what: int) -> void:

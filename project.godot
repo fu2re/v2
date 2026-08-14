@@ -22,6 +22,7 @@ AudioBus="*res://autoload/audio_bus.gd"
 Conductor="*res://autoload/conductor.gd"
 GameState="*res://autoload/game_state.gd"
 FarmState="*res://autoload/farm_state.gd"
+ShopState="*res://autoload/shop_state.gd"
 SaveManager="*res://autoload/save_manager.gd"
 RunManager="*res://autoload/run_manager.gd"
 

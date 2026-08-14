@@ -7,10 +7,12 @@ extends RefCounted
 const MONSTER_DIR := "res://data/monsters"
 const FRUIT_DIR := "res://data/fruits"
 const GEAR_DIR := "res://data/gear"
+const COSMETIC_DIR := "res://data/cosmetics"
 
 static var _monsters: Dictionary = {}
 static var _fruits: Dictionary = {}
 static var _gear: Dictionary = {}
+static var _cosmetics: Dictionary = {}
 static var _loaded := false
 
 
@@ -20,6 +22,7 @@ static func ensure_loaded() -> void:
 	_monsters = _scan(MONSTER_DIR)
 	_fruits = _scan(FRUIT_DIR)
 	_gear = _scan(GEAR_DIR)
+	_cosmetics = _scan(COSMETIC_DIR)
 	_loaded = true
 
 
@@ -100,4 +103,18 @@ static func monsters_of_rarity(rarity: MonsterData.Rarity) -> Array[MonsterData]
 	for m in all_monsters():
 		if m.rarity == rarity:
 			out.append(m)
+	return out
+
+
+static func cosmetic(id: String) -> CosmeticData:
+	ensure_loaded()
+	return _cosmetics.get(id)
+
+
+static func all_cosmetics() -> Array[CosmeticData]:
+	ensure_loaded()
+	var out: Array[CosmeticData] = []
+	for c: CosmeticData in _cosmetics.values():
+		out.append(c)
+	out.sort_custom(func(a, b): return a.price_chords < b.price_chords)
 	return out

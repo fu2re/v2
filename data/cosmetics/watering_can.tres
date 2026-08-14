@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CosmeticData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cosmetic_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "watering_can"
+display_name = "Лейка с бантом"
+slot = 2
+rarity = 0
+price_chords = 80
+in_crates = true

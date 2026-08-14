@@ -188,6 +188,10 @@ func _go_to_collection() -> void:
 	get_tree().change_scene_to_file("res://scenes/collection/Collection.tscn")
 
 
+func _go_to_shop() -> void:
+	get_tree().change_scene_to_file("res://scenes/shop/Shop.tscn")
+
+
 func _build_ui() -> void:
 	var bg := ColorRect.new()
 	bg.size = Vector2(1080, 1920)
@@ -220,21 +224,20 @@ func _build_ui() -> void:
 	_status.add_theme_color_override("font_color", Color("DCC7A4"))
 	add_child(_status)
 
-	var collection := Button.new()
-	collection.text = "Друзья"
-	collection.position = Vector2(90, 460)
-	collection.size = Vector2(420, 130)
-	collection.add_theme_font_size_override("font_size", 46)
-	collection.pressed.connect(_go_to_collection)
-	add_child(collection)
-
-	var forest := Button.new()
-	forest.text = "В лес"
-	forest.position = Vector2(570, 460)
-	forest.size = Vector2(420, 130)
-	forest.add_theme_font_size_override("font_size", 46)
-	forest.pressed.connect(_go_to_forest)
-	add_child(forest)
+	# Три входа с фермы: друзья, лавка, лес
+	var nav := [
+		["Друзья", Vector2(60, 460), _go_to_collection],
+		["Лавка", Vector2(390, 460), _go_to_shop],
+		["В лес", Vector2(720, 460), _go_to_forest],
+	]
+	for entry: Array in nav:
+		var button := Button.new()
+		button.text = entry[0]
+		button.position = entry[1]
+		button.size = Vector2(300, 130)
+		button.add_theme_font_size_override("font_size", 42)
+		button.pressed.connect(entry[2])
+		add_child(button)
 
 	_guardian_label = Label.new()
 	_guardian_label.position = Vector2(60, 620)
