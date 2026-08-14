@@ -15,8 +15,28 @@ var _dirty := false
 var writes_disabled := false
 
 
+## Стартовый набор новой игры.
+##
+## Без гуардиана в лес не выйти, а приручить первого можно только сходив
+## в лес — курица и яйцо. Без семян ферма пустой экран. Выдаётся здесь,
+## а не на экране фермы: иначе вход с любого другого экрана видит пустоту.
+const STARTER_GUARDIAN := "disco_sprout"
+const STARTER_SEEDS := {"drum_berry": 3, "echo_pear": 2}
+
+
 func _ready() -> void:
-	load_game()
+	if not load_game():
+		_grant_new_game()
+
+
+func _grant_new_game() -> void:
+	for fruit_id: String in STARTER_SEEDS:
+		FarmState.add_seed(fruit_id, STARTER_SEEDS[fruit_id])
+
+	var starter := Registry.monster(STARTER_GUARDIAN)
+	if starter != null:
+		GameState.add_friendship(STARTER_GUARDIAN, starter.friendship_threshold())
+		GameState.set_guardian(STARTER_GUARDIAN)
 
 
 ## Перевести подсистему в тестовый режим: ничего не читать и не писать.

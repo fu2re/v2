@@ -6,9 +6,11 @@ extends RefCounted
 
 const MONSTER_DIR := "res://data/monsters"
 const FRUIT_DIR := "res://data/fruits"
+const GEAR_DIR := "res://data/gear"
 
 static var _monsters: Dictionary = {}
 static var _fruits: Dictionary = {}
+static var _gear: Dictionary = {}
 static var _loaded := false
 
 
@@ -17,6 +19,7 @@ static func ensure_loaded() -> void:
 		return
 	_monsters = _scan(MONSTER_DIR)
 	_fruits = _scan(FRUIT_DIR)
+	_gear = _scan(GEAR_DIR)
 	_loaded = true
 
 
@@ -48,6 +51,28 @@ static func monster(id: String) -> MonsterData:
 static func fruit(id: String) -> FruitData:
 	ensure_loaded()
 	return _fruits.get(id)
+
+
+static func gear(id: String) -> GearData:
+	ensure_loaded()
+	return _gear.get(id)
+
+
+static func all_gear() -> Array[GearData]:
+	ensure_loaded()
+	var out: Array[GearData] = []
+	for g: GearData in _gear.values():
+		out.append(g)
+	out.sort_custom(func(a, b): return a.price < b.price)
+	return out
+
+
+static func gear_for_slot(slot: GearData.Slot) -> Array[GearData]:
+	var out: Array[GearData] = []
+	for g in all_gear():
+		if g.slot == slot:
+			out.append(g)
+	return out
 
 
 static func all_monsters() -> Array[MonsterData]:

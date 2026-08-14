@@ -9,7 +9,8 @@ extends Node2D
 const SWIPE_THRESHOLD := 140.0
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
-@export var guardian_id: String = "disco_sprout"
+## Кого берём в лес. Пусто — берём выбранного в коллекции.
+@export var guardian_id: String = ""
 
 var _card: Control = null
 var _headline: Label = null
@@ -21,6 +22,8 @@ var _home_button: Button = null
 
 var _battle: Node2D = null
 var _taming: CanvasLayer = null
+var _panel_bg: ColorRect = null
+var _panel_box: VBoxContainer = null
 var _drag_start := 0.0
 var _dragging := false
 var _busy := false
@@ -43,9 +46,9 @@ func _ready() -> void:
 
 
 func _start_run() -> void:
-	# Гуардиан по умолчанию доступен с самого начала: без стартового
-	# существа в лес не выйти, а игрок ещё никого не приручил
-	if not RunManager.start_run(guardian_id):
+	# Гуардиана выбирают в коллекции; экспорт нужен только для отладки сцены
+	var chosen := guardian_id if not guardian_id.is_empty() else GameState.guardian_id()
+	if not RunManager.start_run(chosen):
 		return
 	_on_groove_changed(RunManager.groove, RunManager.max_groove)
 	_show_glade(RunManager.advance())
@@ -79,7 +82,10 @@ func _show_glade(glade: Glade) -> void:
 		Glade.Type.CAMPFIRE:
 			_subline.text = "Можно перевести дух\n+%d к Ритму" % RunManager.CAMPFIRE_RESTORE
 			_headline.add_theme_color_override("font_color", Color("FF5C7A"))
-			_hint.text = "Тапни, чтобы отдохнуть"
+			_hint.text = "Тапни: отдохнуть или сменить друга"
+		Glade.Type.MERCHANT:
+			_headline.add_theme_color_override("font_color", Color("BA9A6D"))
+			_hint.text = "Тапни, чтобы посмотреть товар"
 		_:
 			_subline.text = "Здесь что-то есть"
 			_headline.add_theme_color_override("font_color", Color("DCC7A4"))
@@ -145,14 +151,117 @@ func _resolve_glade() -> void:
 			_hint.text = "%s: 2 плода и семя!\nСвайп вверх — дальше" % name if known \
 				else "Новый вид: %s!\nСемя пойдёт на грядку.\nСвайп вверх — дальше" % name
 			_busy = false
+		Glade.Type.MERCHANT:
+			_open_merchant(glade)
 		Glade.Type.CAMPFIRE:
 			RunManager.rest_at_campfire()
-			_hint.text = "Отдохнул.\nСвайп вверх — дальше"
-			_busy = false
+			_open_campfire()
 		_:
 			RunManager.add_loot_seeds(glade.seeds_reward)
 			_hint.text = "+%d семечек\nСвайп вверх — дальше" % glade.seeds_reward
 			_busy = false
+
+
+## Торговец. Продаёт снаряжение за семечки, найденные в этом же забеге —
+## значит уйти домой пораньше и потратить всё здесь это настоящий выбор.
+func _open_merchant(glade: Glade) -> void:
+	var stock := _merchant_stock(glade.depth)
+	_open_panel("Бродячий торговец")
+
+	if stock.is_empty():
+		_add_panel_label("Сегодня всё раскуплено.")
+	for item: GearData in stock:
+		var affordable := RunManager.run_seeds >= item.price
+		var button := _add_panel_button("%s — %d семечек\n%s" % [
+			item.display_name, item.price, item.effect_text(),
+		], _buy_gear.bind(item))
+		button.disabled = not affordable
+
+	_add_panel_label("Семечек в кармане: %d" % RunManager.run_seeds)
+	_add_panel_button("Идти дальше", _close_panel)
+
+
+## Ассортимент детерминирован глубиной: игрок, увидевший товар и решивший
+## сначала добить бой, обязан застать его на месте.
+func _merchant_stock(depth: int) -> Array:
+	var pool := Registry.all_gear()
+	if pool.is_empty():
+		return []
+	var out: Array = []
+	for i in 3:
+		out.append(pool[(depth * 7 + i * 3) % pool.size()])
+	return out
+
+
+func _buy_gear(item: GearData) -> void:
+	if RunManager.run_seeds < item.price:
+		return
+	RunManager.add_loot_seeds(-item.price)
+	GameState.add_gear(item.id)
+	_open_merchant(RunManager.current_glade)
+
+
+## Костёр — единственная точка смены гуардиана внутри забега (GDD §15.1).
+func _open_campfire() -> void:
+	_open_panel("Костёр")
+	_add_panel_label("Ритм восстановлен: %d / %d" % [RunManager.groove, RunManager.max_groove])
+
+	var friends := GameState.tamed
+	if friends.size() <= 1:
+		_add_panel_label("Сменить пока некого.")
+	for monster_id in friends:
+		if monster_id == RunManager.guardian_id:
+			continue
+		var monster := Registry.monster(monster_id)
+		if monster == null:
+			continue
+		_add_panel_button("Позвать: %s (%s)" % [
+			monster.display_name, MonsterData.genre_name(monster.genre),
+		], _swap_guardian.bind(monster_id))
+
+	_add_panel_button("Идти дальше", _close_panel)
+
+
+func _swap_guardian(monster_id: String) -> void:
+	GameState.set_guardian(monster_id)
+	RunManager.swap_guardian(monster_id)
+	_open_campfire()
+
+
+func _open_panel(title: String) -> void:
+	_busy = true
+	_panel_box.visible = true
+	_panel_bg.visible = true
+	for child in _panel_box.get_children():
+		child.queue_free()
+	_add_panel_label(title, 52)
+
+
+func _close_panel() -> void:
+	_panel_box.visible = false
+	_panel_bg.visible = false
+	_hint.text = "Свайп вверх — дальше"
+	_busy = false
+
+
+func _add_panel_label(text: String, size: int = 34) -> void:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", Color("DCC7A4"))
+	_panel_box.add_child(label)
+
+
+func _add_panel_button(text: String, callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, 120)
+	button.add_theme_font_size_override("font_size", 32)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.pressed.connect(callback)
+	_panel_box.add_child(button)
+	return button
 
 
 func _start_battle(glade: Glade) -> void:
@@ -255,6 +364,25 @@ func _build_ui() -> void:
 	_groove_fill.size = Vector2(900, 34)
 	_groove_fill.color = Color("1ED8FF")
 	add_child(_groove_fill)
+
+	_panel_bg = ColorRect.new()
+	_panel_bg.size = Vector2(1080, 1920)
+	_panel_bg.color = Color(0.07, 0.11, 0.08, 0.96)
+	_panel_bg.visible = false
+	add_child(_panel_bg)
+
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(70, 200)
+	scroll.size = Vector2(940, 1500)
+	add_child(scroll)
+
+	_panel_box = VBoxContainer.new()
+	_panel_box.custom_minimum_size = Vector2(940, 0)
+	_panel_box.add_theme_constant_override("separation", 20)
+	_panel_box.visible = false
+	_panel_box.visibility_changed.connect(func(): scroll.visible = _panel_box.visible)
+	scroll.visible = false
+	scroll.add_child(_panel_box)
 
 	_home_button = Button.new()
 	_home_button.text = "Домой"

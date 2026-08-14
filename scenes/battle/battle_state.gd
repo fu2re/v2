@@ -29,6 +29,12 @@ var vibe: int = 100
 var max_groove: int = 100
 var groove: int = 100
 
+## Суммарный эффект надетого на гуардиана. Считается один раз на бой
+## и дальше не пересчитывается — снаряжение внутри боя не меняется.
+var window_scale: float = 1.0
+var power_bonus: float = 0.0
+var shield_reduction: float = 0.0
+
 var combo: int = 0
 var max_combo: int = 0
 var blocked: int = 0
@@ -54,9 +60,15 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 	max_vibe = int(round(monster.base_vibe * (1.0 + VIBE_DEPTH_SCALE * depth)))
 	vibe = max_vibe
 
+	var bonuses := GameState.gear_bonuses(guardian.id) if guardian != null else {}
+	window_scale = bonuses.get("window_scale", 1.0)
+	power_bonus = bonuses.get("power_bonus", 0.0)
+	shield_reduction = bonuses.get("shield_reduction", 0.0)
+
 	# Ритм сквозной: он НЕ восстанавливается между полянами сам по себе,
 	# только перекусами и событиями. В этом всё напряжение забега (GDD §4.4)
-	max_groove = guardian.base_groove if guardian != null else 100
+	max_groove = (guardian.base_groove if guardian != null else 100) \
+		+ int(bonuses.get("groove_bonus", 0))
 	groove = clampi(starting_groove, 0, max_groove)
 
 	combo = 0
@@ -92,7 +104,7 @@ func register_hit(grade: int) -> int:
 	max_combo = maxi(max_combo, combo)
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
 
-	var power := guardian.base_power if guardian != null else 4.0
+	var power := (guardian.base_power if guardian != null else 4.0) + power_bonus
 	var amount := int(round(
 		power * Judge.effect(grade) * Judge.combo_multiplier(combo) * genre_multiplier()
 	))
@@ -119,7 +131,10 @@ func take_strike() -> void:
 	combo = 0
 	combo_changed.emit(combo, 1.0)
 
-	groove = maxi(groove - STRIKE_DAMAGE, 0)
+	# Амулет смягчает пропущенную атаку, но никогда не обнуляет её:
+	# щит обязан оставаться механикой, за которой следят
+	var damage := maxi(int(round(STRIKE_DAMAGE * (1.0 - shield_reduction))), 1)
+	groove = maxi(groove - damage, 0)
 	groove_changed.emit(groove, max_groove)
 	if groove <= 0:
 		_finish(false)

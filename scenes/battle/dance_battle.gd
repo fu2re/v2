@@ -119,7 +119,7 @@ func _expire_missed() -> void:
 	var i := 0
 	while i < _active.size():
 		var note: Note = _active[i]
-		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW:
+		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW * state.window_scale:
 			_miss(note)
 			_retire(i)
 		elif note.is_judged:
@@ -161,7 +161,7 @@ func _judge_tap() -> void:
 		if note.is_judged:
 			continue
 		var delta := t - chart.beat_to_time(note.beat)
-		if not Judge.in_range(delta):
+		if not Judge.in_range(delta, state.window_scale):
 			continue
 		if best == null or absf(delta) < absf(best_delta):
 			best = note
@@ -171,7 +171,7 @@ func _judge_tap() -> void:
 		return  # тап в пустоту не наказывается: игра для детей
 
 	best.is_judged = true
-	var grade := Judge.grade(best_delta)
+	var grade := Judge.grade(best_delta, state.window_scale)
 
 	match best.type:
 		ChartData.NoteType.SHIELD:

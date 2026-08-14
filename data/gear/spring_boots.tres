@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="GearData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/gear_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "spring_boots"
+display_name = "Пружинные ботинки"
+slot = 0
+rarity = 1
+window_scale = 1.3
+power_bonus = 0.0
+groove_bonus = 0
+shield_reduction = 0.0
+price = 90

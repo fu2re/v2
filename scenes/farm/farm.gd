@@ -9,7 +9,7 @@ extends Node2D
 const PLOT_COLS := 4
 const PLOT_SIZE := 200.0
 const PLOT_GAP := 24.0
-const GRID_TOP := 640.0
+const GRID_TOP := 780.0
 
 var _plot_buttons: Array[Button] = []
 var _status: Label = null
@@ -17,6 +17,7 @@ var _seeds_label: Label = null
 var _grid: Control = null
 var _dance: CanvasLayer = null
 var _seed_picker: VBoxContainer = null
+var _guardian_label: Label = null
 var _pending_plot := -1
 
 
@@ -31,16 +32,7 @@ func _ready() -> void:
 	FarmState.seeds_changed.connect(_refresh)
 	GameState.seeds_changed.connect(func(_v): _refresh())
 
-	_grant_starter_seeds()
 	_refresh()
-
-
-## Новая игра начинается с горсти семян: без них ферма — пустой экран,
-## а игроку негде взять первый фрукт для приручения.
-func _grant_starter_seeds() -> void:
-	if FarmState.known_seeds.is_empty():
-		FarmState.add_seed("drum_berry", 3)
-		FarmState.add_seed("echo_pear", 2)
 
 
 func _process(_delta: float) -> void:
@@ -52,6 +44,10 @@ func _refresh() -> void:
 	_seeds_label.text = "Семечки: %d      Семена: %d" % [
 		GameState.seeds, _total_seeds(),
 	]
+
+	var guardian := Registry.monster(GameState.guardian_id())
+	_guardian_label.text = "В лес пойдёт: %s" % guardian.display_name if guardian != null \
+		else "Гуардиан не выбран"
 
 
 func _total_seeds() -> int:
@@ -182,7 +178,14 @@ func _on_dance_finished(level: DanceGrade.Level) -> void:
 
 
 func _go_to_forest() -> void:
+	if GameState.guardian_id().is_empty():
+		_status.text = "Некого взять в лес. Сначала подружись с кем-нибудь."
+		return
 	get_tree().change_scene_to_file("res://scenes/run/RunFeed.tscn")
+
+
+func _go_to_collection() -> void:
+	get_tree().change_scene_to_file("res://scenes/collection/Collection.tscn")
 
 
 func _build_ui() -> void:
@@ -217,13 +220,29 @@ func _build_ui() -> void:
 	_status.add_theme_color_override("font_color", Color("DCC7A4"))
 	add_child(_status)
 
+	var collection := Button.new()
+	collection.text = "Друзья"
+	collection.position = Vector2(90, 460)
+	collection.size = Vector2(420, 130)
+	collection.add_theme_font_size_override("font_size", 46)
+	collection.pressed.connect(_go_to_collection)
+	add_child(collection)
+
 	var forest := Button.new()
 	forest.text = "В лес"
-	forest.position = Vector2(340, 460)
-	forest.size = Vector2(400, 130)
-	forest.add_theme_font_size_override("font_size", 50)
+	forest.position = Vector2(570, 460)
+	forest.size = Vector2(420, 130)
+	forest.add_theme_font_size_override("font_size", 46)
 	forest.pressed.connect(_go_to_forest)
 	add_child(forest)
+
+	_guardian_label = Label.new()
+	_guardian_label.position = Vector2(60, 620)
+	_guardian_label.size = Vector2(960, 60)
+	_guardian_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_guardian_label.add_theme_font_size_override("font_size", 34)
+	_guardian_label.add_theme_color_override("font_color", Color("F0DEC0"))
+	add_child(_guardian_label)
 
 	_grid = Control.new()
 	_grid.size = Vector2(1080, 1000)

@@ -59,7 +59,8 @@ func start_run(new_guardian_id: String) -> bool:
 		return false
 
 	guardian_id = new_guardian_id
-	max_groove = guardian.base_groove
+	max_groove = guardian.base_groove \
+		+ int(GameState.gear_bonuses(new_guardian_id).get("groove_bonus", 0))
 	groove = max_groove
 	depth = 0
 	run_fruits.clear()
@@ -164,6 +165,24 @@ func restore_groove(amount: int) -> void:
 
 func rest_at_campfire() -> void:
 	restore_groove(CAMPFIRE_RESTORE)
+
+
+## Сменить гуардиана у костра — единственная точка смены внутри забега.
+##
+## Ритм переносится ДОЛЕЙ, а не числом: иначе смена на существо с большим
+## запасом лечила бы бесплатно, и костёр превратился бы в кнопку хила.
+func swap_guardian(monster_id: String) -> bool:
+	if not is_active or not GameState.is_tamed(monster_id):
+		return false
+	var monster := Registry.monster(monster_id)
+	if monster == null:
+		return false
+
+	var ratio := float(groove) / maxf(max_groove, 1.0)
+	guardian_id = monster_id
+	max_groove = monster.base_groove + int(GameState.gear_bonuses(monster_id).get("groove_bonus", 0))
+	set_groove(int(round(max_groove * ratio)))
+	return true
 
 
 # --- добыча ------------------------------------------------------------------

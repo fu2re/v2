@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="GearData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/gear_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "heartwood_amulet"
+display_name = "Амулет сердцевины"
+slot = 2
+rarity = 3
+window_scale = 1.0
+power_bonus = 0.0
+groove_bonus = 90
+shield_reduction = 0.3
+price = 230
