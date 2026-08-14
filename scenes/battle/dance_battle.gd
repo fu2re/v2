@@ -52,9 +52,19 @@ func _ready() -> void:
 
 
 func start() -> void:
-	chart = ChartLoader.load_by_id(chart_id, difficulty)
-	if chart == null:
+	var loaded := ChartLoader.load_by_id(chart_id, difficulty)
+	if loaded == null:
 		push_error("Не удалось загрузить чарт %s [%s]" % [chart_id, difficulty])
+		return
+	begin(loaded)
+
+
+## Запуск с готовым чартом. Нужен там, где чарт строится в коде —
+## например в обучении. Публичный вход вместо правки полей снаружи:
+## иначе часть подготовки (спрайт монстра, привязка HUD) молча пропускается.
+func begin(prepared: ChartData, vibe_override: int = 0) -> void:
+	chart = prepared
+	if chart == null:
 		return
 
 	var monster := Registry.monster(monster_id)
@@ -64,6 +74,10 @@ func start() -> void:
 		return
 
 	state.setup(monster, guardian, starting_groove, depth)
+	# Обучение занижает Настрой, чтобы первый бой заведомо кончился победой
+	if vibe_override > 0:
+		state.max_vibe = vibe_override
+		state.vibe = vibe_override
 	_hud.bind(state)
 	if _monster_sprite != null:
 		_monster_sprite.texture = monster.sprite()
