@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/monster_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "beat_serpent"
+display_name = "Бит-змей"
+genre = 4
+rarity = 3
+silhouette = 4
+favorite_fruit_id = "chord_apple"
+base_vibe = 200
+base_groove = 140
+base_power = 5.5
+sprite_path = "res://art/placeholder/monster_beat_serpent.png"

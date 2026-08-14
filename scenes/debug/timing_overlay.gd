@@ -58,8 +58,25 @@ func _process(_delta: float) -> void:
 		"попаданий      %d" % _deltas.size(),
 		"",
 		_counts_line(),
-		"комбо          %d (макс %d)" % [_battle.combo, _battle.max_combo] if _battle != null else "",
+		_combo_line(),
 	])
+
+
+## Состояние боя живёт в BattleState, а не на самом узле — оверлей
+## обязан спрашивать его там же, иначе сыплет ошибками каждый кадр.
+func _state() -> BattleState:
+	if _battle == null or not ("state" in _battle):
+		return null
+	return _battle.state
+
+
+func _combo_line() -> String:
+	var s := _state()
+	if s == null:
+		return ""
+	return "комбо          %d (макс %d)\nНастрой        %d / %d\nРитм           %d / %d" % [
+		s.combo, s.max_combo, s.vibe, s.max_vibe, s.groove, s.max_groove,
+	]
 
 
 func _on_note_judged(grade: int, delta: float) -> void:
@@ -94,9 +111,10 @@ func _stddev() -> float:
 
 
 func _counts_line() -> String:
-	if _battle == null:
+	var s := _state()
+	if s == null:
 		return ""
-	var c: Dictionary = _battle.grade_counts
+	var c: Dictionary = s.grade_counts
 	return "P %d   G %d   E/L %d   MISS %d" % [
 		c[Judge.Grade.PERFECT], c[Judge.Grade.GOOD],
 		c[Judge.Grade.EARLY_LATE], c[Judge.Grade.MISS],

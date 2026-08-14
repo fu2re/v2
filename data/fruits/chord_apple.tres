@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FruitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/fruit_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "chord_apple"
+display_name = "Аккорд-яблоко"
+tier = 3
+sprite_path = "res://art/placeholder/fruit_chord_apple.png"

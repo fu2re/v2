@@ -1,0 +1,124 @@
+class_name BattleHUD
+extends CanvasLayer
+
+## Шкалы боя и комбо.
+##
+## Цвета берутся из зарезервированного набора GAMEPLAY (art/palette.json):
+## они не встречаются в окружении, поэтому шкала читается мгновенно
+## даже на пёстрой поляне (GDD §11.1.1).
+
+const VIBE_COLOR := Color("FF57C4")     # Настрой монстра
+const GROOVE_COLOR := Color("1ED8FF")   # Ритм игрока
+const WINDUP_COLOR := Color("FF5C7A")   # тревога: монстр замахнулся
+const TRACK_COLOR := Color(0, 0, 0, 0.45)
+
+const BAR_HEIGHT := 34.0
+const MARGIN := 40.0
+
+const FRAME_THICKNESS := 46.0
+
+var _vibe_fill: ColorRect = null
+var _groove_fill: ColorRect = null
+var _combo_label: Label = null
+var _warning_parts: Array[ColorRect] = []
+var _vibe_width := 0.0
+var _groove_width := 0.0
+
+
+func _ready() -> void:
+	layer = 10
+	var width := 1080.0 - MARGIN * 2.0
+	_vibe_width = width
+	_groove_width = width
+
+	_vibe_fill = _make_bar(Vector2(MARGIN, 120.0), width, VIBE_COLOR)
+	_groove_fill = _make_bar(Vector2(MARGIN, 1740.0), width, GROOVE_COLOR)
+
+	_combo_label = Label.new()
+	_combo_label.position = Vector2(MARGIN, 1640.0)
+	_combo_label.add_theme_font_size_override("font_size", 56)
+	_combo_label.add_theme_color_override("font_color", GROOVE_COLOR)
+	_combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_combo_label.add_theme_constant_override("outline_size", 10)
+	add_child(_combo_label)
+
+	_build_warning_frame()
+
+
+func _make_bar(pos: Vector2, width: float, color: Color) -> ColorRect:
+	var track := ColorRect.new()
+	track.position = pos
+	track.size = Vector2(width, BAR_HEIGHT)
+	track.color = TRACK_COLOR
+	add_child(track)
+
+	var fill := ColorRect.new()
+	fill.position = pos
+	fill.size = Vector2(width, BAR_HEIGHT)
+	fill.color = color
+	add_child(fill)
+	return fill
+
+
+func bind(state: BattleState) -> void:
+	state.vibe_changed.connect(_on_vibe_changed)
+	state.groove_changed.connect(_on_groove_changed)
+	state.combo_changed.connect(_on_combo_changed)
+	_on_vibe_changed(state.vibe, state.max_vibe)
+	_on_groove_changed(state.groove, state.max_groove)
+	_on_combo_changed(state.combo, 1.0)
+
+
+func _on_vibe_changed(current: int, maximum: int) -> void:
+	_set_fill(_vibe_fill, _vibe_width, current, maximum)
+
+
+func _on_groove_changed(current: int, maximum: int) -> void:
+	_set_fill(_groove_fill, _groove_width, current, maximum)
+
+
+func _set_fill(fill: ColorRect, full_width: float, current: int, maximum: int) -> void:
+	var ratio := clampf(float(current) / maxf(maximum, 1.0), 0.0, 1.0)
+	var tween := create_tween()
+	tween.tween_property(fill, "size:x", full_width * ratio, 0.15)
+
+
+func _on_combo_changed(combo: int, multiplier: float) -> void:
+	if combo < 2:
+		_combo_label.text = ""
+		return
+	_combo_label.text = "%d  x%.1f" % [combo, multiplier]
+
+
+## Тревога рисуется РАМКОЙ по краям, а не заливкой всего экрана.
+##
+## Заливка легла бы поверх нот и разбавила зарезервированные цвета — ровно то,
+## что запрещает GDD §11.1.1. Рамка ловится боковым зрением и не трогает центр,
+## где игрок читает ноты.
+func _build_warning_frame() -> void:
+	var w := 1080.0
+	var h := 1920.0
+	var t := FRAME_THICKNESS
+	var rects := [
+		Rect2(0, 0, w, t),
+		Rect2(0, h - t, w, t),
+		Rect2(0, t, t, h - t * 2.0),
+		Rect2(w - t, t, t, h - t * 2.0),
+	]
+	for r: Rect2 in rects:
+		var part := ColorRect.new()
+		part.position = r.position
+		part.size = r.size
+		part.color = Color(WINDUP_COLOR.r, WINDUP_COLOR.g, WINDUP_COLOR.b, 0.0)
+		part.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(part)
+		_warning_parts.append(part)
+
+
+## Вспышка тревоги на замахе монстра. Держится ровно до удара,
+## чтобы игрок связал сигнал с последствием.
+func flash_windup(duration: float) -> void:
+	for part in _warning_parts:
+		var tween := create_tween()
+		tween.tween_property(part, "color:a", 0.85, duration * 0.4)
+		tween.tween_property(part, "color:a", 0.0, duration * 0.6)

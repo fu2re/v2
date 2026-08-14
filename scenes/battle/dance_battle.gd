@@ -1,43 +1,51 @@
 extends Node2D
 
-## Дэнс-баттл, скоуп Фазы 0: падающие ноты, оценка тайминга, комбо.
-## Щиты, шкалы Ритма и Настроя, победа — Фаза 1.
+## Дэнс-баттл: падающие ноты, щиты, шкалы Настроя и Ритма.
+##
+## Логика исхода живёт в BattleState (чистый класс), здесь — только подача.
 
 signal note_judged(grade: int, delta_seconds: float)
+signal battle_finished(won: bool, state: BattleState)
 
 const JUDGE_Y := 1480.0
 const SPAWN_Y := 420.0
 const LANE_X := 540.0
-## За сколько долей до попадания нота появляется. Это и есть «скорость скролла».
+## За сколько долей до попадания нота появляется — «скорость скролла».
 const APPROACH_BEATS := 2.0
+## Насколько заранее монстр начинает замах (GDD: не меньше 2 долей).
+const WINDUP_LEAD := 2.0
+const SNACK_RESTORE := 15
 
 @export var chart_id: String = "demo_disco"
 @export var difficulty: String = "normal"
+@export var monster_id: String = "synth_slime"
+@export var guardian_id: String = "disco_sprout"
+@export var starting_groove: int = 100
+@export var depth: int = 0
 @export var autostart: bool = true
 
 var chart: ChartData = null
-var combo: int = 0
-var max_combo: int = 0
-var grade_counts := {
-	Judge.Grade.PERFECT: 0,
-	Judge.Grade.GOOD: 0,
-	Judge.Grade.EARLY_LATE: 0,
-	Judge.Grade.MISS: 0,
-}
+var state := BattleState.new()
 
 var _pool: NotePool = null
+var _hud: BattleHUD = null
 var _active: Array[Note] = []
 var _next_index: int = 0
-var _monster: Sprite2D = null
+var _next_pattern_index: int = 0
+var _monster_sprite: Sprite2D = null
 
 
 func _ready() -> void:
 	_pool = NotePool.new()
 	add_child(_pool)
+	_hud = BattleHUD.new()
+	add_child(_hud)
 	_build_stage()
 
 	Conductor.beat.connect(_on_beat)
-	Conductor.finished.connect(_on_finished)
+	Conductor.finished.connect(_on_track_finished)
+	state.victory.connect(_on_victory)
+	state.defeat.connect(_on_defeat)
 
 	if autostart:
 		start()
@@ -49,29 +57,34 @@ func start() -> void:
 		push_error("Не удалось загрузить чарт %s [%s]" % [chart_id, difficulty])
 		return
 
-	_reset()
-	Conductor.play(chart)
+	var monster := Registry.monster(monster_id)
+	var guardian := Registry.monster(guardian_id)
+	if monster == null or guardian == null:
+		push_error("Не найден монстр '%s' или гуардиан '%s'" % [monster_id, guardian_id])
+		return
 
+	state.setup(monster, guardian, starting_groove, depth)
+	_hud.bind(state)
+	if _monster_sprite != null:
+		_monster_sprite.texture = monster.sprite()
 
-func _reset() -> void:
 	_pool.release_all()
 	_active.clear()
 	_next_index = 0
-	combo = 0
-	max_combo = 0
-	for key in grade_counts:
-		grade_counts[key] = 0
+	_next_pattern_index = 0
+
+	Conductor.play(chart)
 
 
 func _process(_delta: float) -> void:
-	if not Conductor.is_playing or chart == null:
+	if not Conductor.is_playing or chart == null or state.is_over:
 		return
 	_spawn_due_notes()
+	_run_monster_pattern()
 	_update_positions()
 	_expire_missed()
 
 
-## Нота появляется, когда до её доли осталось APPROACH_BEATS.
 func _spawn_due_notes() -> void:
 	var horizon := Conductor.song_beat + APPROACH_BEATS
 	while _next_index < chart.note_count() and chart.note_beats[_next_index] <= horizon:
@@ -82,29 +95,47 @@ func _spawn_due_notes() -> void:
 		_next_index += 1
 
 
-## Позиция считается ОТ музыкального времени каждый кадр, а не интегрируется.
-## Интегрирование накапливает дрейф и привязывает ноты к частоте кадров.
+## Замах монстра. Телеграф обязателен: ребёнок должен увидеть «монстр
+## готовится» раньше, чем появится нота-щит (GDD §4.2).
+func _run_monster_pattern() -> void:
+	while _next_pattern_index < chart.pattern_beats.size() \
+			and chart.pattern_beats[_next_pattern_index] <= Conductor.song_beat:
+		var action := chart.pattern_actions[_next_pattern_index]
+		if action == "windup":
+			_hud.flash_windup(WINDUP_LEAD * chart.sec_per_beat())
+			_telegraph_monster()
+		_next_pattern_index += 1
+
+
 func _update_positions() -> void:
 	var travel := JUDGE_Y - SPAWN_Y
 	for note in _active:
 		var beats_left := note.beat - Conductor.song_beat
-		var progress := 1.0 - beats_left / APPROACH_BEATS
-		note.position.y = SPAWN_Y + progress * travel
+		note.position.y = SPAWN_Y + (1.0 - beats_left / APPROACH_BEATS) * travel
 
 
-## Нота, ушедшая за окно оценки, считается промахом автоматически.
 func _expire_missed() -> void:
 	var t := Conductor.song_position
 	var i := 0
 	while i < _active.size():
 		var note: Note = _active[i]
 		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW:
-			_apply_grade(Judge.Grade.MISS, t - chart.beat_to_time(note.beat))
+			_miss(note)
 			_retire(i)
 		elif note.is_judged:
 			_retire(i)
 		else:
 			i += 1
+
+
+## Пропуск щита — единственный способ потерять Ритм.
+func _miss(note: Note) -> void:
+	if note.type == ChartData.NoteType.SHIELD:
+		state.take_strike()
+		_shake_screen()
+	else:
+		state.register_hit(Judge.Grade.MISS)
+	note_judged.emit(Judge.Grade.MISS, Judge.LATE_WINDOW)
 
 
 func _retire(index: int) -> void:
@@ -115,14 +146,13 @@ func _retire(index: int) -> void:
 func _input(event: InputEvent) -> void:
 	if not event.is_action_pressed("tap"):
 		return
-	if not Conductor.is_playing or chart == null:
+	if not Conductor.is_playing or chart == null or state.is_over:
 		return
 	_judge_tap()
 
 
 func _judge_tap() -> void:
-	# Время спрашиваем свежее: кэш Conductor отстаёт на кадр, а это треть
-	# окна Perfect
+	# Свежее время: кэш Conductor отстаёт на кадр, это треть окна Perfect
 	var t := Conductor.now()
 
 	var best: Note = null
@@ -141,38 +171,72 @@ func _judge_tap() -> void:
 		return  # тап в пустоту не наказывается: игра для детей
 
 	best.is_judged = true
-	_apply_grade(Judge.grade(best_delta), best_delta)
+	var grade := Judge.grade(best_delta)
 
+	match best.type:
+		ChartData.NoteType.SHIELD:
+			state.block_strike()
+		ChartData.NoteType.SNACK:
+			state.register_hit(grade)
+			state.restore_groove(SNACK_RESTORE)
+		_:
+			state.register_hit(grade)
 
-func _apply_grade(grade: int, delta: float) -> void:
-	grade_counts[grade] += 1
-	if grade == Judge.Grade.MISS:
-		combo = 0
-	else:
-		combo += 1
-		max_combo = maxi(max_combo, combo)
-	note_judged.emit(grade, delta)
+	note_judged.emit(grade, best_delta)
 
 
 func _on_beat(index: int) -> void:
-	if _monster == null:
+	if _monster_sprite == null or state.is_over:
 		return
-	# Покачивание монстра в такт. В Фазе 1 сменится скелетной анимацией
+	# Покачивание в такт. В Фазе 4 сменится скелетной анимацией
 	var dir := 1.0 if index % 2 == 0 else -1.0
 	var tween := create_tween()
-	tween.tween_property(_monster, "rotation", dir * 0.06, 0.12)
-	tween.tween_property(_monster, "rotation", 0.0, 0.12)
+	tween.tween_property(_monster_sprite, "rotation", dir * 0.06, 0.12)
+	tween.tween_property(_monster_sprite, "rotation", 0.0, 0.12)
 
 
-func _on_finished() -> void:
+func _telegraph_monster() -> void:
+	if _monster_sprite == null:
+		return
+	var tween := create_tween()
+	tween.tween_property(_monster_sprite, "scale", Vector2(4.6, 4.6), 0.25)
+	tween.tween_property(_monster_sprite, "scale", Vector2(4.0, 4.0), 0.25)
+
+
+func _shake_screen() -> void:
+	var tween := create_tween()
+	tween.tween_property(self, "position:x", 18.0, 0.05)
+	tween.tween_property(self, "position:x", -18.0, 0.05)
+	tween.tween_property(self, "position:x", 0.0, 0.05)
+
+
+## Трек кончился, а Настрой не сбит: монстр устоял. Это не поражение —
+## Ритм цел, забег продолжается.
+func _on_track_finished() -> void:
+	if state.is_over:
+		return
+	state.finish_by_timeout()
+
+
+func _on_victory() -> void:
+	_end_battle(true)
+
+
+func _on_defeat() -> void:
+	_end_battle(false)
+
+
+func _end_battle(won: bool) -> void:
+	Conductor.stop()
 	_pool.release_all()
 	_active.clear()
+	battle_finished.emit(won, state)
 
 
 func _build_stage() -> void:
 	var bg := ColorRect.new()
 	bg.size = Vector2(1080, 1920)
-	# Фон боя притемнён — иначе земляная палитра спорит с нотами (GDD §11.1.1)
+	# Фон боя притемнён, иначе земляная палитра спорит с нотами (GDD §11.1.1)
 	bg.color = Color("33512A").darkened(0.30)
 	bg.z_index = -10
 	add_child(bg)
@@ -184,10 +248,7 @@ func _build_stage() -> void:
 	line.default_color = Color("1ED8FF")
 	add_child(line)
 
-	_monster = Sprite2D.new()
-	var tex := load("res://art/placeholder/monster_synth_slime.png") as Texture2D
-	if tex != null:
-		_monster.texture = tex
-		_monster.scale = Vector2(4, 4)
-	_monster.position = Vector2(LANE_X, 260)
-	add_child(_monster)
+	_monster_sprite = Sprite2D.new()
+	_monster_sprite.scale = Vector2(4, 4)
+	_monster_sprite.position = Vector2(LANE_X, 300)
+	add_child(_monster_sprite)

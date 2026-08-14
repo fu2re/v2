@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/monster_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "synth_slime"
+display_name = "Синт-слайм"
+genre = 3
+rarity = 0
+silhouette = 3
+favorite_fruit_id = "echo_pear"
+base_vibe = 100
+base_groove = 100
+base_power = 4.0
+sprite_path = "res://art/placeholder/monster_synth_slime.png"
