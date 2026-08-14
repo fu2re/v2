@@ -15,6 +15,23 @@ from .color import nearest, oklab_distance, to_oklab
 from .palette import quantization_palette
 
 
+def remove_background_ml(img: Image.Image) -> Image.Image | None:
+    """Вырезать фон нейросетевой сегментацией. None, если rembg не установлен.
+
+    Нужно потому, что на дистиллированных моделях (Turbo и подобных) промпт
+    «isolated on plain white background» не работает: при cfg 1.0 негативный
+    промпт инертен, и модель всё равно рисует сцену. Заливка от краёв на такой
+    картинке бессильна — вырезать нечего.
+
+    Ставится отдельно:  uv sync --extra cutout
+    """
+    try:
+        from rembg import remove
+    except ImportError:
+        return None
+    return remove(img.convert("RGBA"))
+
+
 def cutout_background(arr: np.ndarray, tolerance: float = 0.10) -> np.ndarray:
     """Убрать плоский фон заливкой от краёв. Возвращает маску «это объект».
 
@@ -56,6 +73,13 @@ def pixelize(img: Image.Image, target: int = 96, palette: np.ndarray | None = No
     target — длинная сторона результата в пикселях.
     """
     img = img.convert("RGBA")
+
+    # Сегментацию гоним ДО уменьшения: на 768×768 модель видит объект,
+    # на 96×96 уже нет
+    if remove_background:
+        cut = remove_background_ml(img)
+        if cut is not None:
+            img = cut
 
     # BOX усредняет блоки — деталь превращается в цвет пикселя,
     # а не выбрасывается, как при NEAREST

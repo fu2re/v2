@@ -13,7 +13,7 @@ import io
 import json
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 DEFAULT_HOST = "http://127.0.0.1:8188"
@@ -35,6 +35,37 @@ STYLE_NEGATIVE = (
     "multiple subjects, cropped, blurry, neon colors, saturated blue, magenta"
 )
 
+# Отдельный шаблон для дистиллированных моделей.
+#
+# ПРИЧИНА: при cfg 1.0, на котором работают Turbo и подобные, негативный промпт
+# практически не влияет на результат. Проверено: с обычным шаблоном Turbo
+# проигнорировал «cluttered background, scenery» и нарисовал целую лесную сцену,
+# после чего вырезать фон стало нечего. Поэтому всё, что критично, вынесено
+# в НАЧАЛО позитивного промпта, где вес максимален.
+STYLE_POSITIVE_DISTILLED = (
+    "plain solid white background, isolated single object, no scenery, "
+    "{subject}, "
+    "centered full body character, painterly game asset sprite, "
+    "warm earthy palette, ochre olive terracotta, soft shading, "
+    "cozy storybook illustration"
+)
+
+
+def positive_prompt(subject: str, checkpoint: str) -> str:
+    template = STYLE_POSITIVE_DISTILLED if is_distilled(checkpoint) else STYLE_POSITIVE
+    return template.format(subject=subject)
+
+
+# Модели-дистилляты (Turbo, Lightning, LCM, Hyper) рассчитаны на 1-4 шага
+# при cfg около 1.0. Обычные 28 шагов с cfg 6.5 дают на них пересвеченную кашу,
+# поэтому параметры подбираются по имени чекпойнта, а не задаются вслепую.
+_TURBO_MARKERS = ("turbo", "lightning", "lcm", "hyper")
+
+
+def is_distilled(checkpoint: str) -> bool:
+    name = checkpoint.lower()
+    return any(marker in name for marker in _TURBO_MARKERS)
+
 
 @dataclass
 class GenerationRequest:
@@ -48,13 +79,28 @@ class GenerationRequest:
     sampler: str = "dpmpp_2m"
     scheduler: str = "karras"
 
+    def tuned(self) -> "GenerationRequest":
+        """Копия с параметрами под тип модели."""
+        if not is_distilled(self.checkpoint):
+            return self
+        return replace(
+            self,
+            steps=min(self.steps, 6) if self.steps <= 6 else 4,
+            cfg=1.0,
+            sampler="euler_ancestral",
+            scheduler="sgm_uniform",
+            width=min(self.width, 768),
+            height=min(self.height, 768),
+        )
 
-def build_workflow(req: GenerationRequest) -> dict:
+
+def build_workflow(raw: GenerationRequest) -> dict:
     """Собрать SDXL txt2img workflow в API-формате ComfyUI.
 
     Используются только базовые ноды — никаких кастомных зависимостей,
     workflow запустится на чистой установке.
     """
+    req = raw.tuned()
     return {
         "1": {
             "class_type": "CheckpointLoaderSimple",
@@ -63,7 +109,7 @@ def build_workflow(req: GenerationRequest) -> dict:
         "2": {
             "class_type": "CLIPTextEncode",
             "inputs": {
-                "text": STYLE_POSITIVE.format(subject=req.subject),
+                "text": positive_prompt(req.subject, req.checkpoint),
                 "clip": ["1", 1],
             },
         },
