@@ -102,6 +102,12 @@ res://
 ## Соглашения по коду
 
 - GDScript, статическая типизация везде: `var hp: int = 100`, `func foo(x: float) -> void:`
+- **Чтение из `Dictionary` или `Array` даёт `Variant` — с ним `:=` не работает.**
+  Пиши явный тип, иначе парсер валит весь скрипт и всё, что от него зависит:
+  ```gdscript
+  var grown: float = plots[0].grown   # так
+  var grown := plots[0].grown         # Parse Error
+  ```
 - `class_name` для всех Resource-типов и переиспользуемых узлов
 - Сигналы вместо прямых вызовов вверх по дереву
 - Имена файлов: `snake_case.gd`, `PascalCase.tscn`

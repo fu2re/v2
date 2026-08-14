@@ -105,12 +105,18 @@ func _input(event: InputEvent) -> void:
 			if _awaiting_restart:
 				if absf(travel) < 40.0:
 					_awaiting_restart = false
-					_start_run()
+					_return_to_farm()
 				return
 			if travel < -SWIPE_THRESHOLD:
 				_next_glade()
 			elif absf(travel) < 40.0:
 				_resolve_glade()
+
+
+## Забег кончился — возвращаемся на ферму. Именно там добыча превращается
+## в новые посадки, и контур замыкается (GDD §7.3).
+func _return_to_farm() -> void:
+	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
 
 
 func _next_glade() -> void:
@@ -128,9 +134,16 @@ func _resolve_glade() -> void:
 		Glade.Type.BATTLE:
 			_start_battle(glade)
 		Glade.Type.WILD_BUSH:
+			# Куст даёт и фрукты, и СЕМЕНА нового вида. Семена — единственный
+			# способ завести новую культуру, и он замыкает контур лес→ферма
 			RunManager.add_loot_fruit(glade.fruit_id, FruitData.Quality.PLAIN, 2)
+			RunManager.add_loot_seed(glade.fruit_id, 1)
 			RunManager.add_loot_seeds(glade.seeds_reward)
-			_hint.text = "Собрано!\nСвайп вверх — дальше"
+			var fruit := Registry.fruit(glade.fruit_id)
+			var name := fruit.display_name if fruit != null else glade.fruit_id
+			var known := FarmState.known_seeds.has(glade.fruit_id)
+			_hint.text = "%s: 2 плода и семя!\nСвайп вверх — дальше" % name if known \
+				else "Новый вид: %s!\nСемя пойдёт на грядку.\nСвайп вверх — дальше" % name
 			_busy = false
 		Glade.Type.CAMPFIRE:
 			RunManager.rest_at_campfire()
@@ -205,10 +218,10 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	_headline.text = "Гуардиан устал" if died else "Домой с добычей"
 	_headline.add_theme_color_override("font_color", Color("DCC7A4"))
 	_subline.text = "Принесли домой:\n%d фруктов, %d семечек" % [kept_fruits, kept_seeds]
-	_hint.text = "Тапни, чтобы пойти снова"
+	_hint.text = "Тапни, чтобы вернуться на ферму"
 	_busy = true
 
-	# Пауза, чтобы игрок успел прочитать итог и не перезапустил забег
+	# Пауза, чтобы игрок успел прочитать итог и не ушёл с экрана
 	# случайным тапом, оставшимся от боя
 	await get_tree().create_timer(1.2).timeout
 	_busy = false

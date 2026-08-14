@@ -11,6 +11,8 @@ var _passed := 0
 
 
 func _ready() -> void:
+	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
+	SaveManager.enter_test_mode()
 	GameState.reset()
 
 	_test_win_always_counts()

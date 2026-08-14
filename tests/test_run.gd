@@ -10,6 +10,8 @@ var _passed := 0
 
 
 func _ready() -> void:
+	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
+	SaveManager.enter_test_mode()
 	GameState.reset()
 	RunManager.set_seed(20260814)
 
@@ -21,6 +23,8 @@ func _ready() -> void:
 	_test_death_keeps_collection()
 	_test_death_halves_loot()
 	_test_groove_is_shared_across_glades()
+	_test_loop_is_closed()
+	_test_seeds_survive_death()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -190,3 +194,64 @@ func _test_groove_is_shared_across_glades() -> void:
 	RunManager.restore_groove(9999)
 	check_eq(RunManager.groove, RunManager.max_groove, "Ритм не превышает максимум")
 	RunManager.go_home()
+
+
+## Контур игры: лес -> семена -> ферма -> фрукты -> приручение -> лес.
+## Если хоть одно звено рвётся, игра распадается на несвязанные мини-игры.
+func _test_loop_is_closed() -> void:
+	print("Контур лес → ферма → приручение замкнут")
+	GameState.reset()
+	FarmState.reset()
+
+	# 1. В лесу нашли дикий куст с неизвестной культурой
+	RunManager.start_run("disco_sprout")
+	RunManager.advance()
+	check(not FarmState.known_seeds.has("loop_fig"), "культура ещё не открыта")
+	RunManager.add_loot_seed("loop_fig", 1)
+	RunManager.go_home()
+
+	# 2. Семя доехало до амбара фермы
+	check(FarmState.known_seeds.has("loop_fig"), "новая культура открыта")
+	check_eq(FarmState.seed_count("loop_fig"), 1, "семя в амбаре")
+
+	# 3. Посадили, станцевали, вырастили
+	check(FarmState.plant(0, "loop_fig"), "семя посажено")
+	FarmState.apply_dance(0, DanceGrade.Level.PERFECT)
+	FarmState.debug_rewind(86400.0)
+	FarmState.tick()
+	check(FarmState.is_ready(0), "выросло")
+	check_eq(FarmState.harvest(0), "loop_fig", "собран фрукт")
+
+	# 4. Фрукт годится для приручения — и это тот вид, который любит мотылёк
+	var moth := Registry.monster("banjo_moth")
+	check_eq(moth.favorite_fruit_id, "loop_fig", "мотылёк любит именно этот фрукт")
+	check(GameState.fruit_count("loop_fig", FruitData.Quality.PERFECT) > 0,
+		"идеальный фрукт в сумке")
+
+	var bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
+		FruitData.Quality.PERFECT)
+	var plain_bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
+		FruitData.Quality.PLAIN)
+	check(bonus > plain_bonus, "танец на грядке окупился прибавкой к дружбе")
+
+	GameState.consume_fruit("loop_fig", FruitData.Quality.PERFECT)
+	GameState.add_friendship("banjo_moth", bonus)
+	check(GameState.get_friendship("banjo_moth") > 0, "дружба выросла — контур замкнулся")
+
+
+## Семена новых культур не теряются при смерти: это открытый прогресс,
+## а не добыча. Потерять только что найденный вид ребёнок воспримет
+## как наказание за то, что дошёл дальше.
+func _test_seeds_survive_death() -> void:
+	print("Новые культуры переживают смерть")
+	GameState.reset()
+	FarmState.reset()
+	RunManager.start_run("disco_sprout")
+	RunManager.advance()
+	RunManager.add_loot_seed("chord_apple", 2)
+	RunManager.add_loot_seeds(100)
+	RunManager.die()
+
+	check_eq(FarmState.seed_count("chord_apple"), 2, "семена дошли целиком")
+	check(FarmState.known_seeds.has("chord_apple"), "культура осталась открытой")
+	check_eq(GameState.seeds, 50, "а вот семечек половина — это добыча")

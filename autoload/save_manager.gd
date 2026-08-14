@@ -10,17 +10,38 @@ const BACKUP_PATH := "user://save.backup.json"
 
 var _dirty := false
 
+## Запрет записи. Тесты гоняют настоящие RunManager и FarmState, и без этого
+## флага прогон тестов затирал бы сохранение игрока.
+var writes_disabled := false
+
 
 func _ready() -> void:
 	load_game()
+
+
+## Перевести подсистему в тестовый режим: ничего не читать и не писать.
+func enter_test_mode() -> void:
+	writes_disabled = true
 
 
 func mark_dirty() -> void:
 	_dirty = true
 
 
+## Сейв собирается из всех подсистем в один файл: частичные сейвы
+## рассинхронизируются между собой при обрыве записи.
+func _collect() -> Dictionary:
+	var data := GameState.to_dict()
+	data["farm"] = FarmState.to_dict()
+	return data
+
+
 func save_game() -> void:
-	var payload := JSON.stringify(GameState.to_dict(), "  ")
+	if writes_disabled:
+		_dirty = false
+		return
+
+	var payload := JSON.stringify(_collect(), "  ")
 
 	# Старый сейв уводим в резерв ДО записи нового: если запись оборвётся
 	# на середине, у игрока останется рабочий предыдущий
@@ -60,7 +81,10 @@ func _load_from(path: String) -> bool:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("Сейв повреждён: %s" % path)
 		return false
-	GameState.from_dict(parsed)
+	var data: Dictionary = parsed
+	GameState.from_dict(data)
+	if data.has("farm"):
+		FarmState.from_dict(data["farm"])
 	return true
 
 
@@ -73,6 +97,7 @@ func delete_save() -> void:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	GameState.reset()
+	FarmState.reset()
 
 
 func _notification(what: int) -> void:

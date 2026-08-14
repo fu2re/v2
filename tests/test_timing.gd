@@ -12,6 +12,8 @@ var _passed := 0
 
 
 func _ready() -> void:
+	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
+	SaveManager.enter_test_mode()
 	_test_judge_windows()
 	_test_combo()
 	_test_chart_loading()

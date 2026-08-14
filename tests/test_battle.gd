@@ -11,6 +11,8 @@ var _passed := 0
 
 
 func _ready() -> void:
+	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
+	SaveManager.enter_test_mode()
 	_test_groove_only_lost_to_shields()
 	_test_vibe_and_combo()
 	_test_genre_advantage()

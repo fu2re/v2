@@ -35,6 +35,9 @@ var current_glade: Glade = null
 
 ## Добыча забега: ключ фрукта -> количество.
 var run_fruits: Dictionary = {}
+## Семена для грядок: fruit_id -> количество. Отдельно от фруктов,
+## потому что это разные сущности: семя сажают, фрукт скармливают монстру.
+var run_seed_bag: Dictionary = {}
 var run_seeds: int = 0
 
 var _rng := RandomNumberGenerator.new()
@@ -60,6 +63,7 @@ func start_run(new_guardian_id: String) -> bool:
 	groove = max_groove
 	depth = 0
 	run_fruits.clear()
+	run_seed_bag.clear()
 	run_seeds = 0
 	current_glade = null
 	is_active = true
@@ -169,6 +173,10 @@ func add_loot_fruit(fruit_id: String, quality: FruitData.Quality, count: int = 1
 	run_fruits[key] = run_fruits.get(key, 0) + count
 
 
+func add_loot_seed(fruit_id: String, count: int = 1) -> void:
+	run_seed_bag[fruit_id] = run_seed_bag.get(fruit_id, 0) + count
+
+
 func add_loot_seeds(amount: int) -> void:
 	run_seeds += amount
 
@@ -209,9 +217,16 @@ func _end(died: bool) -> void:
 	var kept_seeds := int(floor(run_seeds * (1.0 - DEATH_LOSS))) if died else run_seeds
 	GameState.add_seeds(kept_seeds)
 
+	# Семена новых культур переживают смерть целиком.
+	# Потерять только что открытый вид — это откат прогресса, а не потеря
+	# добычи, и ребёнок воспримет это как наказание за попытку
+	for fruit_id: String in run_seed_bag:
+		FarmState.add_seed(fruit_id, run_seed_bag[fruit_id])
+
 	is_active = false
 	current_glade = null
 	run_fruits.clear()
+	run_seed_bag.clear()
 	run_seeds = 0
 
 	SaveManager.save_game()
