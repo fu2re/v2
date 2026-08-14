@@ -12,7 +12,7 @@ config_version=5
 
 config/name="BEATROOT"
 config/description="Ферма, приручение монстров и бесконечная лента дэнс-баттлов."
-run/main_scene="res://scenes/battle/DanceBattle.tscn"
+run/main_scene="res://scenes/run/RunFeed.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
@@ -22,6 +22,7 @@ AudioBus="*res://autoload/audio_bus.gd"
 Conductor="*res://autoload/conductor.gd"
 GameState="*res://autoload/game_state.gd"
 SaveManager="*res://autoload/save_manager.gd"
+RunManager="*res://autoload/run_manager.gd"
 
 [display]
 
