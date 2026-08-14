@@ -22,6 +22,16 @@
 "/c/Program Files/Godot_v4.6.2-stable_win64.exe/Godot_v4.6.2-stable_win64_console.exe" --headless --path E:/v2 --quit
 ```
 
+Прогнать тесты ритм-ядра (падают с ненулевым кодом):
+
+```bash
+"/c/Program Files/Godot_v4.6.2-stable_win64.exe/Godot_v4.6.2-stable_win64_console.exe" --headless --path E:/v2 tests/test_timing.tscn
+```
+
+**Тайминг нельзя проверять в `--write-movie` или headless.** Movie-режим синтезирует
+время и отвязывает звук от драйвера, headless вообще без звука. Показания оверлея
+действительны только в обычном интерактивном запуске.
+
 ---
 
 ## Железные правила

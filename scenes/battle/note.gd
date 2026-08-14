@@ -1,0 +1,68 @@
+class_name Note
+extends Node2D
+
+## Визуал одной ноты. Узел переиспользуется из пула и никогда не удаляется
+## во время боя: queue_free/instantiate при 8 нотах в секунду дают
+## заметный джиттер на слабых телефонах.
+
+const RADIUS := 46.0
+
+## Цвета из art/palette.json, набор GAMEPLAY. Эти цвета зарезервированы
+## и не встречаются в окружении — иначе ноту не найти взглядом (GDD §11.1.1).
+const COLORS := {
+	ChartData.NoteType.BEAT: Color("00E5FF"),
+	ChartData.NoteType.SKILL: Color("FF6BDE"),
+	ChartData.NoteType.SHIELD: Color("2E9BFF"),
+	ChartData.NoteType.SNACK: Color("B87AFF"),
+}
+
+var beat: float = 0.0
+var type: int = ChartData.NoteType.BEAT
+var is_judged: bool = false
+
+var _color: Color = COLORS[ChartData.NoteType.BEAT]
+
+
+func setup(note_beat: float, note_type: int) -> void:
+	beat = note_beat
+	type = note_type
+	is_judged = false
+	_color = COLORS.get(note_type, COLORS[ChartData.NoteType.BEAT])
+	visible = true
+	queue_redraw()
+
+
+func release() -> void:
+	visible = false
+	is_judged = true
+
+
+func _draw() -> void:
+	match type:
+		ChartData.NoteType.SKILL:
+			_draw_diamond()
+		ChartData.NoteType.SHIELD:
+			_draw_shield()
+		_:
+			draw_circle(Vector2.ZERO, RADIUS, _color)
+			draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, _color.lightened(0.4), 5.0, true)
+
+
+func _draw_diamond() -> void:
+	var r := RADIUS * 1.1
+	var points := PackedVector2Array([
+		Vector2(0, -r), Vector2(r, 0), Vector2(0, r), Vector2(-r, 0),
+	])
+	draw_colored_polygon(points, _color)
+	draw_polyline(points + PackedVector2Array([points[0]]), _color.lightened(0.4), 5.0, true)
+
+
+func _draw_shield() -> void:
+	var r := RADIUS
+	var points := PackedVector2Array([
+		Vector2(0, -r), Vector2(r * 0.85, -r * 0.4),
+		Vector2(r * 0.7, r * 0.55), Vector2(0, r),
+		Vector2(-r * 0.7, r * 0.55), Vector2(-r * 0.85, -r * 0.4),
+	])
+	draw_colored_polygon(points, _color)
+	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 5.0, true)
