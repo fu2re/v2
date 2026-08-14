@@ -1,0 +1,84 @@
+{
+  "environment": {
+    "soil": [
+      "#2E1E17",
+      "#4A3122",
+      "#6B4630",
+      "#8C5F41",
+      "#A87A56"
+    ],
+    "wood": [
+      "#3A2A1C",
+      "#5C4229",
+      "#7D5C3A",
+      "#9C7A50",
+      "#BA9A6D"
+    ],
+    "stone": [
+      "#2B2A28",
+      "#4A4844",
+      "#6B6862",
+      "#8D8982",
+      "#ADA99F"
+    ],
+    "foliage": [
+      "#182619",
+      "#24391F",
+      "#33512A",
+      "#446B36",
+      "#578744"
+    ],
+    "grass": [
+      "#2F4A24",
+      "#446A31",
+      "#5C8A3F",
+      "#78A852",
+      "#97C46A"
+    ],
+    "olive": [
+      "#3A3A1E",
+      "#56552C",
+      "#74713C",
+      "#93904F",
+      "#B0AE68"
+    ],
+    "water": [
+      "#17262A",
+      "#253E42",
+      "#345A5C",
+      "#457B78",
+      "#5D9A93"
+    ],
+    "warm": [
+      "#6B5340",
+      "#90735A",
+      "#B39578",
+      "#C9AF8E",
+      "#DCC7A4"
+    ],
+    "skin": [
+      "#5C3A2A",
+      "#8A5A40",
+      "#B07C58",
+      "#D0A078",
+      "#E8C6A0"
+    ]
+  },
+  "gameplay": {
+    "note_beat": "#00E5FF",
+    "note_shield": "#2E9BFF",
+    "note_skill": "#FF6BDE",
+    "note_snack": "#B87AFF",
+    "windup": "#FF5C7A",
+    "perfect": "#FFFFFF",
+    "bar_groove": "#1ED8FF",
+    "bar_vibe": "#FF57C4"
+  },
+  "battle_dim": 0.3,
+  "battle_desaturate": 0.3,
+  "rules": {
+    "min_separation_oklab": 0.15,
+    "min_gameplay_chroma": 0.135,
+    "max_environment_chroma": 0.13
+  }
+}
