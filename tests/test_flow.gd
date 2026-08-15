@@ -41,6 +41,8 @@ func _ready() -> void:
 	await _test_planting_several_plots()
 	await _test_home_button_does_not_start_battle()
 	await _test_monster_glade_blocks_swipe()
+	await _test_defeat_does_not_freeze()
+	await _test_tutorial_notes_cover_whole_track()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -237,4 +239,88 @@ func _test_monster_glade_blocks_swipe() -> void:
 
 	RunManager.go_home()
 	feed.queue_free()
+	await _frames(2)
+
+
+## Игрок сообщил: при проигрыше в лесу игра зависает.
+##
+## Проверяем не «вызвалась ли функция», а что после поражения интерфейс
+## снова принимает ввод и уводит на ферму. Зависание — это именно
+## непринимаемый ввод, и увидеть его можно только настоящим кликом.
+func _test_defeat_does_not_freeze() -> void:
+	print("Поражение не подвешивает ленту")
+	GameState.reset()
+	FarmState.reset()
+	var starter := Registry.monster("disco_sprout")
+	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
+	GameState.set_guardian("disco_sprout")
+	RunManager.set_seed(11)
+
+	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
+	add_child(feed)
+	await _frames(3)
+
+	# Доводим до боевой поляны и имитируем проигранный бой
+	var guard := 0
+	while RunManager.current_glade != null \
+			and RunManager.current_glade.type != Glade.Type.BATTLE and guard < 60:
+		guard += 1
+		feed._next_glade()
+		await _frames(1)
+	check(RunManager.current_glade != null
+		and RunManager.current_glade.type == Glade.Type.BATTLE, "боевая поляна найдена")
+
+	var state := BattleState.new()
+	state.setup(Registry.monster(RunManager.current_glade.monster_id),
+		Registry.monster("disco_sprout"), 1, RunManager.current_glade.depth, 0)
+	state.take_strike()
+	check(state.health <= 0, "здоровье обнулено — поражение")
+
+	var ended: Array[bool] = []
+	RunManager.run_ended.connect(func(_d, _f, _s): ended.append(true), CONNECT_ONE_SHOT)
+	feed._on_battle_finished(false, state)
+	check(not ended.is_empty(), "забег закрылся")
+	check(not RunManager.is_active, "забег неактивен")
+
+	# Ждём паузу на чтение итога и проверяем, что ввод снова живой
+	await get_tree().create_timer(1.5).timeout
+	await _frames(2)
+	check(feed._awaiting_restart, "лента ждёт тапа, а не висит")
+	check(not feed._busy, "ввод разблокирован")
+	check(feed._battle == null, "сцена боя убрана")
+
+	# Кнопка — гарантированный выход, не зависящий от состояния жестов
+	check(feed._finish_button.visible, "кнопка «На ферму» показана")
+	check(not feed._finish_button.disabled, "и она нажимаема")
+
+	feed.queue_free()
+	await _frames(2)
+
+
+## Игрок сообщил: вторая половина мелодии в туториале без нот.
+func _test_tutorial_notes_cover_whole_track() -> void:
+	print("Урок покрывает нотами весь трек")
+	var lesson := preload("res://scenes/onboarding/Onboarding.tscn").instantiate()
+	add_child(lesson)
+	await _frames(3)
+
+	var chart: ChartData = lesson._build_lesson_chart()
+	check(chart != null, "чарт урока построен")
+	if chart == null:
+		return
+
+	var last := chart.note_beats[chart.note_count() - 1]
+	var total := chart.total_beats()
+	check(last >= total * 0.85,
+		"ноты доходят до конца трека (%.0f из %.0f долей)" % [last, total])
+
+	# И урок обязан быть выигрываемым: без атакующих нот победы не бывает
+	var attacks := 0
+	for t in chart.note_types:
+		if t == ChartData.NoteType.ATTACK:
+			attacks += 1
+	check(attacks >= 3, "в уроке есть атакующие ноты (%d)" % attacks)
+
+	Conductor.stop()
+	lesson.queue_free()
 	await _frames(2)

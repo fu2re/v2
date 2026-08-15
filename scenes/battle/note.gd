@@ -22,6 +22,9 @@ const COLORS := {
 var beat: float = 0.0
 var type: int = ChartData.NoteType.BEAT
 var is_judged: bool = false
+## Испорчена ли серия перед этой атакой. Серая звезда сразу говорит,
+## что удар уже не сработает — гадать не придётся.
+var is_dulled: bool = false
 
 var _color: Color = COLORS[ChartData.NoteType.BEAT]
 
@@ -30,6 +33,7 @@ func setup(note_beat: float, note_type: int) -> void:
 	beat = note_beat
 	type = note_type
 	is_judged = false
+	is_dulled = false
 	_color = COLORS.get(note_type, COLORS[ChartData.NoteType.BEAT])
 	visible = true
 	queue_redraw()
@@ -62,14 +66,15 @@ func _draw_diamond() -> void:
 	draw_polyline(points + PackedVector2Array([points[0]]), _color.lightened(0.4), 5.0, true)
 
 
-## Звезда — форма атаки. Острые лучи читаются как «удар» даже в движении.
+## Звезда — форма атаки. Серая означает «серия испорчена, удар вхолостую».
 func _draw_star() -> void:
+	var colour := Color("6B6862") if is_dulled else _color
 	var points := PackedVector2Array()
 	for i in 10:
 		var angle := -PI * 0.5 + i * PI / 5.0
 		var r := RADIUS * 1.25 if i % 2 == 0 else RADIUS * 0.5
 		points.append(Vector2(cos(angle), sin(angle)) * r)
-	draw_colored_polygon(points, _color)
+	draw_colored_polygon(points, colour)
 	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 4.0, true)
 
 

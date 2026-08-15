@@ -269,3 +269,50 @@ func _end(died: bool) -> void:
 
 	SaveManager.save_game()
 	run_ended.emit(died, kept_fruits, kept_seeds)
+
+
+## Шансы выпадения снаряжения за победу, по грейду монстра.
+##
+## Это НЕ платный лутбокс: он не покупается и не связан с деньгами, поэтому
+## регуляторные правила §12.3 к нему не относятся. Но принцип «открытие
+## не пропадает впустую» действует и здесь — сундук всегда что-то даёт.
+const VICTORY_DROP_ODDS := {
+	MonsterData.Rarity.COMMON: [70.0, 25.0, 5.0],
+	MonsterData.Rarity.UNCOMMON: [55.0, 33.0, 12.0],
+	MonsterData.Rarity.RARE: [40.0, 38.0, 22.0],
+	MonsterData.Rarity.UNIQUE: [25.0, 42.0, 33.0],
+	MonsterData.Rarity.EPIC: [15.0, 40.0, 45.0],
+	MonsterData.Rarity.LEGENDARY: [5.0, 35.0, 60.0],
+}
+
+
+## Выдать снаряжение за побеждённого монстра. Возвращает id или пустую строку.
+##
+## Чем выше грейд монстра, тем выше шанс дорогой вещи. Награда обязана
+## отражать риск: иначе редкие монстры не стоят того, чтобы за ними идти.
+func roll_victory_gear(monster: MonsterData) -> String:
+	if monster == null:
+		return ""
+	var odds: Array = VICTORY_DROP_ODDS.get(monster.rarity, [70.0, 25.0, 5.0])
+
+	var total := 0.0
+	for w: float in odds:
+		total += w
+	var roll := _rng.randf() * total
+	var tier := 0
+	for i in odds.size():
+		roll -= odds[i]
+		if roll <= 0.0:
+			tier = i
+			break
+
+	# Снаряжение отсортировано по цене — она и есть мера ценности
+	var pool := Registry.all_gear()
+	if pool.is_empty():
+		return ""
+	var per_tier := maxi(pool.size() / odds.size(), 1)
+	var from := mini(tier * per_tier, pool.size() - 1)
+	var to := mini(from + per_tier, pool.size())
+	var item: GearData = pool[_rng.randi_range(from, to - 1)]
+	GameState.add_gear(item.id)
+	return item.id

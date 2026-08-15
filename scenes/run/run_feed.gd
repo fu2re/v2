@@ -19,6 +19,9 @@ var _hint: Label = null
 var _depth_label: Label = null
 var _health_fill: ColorRect = null
 var _home_button: Button = null
+## Кнопка ухода на ферму после забега. Живёт отдельно от жестов:
+## это единственный выход, который нельзя заблокировать состоянием.
+var _finish_button: Button = null
 
 var _battle: Node2D = null
 var _taming: CanvasLayer = null
@@ -63,6 +66,7 @@ func _show_glade(glade: Glade) -> void:
 	if glade == null:
 		return
 	_busy = false
+	_finish_button.visible = false
 	_depth_label.text = "Поляна %d" % glade.depth
 	_headline.text = glade.headline()
 
@@ -351,6 +355,10 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 
 	if won:
 		RunManager.add_loot_silver(RunManager.current_glade.silver_reward)
+		var prize := RunManager.roll_victory_gear(monster)
+		if not prize.is_empty():
+			var item := Registry.gear(prize)
+			_pending_result = "Сундук: %s" % item.display_name if item != null else ""
 		# Экран угощения поверх боя: монстр остаётся лежать на виду,
 		# и связь «победил → можно подружиться» читается сразу
 		_taming.show_for(monster, perfect)
@@ -402,12 +410,25 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	_headline.text = "Гуардиан устал" if died else "Домой с добычей"
 	_headline.add_theme_color_override("font_color", Color("DCC7A4"))
 	_subline.text = "Принесли домой:\n%d фруктов, %d серебра" % [kept_fruits, kept_seeds]
-	_hint.text = "Тапни, чтобы вернуться на ферму"
+	_hint.text = "Забег окончен"
+
+	# Кнопка, а не жест.
+	#
+	# Игрок сообщил о зависании на этом экране. Точную причину поймать
+	# не удалось, но она заведомо лежит в состоянии жестов: свайп зависит
+	# от _dragging, _busy и _battle разом, и любая рассинхронизация между
+	# ними оставляет игрока запертым. Кнопка не зависит ни от чего из этого —
+	# она либо на экране, либо нет. Тупик закрыт целым классом, а не точечно.
+	_finish_button.visible = true
+	_finish_button.disabled = true
 	_busy = true
 
 	# Пауза, чтобы игрок успел прочитать итог и не ушёл с экрана
 	# случайным тапом, оставшимся от боя
 	await get_tree().create_timer(1.2).timeout
+	if not is_instance_valid(_finish_button):
+		return
+	_finish_button.disabled = false
 	_busy = false
 	_awaiting_restart = true
 
@@ -432,13 +453,15 @@ func _build_ui() -> void:
 	track.position = Vector2(90, 1740)
 	track.size = Vector2(900, 34)
 	track.color = Color(0, 0, 0, 0.45)
-	add_child(track)
+	# Шкалы ленты живут ВНУТРИ карточки: иначе во время боя они остаются
+	# на экране рядом со шкалами боя, и здоровье выглядит задвоенным
+	_card.add_child(track)
 
 	_health_fill = ColorRect.new()
 	_health_fill.position = track.position
 	_health_fill.size = Vector2(900, 34)
 	_health_fill.color = Color("1ED8FF")
-	add_child(_health_fill)
+	_card.add_child(_health_fill)
 
 	_panel_bg = ColorRect.new()
 	_panel_bg.size = Vector2(1080, 1920)
@@ -466,6 +489,15 @@ func _build_ui() -> void:
 	_home_button.add_theme_font_size_override("font_size", 40)
 	_home_button.pressed.connect(func(): RunManager.go_home())
 	add_child(_home_button)
+
+	_finish_button = Button.new()
+	_finish_button.text = "На ферму"
+	_finish_button.position = Vector2(240, 1560)
+	_finish_button.size = Vector2(600, 130)
+	_finish_button.add_theme_font_size_override("font_size", 48)
+	_finish_button.visible = false
+	_finish_button.pressed.connect(_return_to_farm)
+	add_child(_finish_button)
 
 
 func _make_label(pos: Vector2, font_size: int, color: Color) -> Label:

@@ -9,7 +9,10 @@ extends Node2D
 ## Ни одного слова (GDD §15.5). Объясняет пульсирующее кольцо и призрачный
 ## палец, а не подпись на экране.
 
-const NOTE_COUNT := 16
+## Длина связки в уроке: три обычных бита и звезда в конце.
+##
+## Ровно тот же рисунок, что в настоящем бою, — урок обязан учить правде.
+const SERIES_BEATS := 3
 const LEAD_IN_BEATS := 4.0
 
 var _battle: Node2D = null
@@ -74,11 +77,26 @@ func _build_lesson_chart() -> ChartData:
 	chart.beats_per_bar = source.beats_per_bar
 	chart.audio_path = source.audio_path
 
+	# Ноты идут ДО КОНЦА трека. Раньше урок обрывался на шестнадцатой ноте,
+	# и вторая половина мелодии играла в пустоту — ребёнок решал, что сломалось.
 	var beats := PackedFloat32Array()
 	var types := PackedByteArray()
-	for i in NOTE_COUNT:
-		beats.append(LEAD_IN_BEATS + i)
-		types.append(ChartData.NoteType.BEAT)
+	var beat := LEAD_IN_BEATS
+	var in_series := 0
+	var last := chart.total_beats() - 1.0
+
+	while beat <= last:
+		in_series += 1
+		# Каждая четвёртая нота — звезда: связка из трёх и удар.
+		# Без атакующих нот урок вообще нельзя было выиграть
+		if in_series > SERIES_BEATS:
+			types.append(ChartData.NoteType.ATTACK)
+			in_series = 0
+		else:
+			types.append(ChartData.NoteType.BEAT)
+		beats.append(beat)
+		beat += 1.0
+
 	chart.note_beats = beats
 	chart.note_types = types
 	return chart

@@ -30,7 +30,7 @@ const SHIELD_RESTORE := 8
 const BASE_SHIELD := 40
 
 ## Рост Настроя монстра с глубиной забега (GDD §8.3).
-const VIBE_DEPTH_SCALE := 0.12
+const VIBE_DEPTH_SCALE := 0.05
 
 ## Сколько нот подряд обязана содержать серия, чтобы атака в её конце
 ## считалась заслуженной. Ниже — атака проходит, но слабее не бывает:
@@ -43,7 +43,7 @@ const MIN_SERIES_LENGTH := 3
 ## примерно к его концу, а не на середине. Слишком крупный множитель
 ## обрывал бой раньше мелодии — это чинится здесь, а не в чарте.
 ## Охраняется тестом на длину боя.
-const ATTACK_MULTIPLIER := 1.35
+const ATTACK_MULTIPLIER := 1.8
 
 var monster: MonsterData = null
 var guardian: MonsterData = null

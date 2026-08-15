@@ -23,6 +23,7 @@ var _health_fill: ColorRect = null
 var _shield_fill: ColorRect = null
 var _combo_label: Label = null
 var _vibe_label: Label = null
+var _monster_label: Label = null
 var _shield_label: Label = null
 var _health_label: Label = null
 var _warning_parts: Array[ColorRect] = []
@@ -39,6 +40,8 @@ func _ready() -> void:
 	_shield_width = width
 
 	_vibe_fill = _make_bar(Vector2(MARGIN, 120.0), width, VIBE_COLOR)
+	_monster_label = _add_caption(Vector2(MARGIN, 14.0), "", Color.WHITE)
+	_monster_label.add_theme_font_size_override("font_size", 40)
 	_vibe_label = _add_caption(Vector2(MARGIN, 62.0), "", VIBE_COLOR)
 
 	# Щит над здоровьем: урон съедает его первым, и порядок сверху вниз
@@ -86,6 +89,21 @@ func _add_caption(pos: Vector2, text: String, colour: Color) -> Label:
 	label.add_theme_constant_override("outline_size", 8)
 	add_child(label)
 	return label
+
+
+## Подпись монстра: имя и грейд.
+##
+## Слово «Обычный» не пишем — оно ничего не сообщает и лишь занимает место.
+## Грейд должен бросаться в глаза именно тогда, когда он есть.
+func set_monster(monster: MonsterData) -> void:
+	if monster == null:
+		return
+	var suffix := ""
+	if monster.rarity > MonsterData.Rarity.COMMON:
+		suffix = " · " + MonsterData.rarity_name(monster.rarity)
+	_monster_label.text = monster.display_name + suffix
+	_monster_label.add_theme_color_override("font_color",
+		MonsterData.rarity_color(monster.rarity))
 
 
 func bind(state: BattleState) -> void:
@@ -159,3 +177,15 @@ func flash_windup(duration: float) -> void:
 		var tween := create_tween()
 		tween.tween_property(part, "color:a", 0.85, duration * 0.4)
 		tween.tween_property(part, "color:a", 0.0, duration * 0.6)
+
+
+## Вспышка по экрану от удавшейся атаки.
+##
+## Отличается от тревоги замаха и цветом, и тем, что гаснет быстро:
+## это награда, а не предупреждение, и задерживаться она не должна.
+func flash_hit() -> void:
+	for part in _warning_parts:
+		var tween := create_tween()
+		tween.tween_property(part, "color", Color(1.0, 0.82, 0.30, 0.9), 0.05)
+		tween.tween_property(part, "color", Color(WINDUP_COLOR.r, WINDUP_COLOR.g,
+			WINDUP_COLOR.b, 0.0), 0.25)

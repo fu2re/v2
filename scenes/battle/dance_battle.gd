@@ -38,6 +38,9 @@ var _knocked_out: Node2D = null
 var _outcome_label: Label = null
 var _hero: Dancer = null
 var _guardian_dancer: Dancer = null
+## Линия, соединяющая ноты одной серии. Без неё непонятно, где связка
+## началась и почему звезда в её конце вдруг серая.
+var _series_line: Node2D = null
 
 
 func _ready() -> void:
@@ -84,6 +87,7 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 		state.max_vibe = vibe_override
 		state.vibe = vibe_override
 	_hud.bind(state)
+	_hud.set_monster(monster)
 	if _monster_sprite != null:
 		_monster_sprite.texture = monster.sprite()
 	_hero.setup(load("res://art/placeholder/hero.png") as Texture2D)
@@ -134,6 +138,16 @@ func _update_positions() -> void:
 		var beats_left := note.beat - Conductor.song_beat
 		note.position.y = SPAWN_Y + (1.0 - beats_left / APPROACH_BEATS) * travel
 
+	# Серая звезда сразу сообщает, что удар уже не сработает
+	for note in _active:
+		if note.type == ChartData.NoteType.ATTACK:
+			var dull := not state.series_clean
+			if note.is_dulled != dull:
+				note.is_dulled = dull
+				note.queue_redraw()
+
+	_series_line.queue_redraw()
+
 
 func _expire_missed() -> void:
 	var t := Conductor.song_position
@@ -168,6 +182,10 @@ func _miss(note: Note) -> void:
 func _flash_attack(landed: bool) -> void:
 	if _monster_sprite == null:
 		return
+	if landed:
+		_hud.flash_hit()
+		_shake_screen()
+
 	var tween := create_tween()
 	if landed:
 		_monster_sprite.modulate = Color("FF6BDE")
@@ -356,6 +374,11 @@ func _build_stage() -> void:
 	_guardian_dancer.position = Vector2(LANE_X + 250.0, 1560.0)
 	add_child(_guardian_dancer)
 
+	_series_line = Node2D.new()
+	_series_line.z_index = -1
+	_series_line.draw.connect(_draw_series_line)
+	add_child(_series_line)
+
 	_build_knocked_out()
 
 	_outcome_label = Label.new()
@@ -367,3 +390,26 @@ func _build_stage() -> void:
 	_outcome_label.add_theme_constant_override("outline_size", 12)
 	_outcome_label.visible = false
 	add_child(_outcome_label)
+
+
+## Соединить ноты текущей серии линией.
+##
+## Игрок должен видеть связку как единое целое: без этого правило «серия
+## без промахов» остаётся невидимым, а серая звезда выглядит случайностью.
+func _draw_series_line() -> void:
+	if chart == null or _active.size() < 2:
+		return
+
+	var points := PackedVector2Array()
+	for note in _active:
+		if note.is_judged or note.type == ChartData.NoteType.SHIELD:
+			continue
+		points.append(note.position)
+		# Атака завершает серию — дальше идёт уже другая связка
+		if note.type == ChartData.NoteType.ATTACK:
+			break
+
+	if points.size() < 2:
+		return
+	var colour := Color("00E5FF") if state.series_clean else Color("6B6862")
+	_series_line.draw_polyline(points, Color(colour.r, colour.g, colour.b, 0.5), 5.0, true)

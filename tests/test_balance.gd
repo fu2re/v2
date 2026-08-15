@@ -21,6 +21,8 @@ func _ready() -> void:
 	_test_clean_run_wins_late()
 	_test_sloppy_run_loses()
 	_test_charts_have_enough_attacks()
+	_test_new_player_beats_shallow_monsters()
+	_test_deep_monsters_need_progression()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -157,3 +159,62 @@ func _test_charts_have_enough_attacks() -> void:
 					attacks += 1
 			check(attacks >= 3,
 				"%s [%s]: атак %d — победа достижима" % [id, difficulty, attacks])
+
+
+## Свежий игрок обязан побеждать то, что встречает у поверхности.
+##
+## Иначе первый же забег превращается в череду убегающих монстров,
+## а приручить можно только побеждённого — то есть игра не начинается.
+func _test_new_player_beats_shallow_monsters() -> void:
+	print("Новичок побеждает монстров у поверхности")
+	GameState.reset()
+	var chart := ChartLoader.load_by_id("demo_disco", "normal")
+
+	for id in ["disco_sprout", "synth_slime", "bass_bear"]:
+		for depth in [1, 3, 5]:
+			var state := _play_clean(chart, id, "disco_sprout", depth)
+			check(state.did_win,
+				"%s на глубине %d побеждается чистой игрой (Настрой %d из %d)"
+					% [id, depth, state.vibe, state.max_vibe])
+
+
+## А вглубь без снаряжения и опыта уже не вытянуть — и это правильно.
+func _test_deep_monsters_need_progression() -> void:
+	print("Глубина требует снаряжения и опыта")
+	GameState.reset()
+	var chart := ChartLoader.load_by_id("demo_disco", "normal")
+
+	var bare := _play_clean(chart, "beat_serpent", "disco_sprout", 10)
+	check(not bare.did_win, "уникальный на глубине 10 без прокачки устоял")
+
+	# Даём снаряжение и опыт — тот же бой должен стать проходимым
+	GameState.add_gear("thunder_pick")
+	GameState.equip("disco_sprout", "thunder_pick")
+	for i in 15:
+		GameState.add_battle_experience("beat_serpent")
+
+	var ready := _play_clean(chart, "beat_serpent", "disco_sprout", 10)
+	check(ready.did_win,
+		"с плащом и опытом тот же монстр побеждается (Настрой %d из %d)"
+			% [ready.vibe, ready.max_vibe])
+	GameState.reset()
+
+
+## Проиграть чарт идеально и вернуть итоговое состояние.
+func _play_clean(chart: ChartData, monster_id: String, guardian_id: String,
+		depth: int) -> BattleState:
+	var state := BattleState.new()
+	state.setup(Registry.monster(monster_id), Registry.monster(guardian_id), 100, depth)
+	for i in chart.note_count():
+		if state.is_over:
+			break
+		if i > 0 and chart.note_beats[i] - chart.note_beats[i - 1] > ChartValidator.SERIES_GAP:
+			state.break_series()
+		match chart.note_types[i]:
+			ChartData.NoteType.ATTACK:
+				state.register_attack(Judge.Grade.PERFECT)
+			ChartData.NoteType.SHIELD:
+				state.block_strike()
+			_:
+				state.register_hit(Judge.Grade.PERFECT)
+	return state

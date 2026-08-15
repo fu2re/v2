@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_swap_requires_tamed()
 	_test_gear_raises_run_health()
 	_test_merchant_stock_is_stable()
+	_test_victory_gives_gear()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -132,3 +133,35 @@ func _test_merchant_stock_is_stable() -> void:
 	check(differs, "на другой глубине товар другой")
 
 	feed.queue_free()
+
+
+## Победа над монстром даёт снаряжение, и чем выше грейд — тем ценнее.
+func _test_victory_gives_gear() -> void:
+	print("За победу выдаётся снаряжение")
+	GameState.reset()
+	RunManager.set_seed(555)
+
+	for id in ["disco_sprout", "beat_serpent"]:
+		var monster := Registry.monster(id)
+		var before := GameState.owned_gear_ids().size()
+		var prize := RunManager.roll_victory_gear(monster)
+		check(not prize.is_empty(), "%s: сундук что-то дал" % id)
+		check(Registry.gear(prize) != null, "%s: выпавший предмет существует" % id)
+		check(GameState.owned_gear_ids().size() >= before,
+			"%s: предмет попал в сундук игрока" % id)
+
+	# Чем выше грейд, тем дороже средняя добыча
+	var cheap_total := 0
+	var rich_total := 0
+	for i in 60:
+		GameState.reset()
+		var a := Registry.gear(RunManager.roll_victory_gear(Registry.monster("disco_sprout")))
+		var b := Registry.gear(RunManager.roll_victory_gear(Registry.monster("beat_serpent")))
+		if a != null:
+			cheap_total += a.price
+		if b != null:
+			rich_total += b.price
+
+	check(rich_total > cheap_total,
+		"с редкого монстра добыча ценнее (%d против %d)" % [rich_total, cheap_total])
+	GameState.reset()
