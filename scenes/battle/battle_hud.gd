@@ -53,10 +53,16 @@ func _ready() -> void:
 	_shield_label = _add_caption(Vector2(MARGIN, 1660.0), "", SHIELD_COLOR)
 	_health_label = _add_caption(Vector2(MARGIN, 1750.0), "", HEALTH_COLOR)
 
+	# Комбо по центру и крупно. Раньше оно стояло в углу за танцорами
+	# и его попросту не замечали — а это главный показатель того,
+	# что серия идёт чисто
 	_combo_label = Label.new()
-	_combo_label.position = Vector2(MARGIN, 1570.0)
-	_combo_label.add_theme_font_size_override("font_size", 56)
-	_combo_label.add_theme_color_override("font_color", HEALTH_COLOR)
+	# Слева и ниже монстра: по центру оно налезало на него, а дорожка нот
+	# идёт посередине — единственное свободное место это левый край
+	_combo_label.position = Vector2(MARGIN, 640.0)
+	_combo_label.size = Vector2(400, 140)
+	_combo_label.add_theme_font_size_override("font_size", 80)
+	_combo_label.add_theme_color_override("font_color", Color("FFD24D"))
 	_combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_combo_label.add_theme_constant_override("outline_size", 10)
 	add_child(_combo_label)
@@ -142,7 +148,11 @@ func _on_combo_changed(combo: int, multiplier: float) -> void:
 	if combo < 2:
 		_combo_label.text = ""
 		return
-	_combo_label.text = "%d  x%.1f" % [combo, multiplier]
+	_combo_label.text = "%d  ×%.1f" % [combo, multiplier]
+	# Толчок на каждом шаге: растущее число замечают, статичное — нет
+	var tween := create_tween()
+	tween.tween_property(_combo_label, "scale", Vector2(1.18, 1.18), 0.05)
+	tween.tween_property(_combo_label, "scale", Vector2.ONE, 0.12)
 
 
 ## Тревога рисуется РАМКОЙ по краям, а не заливкой всего экрана.

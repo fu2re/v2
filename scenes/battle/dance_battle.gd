@@ -417,4 +417,23 @@ func _draw_series_line() -> void:
 	if points.size() < 2:
 		return
 	var colour := Color("00E5FF") if state.series_clean else Color("6B6862")
-	_series_line.draw_polyline(points, Color(colour.r, colour.g, colour.b, 0.5), 5.0, true)
+	# Линия толстая и почти непрозрачная: тонкая полупрозрачная просто
+	# не читалась на фоне, и правило серии оставалось невидимым
+	_series_line.draw_polyline(points, Color(colour.r, colour.g, colour.b, 0.85), 14.0, true)
+
+
+## Включить наглядного тренера поверх боя.
+##
+## Обучение — это ТОТ ЖЕ бой, просто с дополнительным слоем. Отдельная сцена
+## для урока означала бы, что игрок учится на одном, а играет в другое,
+## и любое расхождение между ними всплывало бы у него на экране.
+func enable_coach() -> Node:
+	var coach := preload("res://scenes/onboarding/CoachOverlay.tscn").instantiate()
+	coach.judge_y = JUDGE_Y
+	coach.lane_x = LANE_X
+	add_child(coach)
+	note_judged.connect(func(grade: int, _d: float):
+		if grade != Judge.Grade.MISS:
+			coach.note_hit())
+	battle_finished.connect(func(_won: bool, _s: BattleState): coach.finish())
+	return coach

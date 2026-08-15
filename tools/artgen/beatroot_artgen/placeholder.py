@@ -134,6 +134,72 @@ def _eyes(rgba: np.ndarray, mask: np.ndarray, rng: np.random.Generator) -> None:
         rgba[glint, :3] = (240, 236, 228)
 
 
+def hero(name: str = "hero", size: int = 96) -> Image.Image:
+    """Человечек: голова, туловище, руки, ноги, волосы.
+
+    Отдельная функция, а не силуэт из SILHOUETTES: герой — не монстр,
+    и игрок обязан отличать себя от защитника с первого взгляда.
+    Пропорции детские — крупная голова, короткие ноги.
+    """
+    rng = _seed(f"hero/{name}")
+    s = size / 100.0
+    cx = size / 2.0
+
+    skin = ENVIRONMENT["skin"]
+    clothes = ENVIRONMENT[FRUIT_RAMP[rng.integers(len(FRUIT_RAMP))]]
+    hair = ENVIRONMENT["soil"]
+
+    rgba = np.zeros((size, size, 4), dtype=np.uint8)
+
+    # Ноги и руки рисуем первыми — туловище ляжет поверх и скроет стыки
+    legs = np.zeros((size, size), dtype=bool)
+    for side in (-1, 1):
+        _ellipse(legs, cx + side * 11 * s, 84 * s, 7 * s, 14 * s)
+    _paint(rgba, legs, clothes[1])
+
+    arms = np.zeros((size, size), dtype=bool)
+    for side in (-1, 1):
+        _ellipse(arms, cx + side * 25 * s, 58 * s, 6 * s, 15 * s)
+    _paint(rgba, arms, skin[2])
+
+    body = np.zeros((size, size), dtype=bool)
+    _ellipse(body, cx, 62 * s, 18 * s, 20 * s)
+    _paint(rgba, body, clothes[2])
+
+    head = np.zeros((size, size), dtype=bool)
+    _ellipse(head, cx, 30 * s, 17 * s, 18 * s)
+    _paint(rgba, head, skin[3])
+
+    # Волосы — шапочкой поверх верха головы
+    fringe = np.zeros((size, size), dtype=bool)
+    _ellipse(fringe, cx, 24 * s, 18 * s, 13 * s)
+    fringe &= head
+    _paint(rgba, fringe, hair[1])
+
+    _hero_face(rgba, head, size, s, cx)
+    return Image.fromarray(rgba, mode="RGBA")
+
+
+def _paint(rgba: np.ndarray, mask: np.ndarray, colour_hex: str) -> None:
+    rgba[mask, :3] = hex_to_rgb(colour_hex)
+    rgba[mask, 3] = 255
+
+
+def _hero_face(rgba: np.ndarray, head: np.ndarray, size: int, s: float, cx: float) -> None:
+    for side in (-1, 1):
+        eye = np.zeros((size, size), dtype=bool)
+        _ellipse(eye, cx + side * 6 * s, 33 * s, 2.6 * s, 3.2 * s)
+        eye &= head
+        rgba[eye, :3] = (28, 22, 20)
+        rgba[eye, 3] = 255
+
+    smile = np.zeros((size, size), dtype=bool)
+    _ellipse(smile, cx, 40 * s, 5 * s, 2 * s)
+    smile &= head
+    rgba[smile, :3] = (120, 70, 60)
+    rgba[smile, 3] = 255
+
+
 def creature(name: str, silhouette: str = "blob", genre: str = "disco",
              size: int = 96) -> Image.Image:
     if silhouette not in SILHOUETTES:
