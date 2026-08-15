@@ -34,27 +34,30 @@ const SERIES_LINE_WIDTH := 16.0
 var chart: ChartData = null
 var state := BattleState.new()
 
-var _pool: NotePool = null
-var _hud: BattleHUD = null
+## Сцена боя лежит в DanceBattle.tscn и правится в инспекторе (GDD §13.2.1).
+## Позиции монстра, героя, защитника и линии удара — там, а не здесь.
+@onready var _pool: NotePool = $NotePool
+@onready var _hud: BattleHUD = $BattleHUD
+@onready var _monster_sprite: Sprite2D = $MonsterSprite
+@onready var _knocked_out: Node2D = $KnockedOut
+@onready var _outcome_label: Label = $OutcomeLabel
+@onready var _hero: Dancer = $Hero
+@onready var _guardian_dancer: Dancer = $GuardianDancer
+## Линия, соединяющая ноты одной серии. Без неё непонятно, где связка
+## началась и почему звезда в её конце вдруг серая.
+@onready var _series_line: Node2D = $SeriesLine
+
 var _active: Array[Note] = []
 var _next_index: int = 0
 var _next_pattern_index: int = 0
-var _monster_sprite: Sprite2D = null
-var _knocked_out: Node2D = null
-var _outcome_label: Label = null
-var _hero: Dancer = null
-var _guardian_dancer: Dancer = null
-## Линия, соединяющая ноты одной серии. Без неё непонятно, где связка
-## началась и почему звезда в её конце вдруг серая.
-var _series_line: Node2D = null
 
 
 func _ready() -> void:
-	_pool = NotePool.new()
-	add_child(_pool)
-	_hud = BattleHUD.new()
-	add_child(_hud)
-	_build_stage()
+	# Рисование остаётся в коде: узел в сцене задаёт ГДЕ, а _draw — ЧТО.
+	# Ноты и линия серии перерисовываются десятки раз в секунду,
+	# и отдельные узлы под каждый штрих тут дороже (GDD §13.2.1)
+	_series_line.draw.connect(_draw_series_line)
+	_knocked_out.draw.connect(_draw_knocked_out)
 
 	Conductor.beat.connect(_on_beat)
 	Conductor.finished.connect(_on_track_finished)
@@ -342,65 +345,13 @@ func _show_outcome(won: bool) -> void:
 
 ## Крестики вместо глаз. Рисуются поверх спрайта, потому что плейсхолдеры
 ## одинаковых глаз не имеют, а знак «монстр наплясался» нужен уже сейчас.
-func _build_knocked_out() -> void:
-	_knocked_out = Node2D.new()
-	_knocked_out.visible = false
-	_knocked_out.z_index = 5
-	_knocked_out.position = Vector2(LANE_X, 300)
-	_knocked_out.draw.connect(func():
-		for side in [-1.0, 1.0]:
-			var c := Vector2(side * 34.0, -18.0)
-			var r := 18.0
-			_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 7.0)
-			_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 7.0))
-	add_child(_knocked_out)
+func _draw_knocked_out() -> void:
+	for side in [-1.0, 1.0]:
+		var c := Vector2(side * 34.0, -18.0)
+		var r := 18.0
+		_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 7.0)
+		_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 7.0)
 
-
-func _build_stage() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	# Фон боя притемнён, иначе земляная палитра спорит с нотами (GDD §11.1.1)
-	bg.color = Color("33512A").darkened(0.30)
-	bg.z_index = -10
-	add_child(bg)
-
-	var line := Line2D.new()
-	line.add_point(Vector2(60, JUDGE_Y))
-	line.add_point(Vector2(1020, JUDGE_Y))
-	line.width = 6.0
-	line.default_color = Color("1ED8FF")
-	add_child(line)
-
-	_monster_sprite = Sprite2D.new()
-	_monster_sprite.scale = Vector2(4, 4)
-	_monster_sprite.position = Vector2(LANE_X, 300)
-	add_child(_monster_sprite)
-	# Герой и защитник внизу: игрок видит, что танцует не один,
-	# и что снаряжение на защитнике действительно надето
-	_hero = Dancer.new()
-	_hero.position = Vector2(LANE_X - 250.0, 1560.0)
-	add_child(_hero)
-
-	_guardian_dancer = Dancer.new()
-	_guardian_dancer.position = Vector2(LANE_X + 250.0, 1560.0)
-	add_child(_guardian_dancer)
-
-	_series_line = Node2D.new()
-	_series_line.z_index = -1
-	_series_line.draw.connect(_draw_series_line)
-	add_child(_series_line)
-
-	_build_knocked_out()
-
-	_outcome_label = Label.new()
-	_outcome_label.position = Vector2(60, 560)
-	_outcome_label.size = Vector2(960, 120)
-	_outcome_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_outcome_label.add_theme_font_size_override("font_size", 72)
-	_outcome_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_outcome_label.add_theme_constant_override("outline_size", 12)
-	_outcome_label.visible = false
-	add_child(_outcome_label)
 
 
 ## Соединить ноты текущей серии линией.

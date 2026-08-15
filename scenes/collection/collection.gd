@@ -8,14 +8,22 @@ extends Node2D
 
 const CARD_HEIGHT := 240.0
 
-var _list: VBoxContainer = null
-var _status: Label = null
-var _gear_panel: VBoxContainer = null
+## Раскладка живёт в Collection.tscn и правится в инспекторе (GDD §13.2.1).
+@onready var _list: VBoxContainer = $ListScroll/List
+@onready var _status: Label = $Status
+@onready var _gear_panel: VBoxContainer = $GearPanel
+
 var _selected_id: String = ""
 
 
 func _ready() -> void:
-	_build_ui()
+	$BackButton.pressed.connect(_go_back)
+	# Подложка гаснет вместе с панелью: иначе панель висит поверх живого
+	# экрана, кнопки под ней видно, но нажать нельзя
+	var backdrop: ColorRect = $GearBackdrop
+	_gear_panel.visibility_changed.connect(
+		func(): backdrop.visible = _gear_panel.visible)
+
 	GameState.gear_changed.connect(_refresh)
 	GameState.guardian_changed.connect(func(_id): _refresh())
 	_refresh()
@@ -236,57 +244,3 @@ func _go_back() -> void:
 	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
 
 
-func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	bg.color = Color("2A414F")
-	add_child(bg)
-
-	var title := Label.new()
-	title.position = Vector2(60, 80)
-	title.size = Vector2(960, 90)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 60)
-	title.add_theme_color_override("font_color", Color("DCC7A4"))
-	title.text = "Друзья"
-	add_child(title)
-
-	var back := Button.new()
-	back.text = "На ферму"
-	back.position = Vector2(60, 1740)
-	back.size = Vector2(960, 110)
-	back.add_theme_font_size_override("font_size", 44)
-	back.pressed.connect(_go_back)
-	add_child(back)
-
-	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(60, 200)
-	scroll.size = Vector2(960, 1500)
-	add_child(scroll)
-
-	_list = VBoxContainer.new()
-	_list.custom_minimum_size = Vector2(960, 0)
-	_list.add_theme_constant_override("separation", 20)
-	scroll.add_child(_list)
-
-	_status = Label.new()
-	_status.position = Vector2(60, 1660)
-	_status.size = Vector2(960, 60)
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.add_theme_font_size_override("font_size", 30)
-	_status.add_theme_color_override("font_color", Color("DCC7A4"))
-	add_child(_status)
-
-	var panel := ColorRect.new()
-	panel.size = Vector2(1080, 1920)
-	panel.color = Color(0.09, 0.13, 0.16, 0.97)
-	panel.visible = false
-	add_child(panel)
-
-	_gear_panel = VBoxContainer.new()
-	_gear_panel.position = Vector2(60, 160)
-	_gear_panel.size = Vector2(960, 1600)
-	_gear_panel.add_theme_constant_override("separation", 14)
-	_gear_panel.visible = false
-	_gear_panel.visibility_changed.connect(func(): panel.visible = _gear_panel.visible)
-	add_child(_gear_panel)

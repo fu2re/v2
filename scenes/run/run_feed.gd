@@ -24,26 +24,28 @@ const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 ## Кого берём в лес. Пусто — берём выбранного в коллекции.
 @export var guardian_id: String = ""
 
-var _card: Control = null
-var _headline: Label = null
-var _subline: Label = null
-var _hint: Label = null
-var _glade_art: Sprite2D = null
-var _depth_label: Label = null
-var _health_fill: ColorRect = null
-var _home_button: Button = null
+## Раскладка живёт в RunFeed.tscn и правится в инспекторе (GDD §13.2.1).
+## Скрипт связывает узлы с логикой и больше ничего о них не знает.
+@onready var _card: Control = $Card
+@onready var _headline: Label = $Card/Headline
+@onready var _subline: Label = $Card/Subline
+@onready var _hint: Label = $Card/Hint
+@onready var _glade_art: Sprite2D = $Card/GladeArt
+@onready var _depth_label: Label = $Card/DepthLabel
+@onready var _health_fill: ColorRect = $Card/HealthFill
+@onready var _home_button: Button = $HomeButton
 ## Кнопка ухода на ферму после забега. Живёт отдельно от жестов:
 ## это единственный выход, который нельзя заблокировать состоянием.
-var _finish_button: Button = null
+@onready var _finish_button: Button = $FinishButton
 ## Кнопки действия и перехода. Дублируют жесты, потому что жест
 ## зависит от состояния и порогов, а кнопка — нет.
-var _action_button: Button = null
-var _next_button: Button = null
+@onready var _action_button: Button = $ActionButton
+@onready var _next_button: Button = $NextButton
+@onready var _panel_bg: ColorRect = $PanelBackdrop
+@onready var _panel_box: VBoxContainer = $PanelScroll/PanelBox
 
 var _battle: Node2D = null
 var _taming: CanvasLayer = null
-var _panel_bg: ColorRect = null
-var _panel_box: VBoxContainer = null
 var _drag_start := 0.0
 var _dragging := false
 var _busy := false
@@ -58,7 +60,14 @@ var _pending_result := ""
 
 
 func _ready() -> void:
-	_build_ui()
+	_home_button.pressed.connect(func(): RunManager.go_home())
+	_finish_button.pressed.connect(_return_to_farm)
+	_action_button.pressed.connect(_confirm)
+	_next_button.pressed.connect(_advance)
+	# Прокрутка живёт и гаснет вместе с панелью: пустой ScrollContainer
+	# во весь экран молча съедал бы клики по тому, что под ним
+	var scroll: ScrollContainer = $PanelScroll
+	_panel_box.visibility_changed.connect(func(): scroll.visible = _panel_box.visible)
 
 	_taming = preload("res://scenes/battle/TamingScreen.tscn").instantiate()
 	add_child(_taming)
@@ -494,111 +503,6 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	_finish_button.disabled = false
 	_busy = false
 	_awaiting_restart = true
-
-
-func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	bg.color = Color("24391F")
-	add_child(bg)
-
-	_card = Control.new()
-	_card.size = Vector2(1080, 1920)
-	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_card)
-
-	# Кого встретил — видно, а не написано. Ребёнок 7 лет узнаёт поляну
-	# по картинке быстрее, чем прочитает название
-	_glade_art = Sprite2D.new()
-	_glade_art.position = Vector2(540, 420)
-	_glade_art.scale = Vector2(4.0, 4.0)
-	_glade_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_card.add_child(_glade_art)
-
-	_depth_label = _make_label(Vector2(60, 140), 44, Color("ADA99F"))
-	_headline = _make_label(Vector2(60, 620), 76, Color("DCC7A4"))
-	_subline = _make_label(Vector2(60, 800), 42, Color("ADA99F"))
-	_hint = _make_label(Vector2(60, 1420), 38, Color("1ED8FF"))
-
-	var track := ColorRect.new()
-	track.position = Vector2(90, 1740)
-	track.size = Vector2(900, 34)
-	track.color = Color(0, 0, 0, 0.45)
-	# Шкалы ленты живут ВНУТРИ карточки: иначе во время боя они остаются
-	# на экране рядом со шкалами боя, и здоровье выглядит задвоенным
-	_card.add_child(track)
-
-	_health_fill = ColorRect.new()
-	_health_fill.position = track.position
-	_health_fill.size = Vector2(900, 34)
-	_health_fill.color = Color("1ED8FF")
-	_card.add_child(_health_fill)
-
-	_panel_bg = ColorRect.new()
-	_panel_bg.size = Vector2(1080, 1920)
-	_panel_bg.color = Color(0.07, 0.11, 0.08, 0.96)
-	_panel_bg.visible = false
-	add_child(_panel_bg)
-
-	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(70, 200)
-	scroll.size = Vector2(940, 1500)
-	add_child(scroll)
-
-	_panel_box = VBoxContainer.new()
-	_panel_box.custom_minimum_size = Vector2(940, 0)
-	_panel_box.add_theme_constant_override("separation", 20)
-	_panel_box.visible = false
-	_panel_box.visibility_changed.connect(func(): scroll.visible = _panel_box.visible)
-	scroll.visible = false
-	scroll.add_child(_panel_box)
-
-	_home_button = Button.new()
-	_home_button.text = "Домой"
-	_home_button.position = Vector2(760, 120)
-	_home_button.size = Vector2(240, 100)
-	_home_button.add_theme_font_size_override("font_size", 40)
-	_home_button.pressed.connect(func(): RunManager.go_home())
-	add_child(_home_button)
-
-	_finish_button = Button.new()
-	_finish_button.text = "На ферму"
-	_finish_button.position = Vector2(240, 1560)
-	_finish_button.size = Vector2(600, 130)
-	_finish_button.add_theme_font_size_override("font_size", 48)
-	_finish_button.visible = false
-	_finish_button.pressed.connect(_return_to_farm)
-	add_child(_finish_button)
-
-	# Явные кнопки рядом с жестами. Жест зависит от состояния и порогов,
-	# кнопка не зависит ни от чего — за три отчёта подряд об одном и том же
-	# месте это единственный надёжный ответ
-	_action_button = Button.new()
-	_action_button.position = Vector2(90, 1180)
-	_action_button.size = Vector2(430, 130)
-	_action_button.add_theme_font_size_override("font_size", 44)
-	_action_button.pressed.connect(_confirm)
-	add_child(_action_button)
-
-	_next_button = Button.new()
-	_next_button.text = "Дальше ↑"
-	_next_button.position = Vector2(560, 1180)
-	_next_button.size = Vector2(430, 130)
-	_next_button.add_theme_font_size_override("font_size", 44)
-	_next_button.pressed.connect(_advance)
-	add_child(_next_button)
-
-
-func _make_label(pos: Vector2, font_size: int, color: Color) -> Label:
-	var label := Label.new()
-	label.position = pos
-	label.size = Vector2(960, 220)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	_card.add_child(label)
-	return label
 
 
 ## Единая точка «разрешить текущий экран».

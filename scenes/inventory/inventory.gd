@@ -11,12 +11,14 @@ extends Node2D
 const TEXT_COLOR := Color("DCC7A4")
 const DIM_COLOR := Color("ADA99F")
 
-var _list: VBoxContainer = null
-var _wallet: Label = null
+## Раскладка живёт в Inventory.tscn и правится в инспекторе (GDD §13.2.1).
+@onready var _list: VBoxContainer = $ListScroll/List
+@onready var _wallet: Label = $Wallet
 
 
 func _ready() -> void:
-	_build_ui()
+	$BackButton.pressed.connect(_go_back)
+
 	GameState.fruits_changed.connect(_refresh)
 	GameState.silver_changed.connect(func(_v): _refresh())
 	FarmState.seeds_changed.connect(_refresh)
@@ -102,43 +104,3 @@ func _go_back() -> void:
 	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
 
 
-func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	bg.color = Color("3A2A1C")
-	add_child(bg)
-
-	var title := Label.new()
-	title.position = Vector2(60, 60)
-	title.size = Vector2(960, 80)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 58)
-	title.add_theme_color_override("font_color", TEXT_COLOR)
-	title.text = "Сумка"
-	add_child(title)
-
-	_wallet = Label.new()
-	_wallet.position = Vector2(60, 150)
-	_wallet.size = Vector2(960, 50)
-	_wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wallet.add_theme_font_size_override("font_size", 34)
-	_wallet.add_theme_color_override("font_color", Color("FFD24D"))
-	add_child(_wallet)
-
-	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(60, 230)
-	scroll.size = Vector2(960, 1500)
-	add_child(scroll)
-
-	_list = VBoxContainer.new()
-	_list.custom_minimum_size = Vector2(960, 0)
-	_list.add_theme_constant_override("separation", 12)
-	scroll.add_child(_list)
-
-	var back := Button.new()
-	back.text = "На ферму"
-	back.position = Vector2(60, 1770)
-	back.size = Vector2(960, 100)
-	back.add_theme_font_size_override("font_size", 40)
-	back.pressed.connect(_go_back)
-	add_child(back)

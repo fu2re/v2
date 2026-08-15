@@ -11,19 +11,29 @@ const PLOT_SIZE := 200.0
 const PLOT_GAP := 24.0
 const GRID_TOP := 780.0
 
+## Раскладка живёт в Farm.tscn и правится в инспекторе (GDD §13.2.1).
+## Скрипт только связывает узлы с логикой.
+@onready var _status: Label = $Status
+@onready var _seeds_label: Label = $SeedsLabel
+@onready var _grid: Control = $PlotGrid
+@onready var _seed_picker: VBoxContainer = $SeedPicker
+@onready var _picker_bg: ColorRect = $PickerBackdrop
+@onready var _guardian_label: Label = $GuardianLabel
+
 var _plot_buttons: Array[Button] = []
-var _status: Label = null
-var _seeds_label: Label = null
-var _grid: Control = null
 var _dance: CanvasLayer = null
-var _seed_picker: VBoxContainer = null
-var _picker_bg: ColorRect = null
-var _guardian_label: Label = null
 var _pending_plot := -1
 
 
 func _ready() -> void:
-	_build_ui()
+	$NavFriends.pressed.connect(_go_to_collection)
+	$NavBag.pressed.connect(_go_to_inventory)
+	$NavShop.pressed.connect(_go_to_shop)
+	$NavForest.pressed.connect(_go_to_forest)
+	# Подложка гаснет вместе с панелью: без неё панель висит поверх
+	# живого экрана, кнопки под ней видно, но нажать нельзя
+	_seed_picker.visibility_changed.connect(
+		func(): _picker_bg.visible = _seed_picker.visible)
 
 	_dance = preload("res://scenes/farm/PlantDance.tscn").instantiate()
 	add_child(_dance)
@@ -226,82 +236,3 @@ func _go_to_shop() -> void:
 func _go_to_inventory() -> void:
 	get_tree().change_scene_to_file("res://scenes/inventory/Inventory.tscn")
 
-
-func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	bg.color = Color("446A31")
-	add_child(bg)
-
-	var title := Label.new()
-	title.position = Vector2(60, 100)
-	title.size = Vector2(960, 100)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 64)
-	title.add_theme_color_override("font_color", Color("DCC7A4"))
-	title.text = "Твой огород"
-	add_child(title)
-
-	_seeds_label = Label.new()
-	_seeds_label.position = Vector2(60, 210)
-	_seeds_label.size = Vector2(960, 60)
-	_seeds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_seeds_label.add_theme_font_size_override("font_size", 38)
-	_seeds_label.add_theme_color_override("font_color", Color("F0DEC0"))
-	add_child(_seeds_label)
-
-	_status = Label.new()
-	_status.position = Vector2(60, 290)
-	_status.size = Vector2(960, 140)
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.add_theme_font_size_override("font_size", 34)
-	_status.add_theme_color_override("font_color", Color("DCC7A4"))
-	add_child(_status)
-
-	# Три входа с фермы: друзья, лавка, лес
-	var nav := [
-		["Друзья", Vector2(60, 460), _go_to_collection],
-		["Сумка", Vector2(310, 460), _go_to_inventory],
-		["Лавка", Vector2(560, 460), _go_to_shop],
-		["В лес", Vector2(810, 460), _go_to_forest],
-	]
-	for entry: Array in nav:
-		var button := Button.new()
-		button.text = entry[0]
-		button.position = entry[1]
-		button.size = Vector2(210, 130)
-		button.add_theme_font_size_override("font_size", 42)
-		button.pressed.connect(entry[2])
-		add_child(button)
-
-	_guardian_label = Label.new()
-	_guardian_label.position = Vector2(60, 620)
-	_guardian_label.size = Vector2(960, 60)
-	_guardian_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_guardian_label.add_theme_font_size_override("font_size", 34)
-	_guardian_label.add_theme_color_override("font_color", Color("F0DEC0"))
-	add_child(_guardian_label)
-
-	_grid = Control.new()
-	_grid.size = Vector2(1080, 1000)
-	# Обёртка для кнопок грядок не должна ловить ввод сама.
-	# У Control по умолчанию mouse_filter = STOP, и пустой контейнер
-	# во весь экран молча съедал клики по кнопкам навигации под ним
-	_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_grid)
-
-	# Подложка под выбор семян: без неё панель висит поверх живого экрана,
-	# кнопки под ней видно, но они не нажимаются — читается как поломка
-	_picker_bg = UIUtil.make_backdrop(Color(0.14, 0.22, 0.12, 0.96))
-	_picker_bg.visible = false
-	add_child(_picker_bg)
-
-	_seed_picker = VBoxContainer.new()
-	_seed_picker.position = Vector2(90, 400)
-	_seed_picker.size = Vector2(900, 1100)
-	_seed_picker.add_theme_constant_override("separation", 20)
-	_seed_picker.visible = false
-	_seed_picker.visibility_changed.connect(
-		func(): _picker_bg.visible = _seed_picker.visible)
-	add_child(_seed_picker)
