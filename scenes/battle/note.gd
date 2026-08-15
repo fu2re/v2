@@ -68,7 +68,8 @@ func _draw_diamond() -> void:
 
 ## Звезда — форма атаки. Серая означает «серия испорчена, удар вхолостую».
 func _draw_star() -> void:
-	var colour := Color("6B6862") if is_dulled else _color
+	# Светло-серый, а не тёмный: на тёмном фоне тёмная звезда сливалась
+	var colour := Color("C9C4B8") if is_dulled else _color
 	var points := PackedVector2Array()
 	for i in 10:
 		var angle := -PI * 0.5 + i * PI / 5.0

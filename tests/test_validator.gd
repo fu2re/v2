@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_catches_early_first_note()
 	_test_catches_shield_collision()
 	_test_density_limit_by_difficulty()
+	_test_forge_knows_every_note_type()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -152,3 +153,22 @@ func _test_density_limit_by_difficulty() -> void:
 		"шестнадцатые на нормальной отклонены")
 	check(not _has_problem(_make(dense_beats, dense_types, "hard")),
 		"на сложной та же плотность допустима")
+
+
+## Редактор обязан знать КАЖДЫЙ тип ноты из enum.
+##
+## Атакующие ноты добавили в ChartData, а таблицы Chart Forge не тронули —
+## и редактор падал на отрисовке любого настоящего чарта:
+## «Out of bounds get index '4' (on base: 'Dictionary')». Ошибка вылезала
+## в логе, но не роняла ни один тест, потому что никто не сверял таблицы
+## с enum. Теперь сверяет.
+func _test_forge_knows_every_note_type() -> void:
+	print("Chart Forge знает все типы нот")
+	var forge_script := load("res://tools/chart_forge/chart_forge.gd")
+	var colors: Dictionary = forge_script.TYPE_COLORS
+	var names: Dictionary = forge_script.TYPE_NAMES
+
+	for type_name: String in ChartData.NoteType.keys():
+		var value: int = ChartData.NoteType[type_name]
+		check(colors.has(value), "у типа %s есть цвет в редакторе" % type_name)
+		check(names.has(value), "у типа %s есть подпись в редакторе" % type_name)

@@ -19,6 +19,9 @@ const TYPE_COLORS := {
 	ChartData.NoteType.SKILL: Color("FF6BDE"),
 	ChartData.NoteType.SHIELD: Color("2E9BFF"),
 	ChartData.NoteType.SNACK: Color("B87AFF"),
+	# Цвет тот же, что у звезды в бою: редактор обязан показывать
+	# ноту так, как её увидит игрок
+	ChartData.NoteType.ATTACK: Color("FFD24D"),
 }
 
 const TYPE_NAMES := {
@@ -26,6 +29,7 @@ const TYPE_NAMES := {
 	ChartData.NoteType.SKILL: "Скилл",
 	ChartData.NoteType.SHIELD: "Щит",
 	ChartData.NoteType.SNACK: "Перекус",
+	ChartData.NoteType.ATTACK: "Удар",
 }
 
 @export var chart_id: String = "demo_disco"

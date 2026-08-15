@@ -16,6 +16,12 @@ const APPROACH_BEATS := 2.0
 const WINDUP_LEAD := 2.0
 const SNACK_RESTORE := 15
 
+## Линия серии. Оба цвета намеренно СВЕТЛЕЕ фона боя: тёмно-серый
+## на тёмно-зелёном не читался, и линии как будто не было вовсе.
+const SERIES_CLEAN_COLOR := Color("7FF3FF")
+const SERIES_BROKEN_COLOR := Color("C9C4B8")
+const SERIES_LINE_WIDTH := 16.0
+
 @export var chart_id: String = "demo_disco"
 @export var difficulty: String = "normal"
 @export var monster_id: String = "synth_slime"
@@ -407,8 +413,12 @@ func _draw_series_line() -> void:
 
 	var points := PackedVector2Array()
 	for note in _active:
-		if note.is_judged or note.type == ChartData.NoteType.SHIELD:
+		if note.is_judged:
 			continue
+		# Щит ВХОДИТ в серию: block_strike наращивает её длину, значит
+		# и линия обязана его соединять. Раньше он пропускался, и картинка
+		# расходилась с логикой — связка на экране рвалась там, где в игре
+		# продолжалась
 		points.append(note.position)
 		# Атака завершает серию — дальше идёт уже другая связка
 		if note.type == ChartData.NoteType.ATTACK:
@@ -416,10 +426,14 @@ func _draw_series_line() -> void:
 
 	if points.size() < 2:
 		return
-	var colour := Color("00E5FF") if state.series_clean else Color("6B6862")
-	# Линия толстая и почти непрозрачная: тонкая полупрозрачная просто
-	# не читалась на фоне, и правило серии оставалось невидимым
-	_series_line.draw_polyline(points, Color(colour.r, colour.g, colour.b, 0.85), 14.0, true)
+
+	# Оба цвета СВЕТЛЕЕ фона.
+	#
+	# Серый #6B6862 на тёмно-зелёном фоне боя не читался вовсе, и игрок
+	# трижды сообщал, что линии нет. «Серия испорчена» — это информация,
+	# а не украшение: она обязана оставаться видимой.
+	var colour := SERIES_CLEAN_COLOR if state.series_clean else SERIES_BROKEN_COLOR
+	_series_line.draw_polyline(points, colour, SERIES_LINE_WIDTH, true)
 
 
 ## Включить наглядного тренера поверх боя.

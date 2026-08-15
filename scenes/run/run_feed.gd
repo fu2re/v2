@@ -15,6 +15,10 @@ extends Node2D
 ## а когда доходил до порога тапа — заново входил в тот же бой.
 const SWIPE_FRACTION := 0.07
 const TAP_FRACTION := 0.02
+
+## Подсказка называет КНОПКУ, а жест лишь дублирует её: жест зависит
+## от порогов и состояния и уже подводил игрока, кнопка — нет.
+const HINT_NEXT := "Кнопка «Дальше» или свайп вверх"
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
 ## Кого берём в лес. Пусто — берём выбранного в коллекции.
@@ -30,6 +34,10 @@ var _home_button: Button = null
 ## Кнопка ухода на ферму после забега. Живёт отдельно от жестов:
 ## это единственный выход, который нельзя заблокировать состоянием.
 var _finish_button: Button = null
+## Кнопки действия и перехода. Дублируют жесты, потому что жест
+## зависит от состояния и порогов, а кнопка — нет.
+var _action_button: Button = null
+var _next_button: Button = null
 
 var _battle: Node2D = null
 var _taming: CanvasLayer = null
@@ -109,6 +117,8 @@ func _show_glade(glade: Glade) -> void:
 			_headline.add_theme_color_override("font_color", Color("DCC7A4"))
 			_hint.text = "Тапни, чтобы посмотреть"
 
+	_refresh_buttons()
+
 
 ## Свайп и тап по поляне ловим в _unhandled_input, а НЕ в _input.
 ##
@@ -124,10 +134,32 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _busy and not _awaiting_result_swipe:
 		return
 
+	# Клавиатура: пробел разрешает поляну, стрелка вверх листает дальше.
+	# Игрок жал пробел и не получал ничего — на десктопе это основной ввод
+	if event is InputEventKey and event.pressed and not event.echo:
+		match (event as InputEventKey).keycode:
+			KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
+				_confirm()
+			KEY_UP, KEY_W, KEY_PAGEUP:
+				_advance()
+		return
+
 	if event is InputEventScreenDrag or event is InputEventMouseMotion:
 		if _dragging:
 			return
 	if event is InputEventScreenTouch or event is InputEventMouseButton:
+		# Колесо мыши приходит СЮДА ЖЕ, но нажатие и отпускание у него
+		# в одной точке. Жест читался как тап и заново запускал тот же бой —
+		# ровно то, о чём сообщал игрок. Колесо вверх это явное «дальше»
+		if event is InputEventMouseButton:
+			var button := (event as InputEventMouseButton).button_index
+			if button == MOUSE_BUTTON_WHEEL_UP:
+				if event.pressed:
+					_advance()
+				return
+			if button != MOUSE_BUTTON_LEFT:
+				return
+
 		var pressed: bool = event.pressed
 		var pos_y: float = event.position.y
 		if pressed:
@@ -216,8 +248,8 @@ func _resolve_glade() -> void:
 			var fruit := Registry.fruit(glade.fruit_id)
 			var name := fruit.display_name if fruit != null else glade.fruit_id
 			var known := FarmState.known_seeds.has(glade.fruit_id)
-			_hint.text = "%s: 2 плода и семя!\nСвайп вверх — дальше" % name if known \
-				else "Новый вид: %s!\nСемя пойдёт на грядку.\nСвайп вверх — дальше" % name
+			_hint.text = "%s: 2 плода и семя!\n%s" % [name, HINT_NEXT] if known \
+				else "Новый вид: %s!\nСемя пойдёт на грядку.\n%s" % [name, HINT_NEXT]
 			_busy = false
 		Glade.Type.MERCHANT:
 			_open_merchant(glade)
@@ -226,7 +258,7 @@ func _resolve_glade() -> void:
 			_open_campfire()
 		_:
 			RunManager.add_loot_silver(glade.silver_reward)
-			_hint.text = "+%d серебра\nСвайп вверх — дальше" % glade.silver_reward
+			_hint.text = "+%d серебра\n%s" % [glade.silver_reward, HINT_NEXT]
 			_busy = false
 
 
@@ -307,7 +339,7 @@ func _open_panel(title: String) -> void:
 func _close_panel() -> void:
 	_panel_box.visible = false
 	_panel_bg.visible = false
-	_hint.text = "Свайп вверх — дальше"
+	_hint.text = HINT_NEXT
 	_busy = false
 
 
@@ -334,6 +366,8 @@ func _add_panel_button(text: String, callback: Callable) -> Button:
 func _start_battle(glade: Glade) -> void:
 	_card.visible = false
 	_home_button.visible = false
+	_action_button.visible = false
+	_next_button.visible = false
 
 	_battle = BATTLE_SCENE.instantiate()
 	_battle.chart_id = "demo_disco"
@@ -384,6 +418,7 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 			% monster.display_name
 		_awaiting_result_swipe = true
 		_busy = false
+		_refresh_buttons()
 
 
 ## Убрать сцену боя и вернуть карточку поляны.
@@ -397,13 +432,14 @@ func _dismiss_battle() -> void:
 	_awaiting_result_swipe = false
 	_card.visible = true
 	_home_button.visible = true
+	_refresh_buttons()
 	if not _pending_result.is_empty():
-		_hint.text = "%s\n\nСвайп вверх — дальше" % _pending_result
+		_hint.text = "%s\n\n%s" % [_pending_result, HINT_NEXT]
 		_pending_result = ""
 
 
 func _on_taming_finished() -> void:
-	_pending_result = "Свайп вверх — следующая поляна"
+	_pending_result = ""
 	_dismiss_battle()
 	_busy = false
 
@@ -433,6 +469,8 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	# от _dragging, _busy и _battle разом, и любая рассинхронизация между
 	# ними оставляет игрока запертым. Кнопка не зависит ни от чего из этого —
 	# она либо на экране, либо нет. Тупик закрыт целым классом, а не точечно.
+	_action_button.visible = false
+	_next_button.visible = false
 	_finish_button.visible = true
 	_finish_button.disabled = true
 	_busy = true
@@ -513,6 +551,24 @@ func _build_ui() -> void:
 	_finish_button.pressed.connect(_return_to_farm)
 	add_child(_finish_button)
 
+	# Явные кнопки рядом с жестами. Жест зависит от состояния и порогов,
+	# кнопка не зависит ни от чего — за три отчёта подряд об одном и том же
+	# месте это единственный надёжный ответ
+	_action_button = Button.new()
+	_action_button.position = Vector2(90, 1180)
+	_action_button.size = Vector2(430, 130)
+	_action_button.add_theme_font_size_override("font_size", 44)
+	_action_button.pressed.connect(_confirm)
+	add_child(_action_button)
+
+	_next_button = Button.new()
+	_next_button.text = "Дальше ↑"
+	_next_button.position = Vector2(560, 1180)
+	_next_button.size = Vector2(430, 130)
+	_next_button.add_theme_font_size_override("font_size", 44)
+	_next_button.pressed.connect(_advance)
+	add_child(_next_button)
+
 
 func _make_label(pos: Vector2, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -524,3 +580,65 @@ func _make_label(pos: Vector2, font_size: int, color: Color) -> Label:
 	label.add_theme_color_override("font_color", color)
 	_card.add_child(label)
 	return label
+
+
+## Единая точка «разрешить текущий экран».
+##
+## Сюда сходятся тап, пробел и кнопка. Раньше каждый ввод шёл своей веткой,
+## и часть из них молча ничего не делала.
+func _confirm() -> void:
+	if _awaiting_result_swipe:
+		_dismiss_battle()
+		return
+	if _awaiting_restart:
+		_awaiting_restart = false
+		_return_to_farm()
+		return
+	_resolve_glade()
+
+
+## Единая точка «идти дальше».
+func _advance() -> void:
+	if _awaiting_result_swipe:
+		_dismiss_battle()
+		return
+	if _awaiting_restart:
+		return
+	_try_next_glade()
+
+
+## Обновить подписи кнопок под текущее состояние.
+##
+## Кнопка обязана говорить, что она сделает: «Танцевать» на бою,
+## «Собрать» на кусте. Одинаковая подпись на все случаи — это та же
+## непонятность, что и голый жест.
+func _refresh_buttons() -> void:
+	var glade := RunManager.current_glade
+	if glade == null:
+		_action_button.visible = false
+		_next_button.visible = false
+		return
+
+	if _awaiting_result_swipe:
+		_action_button.text = "Дальше"
+		_action_button.visible = true
+		_next_button.visible = false
+		return
+
+	match glade.type:
+		Glade.Type.BATTLE:
+			_action_button.text = "Танцевать"
+		Glade.Type.WILD_BUSH:
+			_action_button.text = "Собрать"
+		Glade.Type.CAMPFIRE:
+			_action_button.text = "Отдохнуть"
+		Glade.Type.MERCHANT:
+			_action_button.text = "Товар"
+		_:
+			_action_button.text = "Посмотреть"
+
+	_action_button.visible = not _glade_cleared or glade.type != Glade.Type.BATTLE
+	# Кнопка «дальше» гаснет там, где поляну нельзя пропустить,
+	# и это видно сразу, а не после безрезультатного свайпа
+	_next_button.visible = true
+	_next_button.disabled = _blocks_swipe()

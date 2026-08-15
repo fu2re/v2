@@ -60,6 +60,11 @@ func _prepare_state() -> void:
 	GameState.add_silver(500)
 	ShopState.add_gold(500)
 
+	# Без фиксированного зерна поляны выпадают случайно, а вместе с ними
+	# и набор кнопок: прогон к прогону число проверок гуляло, и падение
+	# ниже прежнего было бы неотличимо от невезения
+	RunManager.set_seed(7)
+
 
 func check(condition: bool, description: String) -> void:
 	if condition:

@@ -45,6 +45,8 @@ func _ready() -> void:
 	await _test_tutorial_notes_cover_whole_track()
 	await _test_defeat_during_miss_does_not_crash()
 	_test_swipe_thresholds_are_relative()
+	_test_series_visuals_contrast_with_background()
+	await _test_wheel_and_keys_move_forward()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -380,3 +382,134 @@ func _test_swipe_thresholds_are_relative() -> void:
 		"порог свайпа — доля высоты (%.2f)" % swipe)
 	check(tap < swipe,
 		"порог тапа меньше порога свайпа")
+
+
+## Относительная яркость по WCAG — та же формула, что в палитре проекта.
+func _luminance(c: Color) -> float:
+	var parts := [c.r, c.g, c.b]
+	var lin := []
+	for v: float in parts:
+		lin.append(v / 12.92 if v <= 0.04045 else pow((v + 0.055) / 1.055, 2.4))
+	return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+func _contrast(a: Color, b: Color) -> float:
+	var la := _luminance(a)
+	var lb := _luminance(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+## Линия серии и погасшая звезда обязаны быть ВИДНЫ на фоне боя.
+##
+## Игрок трижды сообщал, что линии нет. Она рисовалась — но тёмно-серым
+## по тёмно-зелёному, то есть не существовала для глаза. Цвет, который
+## нельзя разглядеть, ничем не отличается от отсутствующего.
+func _test_series_visuals_contrast_with_background() -> void:
+	print("Линия серии и погасшая звезда видны на фоне")
+	var battle := preload("res://scenes/battle/DanceBattle.tscn").instantiate()
+	var background := Color("33512A").darkened(0.30)
+
+	var clean: Color = battle.SERIES_CLEAN_COLOR
+	var broken: Color = battle.SERIES_BROKEN_COLOR
+	battle.free()
+
+	check(_contrast(clean, background) >= 3.0,
+		"чистая серия читается на фоне (%.1f:1)" % _contrast(clean, background))
+	check(_contrast(broken, background) >= 3.0,
+		"испорченная серия тоже читается (%.1f:1)" % _contrast(broken, background))
+
+	# Погасшая звезда — тот же класс ошибки
+	var dulled := Color("C9C4B8")
+	check(_contrast(dulled, background) >= 3.0,
+		"погасшая звезда читается (%.1f:1)" % _contrast(dulled, background))
+
+	# И два состояния серии должны отличаться ДРУГ ОТ ДРУГА
+	check(_contrast(clean, broken) >= 1.3,
+		"чистая и испорченная серии различимы между собой (%.2f:1)"
+			% _contrast(clean, broken))
+
+
+func _send_key(code: Key) -> void:
+	for pressed in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = pressed
+		get_viewport().push_input(event, true)
+		await get_tree().process_frame
+	await get_tree().process_frame
+
+
+func _send_wheel_up() -> void:
+	var point := get_viewport().get_visible_rect().get_center()
+	for pressed in [true, false]:
+		var event := InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_WHEEL_UP
+		event.position = point
+		event.global_position = point
+		event.pressed = pressed
+		event.factor = 1.0
+		get_viewport().push_input(event, true)
+		await get_tree().process_frame
+	await get_tree().process_frame
+
+
+## Игрок сообщил: «колесо вверх снова запускает поляну 1».
+##
+## Колесо приходит как InputEventMouseButton с нажатием и отпусканием
+## в ОДНОЙ точке — то есть выглядит как идеальный тап. Обработчик жеста
+## честно считал его тапом и перезапускал ту же поляну вместо перехода
+## на следующую. Проверяем наблюдаемое: номер поляны вырос, бой не начался.
+func _test_wheel_and_keys_move_forward() -> void:
+	print("Колесо и клавиши ведут вперёд, а не перезапускают поляну")
+	GameState.reset()
+	FarmState.reset()
+	var starter := Registry.monster("disco_sprout")
+	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
+	GameState.set_guardian("disco_sprout")
+	RunManager.set_seed(5)
+
+	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
+	add_child(feed)
+	await _frames(3)
+
+	# Встаём на поляну, которую можно пропустить: боевая уйти не даёт
+	var guard := 0
+	while RunManager.current_glade != null \
+			and RunManager.current_glade.type == Glade.Type.BATTLE and guard < 60:
+		guard += 1
+		feed._next_glade()
+		await _frames(1)
+	check(RunManager.current_glade != null, "поляна есть")
+	check(RunManager.current_glade != null
+		and RunManager.current_glade.type != Glade.Type.BATTLE, "и она не боевая")
+
+	var before: int = RunManager.depth
+	await _send_wheel_up()
+	check(RunManager.depth > before,
+		"колесо перевело на следующую поляну (%d → %d)" % [before, RunManager.depth])
+	check(feed._battle == null, "и не запустило бой на месте")
+
+	# Клавиша «вверх» — тот же переход
+	guard = 0
+	while RunManager.current_glade != null \
+			and RunManager.current_glade.type == Glade.Type.BATTLE and guard < 60:
+		guard += 1
+		feed._next_glade()
+		await _frames(1)
+	before = RunManager.depth
+	await _send_key(KEY_UP)
+	check(RunManager.depth > before,
+		"клавиша вверх тоже ведёт вперёд (%d → %d)" % [before, RunManager.depth])
+
+	# Кнопки обязаны существовать и быть нажимаемы: жест зависит
+	# от порогов и состояния, кнопка — нет
+	check(feed._action_button != null and feed._action_button.visible,
+		"кнопка действия видна")
+	check(feed._next_button != null and feed._next_button.visible,
+		"кнопка «Дальше» видна")
+	check(feed._action_button != null and feed._action_button.text != "",
+		"у кнопки действия есть подпись")
+
+	feed.queue_free()
+	await _frames(2)
