@@ -54,8 +54,7 @@ func show_for(monster: MonsterData, perfect_run: bool) -> void:
 
 
 func _build_fruit_buttons() -> void:
-	for child in _buttons.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_buttons)
 
 	var offers := _available_fruits()
 	if offers.is_empty():
@@ -133,8 +132,7 @@ func _celebrate() -> void:
 	_detail.text = "Шкала дружбы заполнена.\nТеперь его можно брать в забег."
 	_bar_fill.color = TAMED_COLOR
 
-	for child in _buttons.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_buttons)
 	_add_button("Отлично!", _finish)
 
 

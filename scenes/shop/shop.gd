@@ -51,8 +51,7 @@ func _refresh() -> void:
 		_crate_button.text = "Пластинка — %d ♪" % ShopState.CRATE_PRICE \
 			if _pending != "__crate__" else "Точно открыть? Нажми ещё раз"
 
-	for child in _list.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_list)
 
 	for item in Registry.all_cosmetics():
 		_list.add_child(_make_row(item))

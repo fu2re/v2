@@ -22,8 +22,7 @@ func _ready() -> void:
 
 
 func _refresh() -> void:
-	for child in _list.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_list)
 
 	for monster in Registry.all_monsters():
 		_list.add_child(_make_card(monster))
@@ -112,8 +111,7 @@ func _gear_summary(monster_id: String) -> String:
 
 func _open_gear(monster_id: String) -> void:
 	_selected_id = monster_id
-	for child in _gear_panel.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_gear_panel)
 
 	var monster := Registry.monster(monster_id)
 	var header := Label.new()

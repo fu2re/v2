@@ -17,6 +17,7 @@ var _seeds_label: Label = null
 var _grid: Control = null
 var _dance: CanvasLayer = null
 var _seed_picker: VBoxContainer = null
+var _picker_bg: ColorRect = null
 var _guardian_label: Label = null
 var _pending_plot := -1
 
@@ -57,9 +58,22 @@ func _total_seeds() -> int:
 	return total
 
 
+## Убрать детей ПРЯМО СЕЙЧАС, а не в конце кадра.
+##
+## queue_free() отложен: узел остаётся в дереве до конца кадра, продолжает
+## занимать место в контейнере и ловить ввод. Из-за этого список семян
+## накапливал старые кнопки, а новые уезжали вниз за край панели.
+func _clear(parent: Node) -> void:
+	for child in parent.get_children():
+		parent.remove_child(child)
+		child.queue_free()
+
+
 func _rebuild_grid() -> void:
 	for button in _plot_buttons:
-		button.queue_free()
+		if is_instance_valid(button):
+			_grid.remove_child(button)
+			button.queue_free()
 	_plot_buttons.clear()
 
 	for i in FarmState.plot_count():
@@ -130,8 +144,7 @@ func _open_seed_picker(index: int) -> void:
 		return
 
 	_pending_plot = index
-	for child in _seed_picker.get_children():
-		child.queue_free()
+	_clear(_seed_picker)
 
 	for fruit_id in available:
 		var fruit := Registry.fruit(fruit_id)
@@ -249,11 +262,23 @@ func _build_ui() -> void:
 
 	_grid = Control.new()
 	_grid.size = Vector2(1080, 1000)
+	# Обёртка для кнопок грядок не должна ловить ввод сама.
+	# У Control по умолчанию mouse_filter = STOP, и пустой контейнер
+	# во весь экран молча съедал клики по кнопкам навигации под ним
+	_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_grid)
 
+	# Подложка под выбор семян: без неё панель висит поверх живого экрана,
+	# кнопки под ней видно, но они не нажимаются — читается как поломка
+	_picker_bg = UIUtil.make_backdrop(Color(0.14, 0.22, 0.12, 0.96))
+	_picker_bg.visible = false
+	add_child(_picker_bg)
+
 	_seed_picker = VBoxContainer.new()
-	_seed_picker.position = Vector2(90, 500)
-	_seed_picker.size = Vector2(900, 900)
+	_seed_picker.position = Vector2(90, 400)
+	_seed_picker.size = Vector2(900, 1100)
 	_seed_picker.add_theme_constant_override("separation", 20)
 	_seed_picker.visible = false
+	_seed_picker.visibility_changed.connect(
+		func(): _picker_bg.visible = _seed_picker.visible)
 	add_child(_seed_picker)

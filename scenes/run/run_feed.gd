@@ -232,8 +232,7 @@ func _open_panel(title: String) -> void:
 	_busy = true
 	_panel_box.visible = true
 	_panel_bg.visible = true
-	for child in _panel_box.get_children():
-		child.queue_free()
+	UIUtil.clear_children(_panel_box)
 	_add_panel_label(title, 52)
 
 
