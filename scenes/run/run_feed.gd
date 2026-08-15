@@ -28,6 +28,7 @@ var _card: Control = null
 var _headline: Label = null
 var _subline: Label = null
 var _hint: Label = null
+var _glade_art: Sprite2D = null
 var _depth_label: Label = null
 var _health_fill: ColorRect = null
 var _home_button: Button = null
@@ -100,22 +101,28 @@ func _show_glade(glade: Glade) -> void:
 			_headline.add_theme_color_override("font_color",
 				MonsterData.rarity_color(monster.rarity))
 			# Мимо монстра не пройти — это не пропускаемая поляна
-			_hint.text = "Тапни, чтобы танцевать"
+			_hint.text = "Кнопка «Танцевать» или тап по экрану"
+			_glade_art.texture = monster.sprite() if monster != null else null
 		Glade.Type.WILD_BUSH:
 			_subline.text = "Здесь можно собрать семена"
 			_headline.add_theme_color_override("font_color", Color("97C46A"))
-			_hint.text = "Тапни, чтобы собрать"
+			_hint.text = "Кнопка «Собрать» или тап по экрану"
+			var bush := Registry.fruit(glade.fruit_id)
+			_glade_art.texture = bush.sprite() if bush != null else null
 		Glade.Type.CAMPFIRE:
 			_subline.text = "Можно перевести дух\n+%d к здоровью" % RunManager.CAMPFIRE_RESTORE
 			_headline.add_theme_color_override("font_color", Color("FF5C7A"))
-			_hint.text = "Тапни: отдохнуть или сменить друга"
+			_hint.text = "Кнопка «Отдохнуть» или тап по экрану"
+			_glade_art.texture = null
 		Glade.Type.MERCHANT:
 			_headline.add_theme_color_override("font_color", Color("BA9A6D"))
-			_hint.text = "Тапни, чтобы посмотреть товар"
+			_hint.text = "Кнопка «Товар» или тап по экрану"
+			_glade_art.texture = null
 		_:
 			_subline.text = "Здесь что-то есть"
 			_headline.add_theme_color_override("font_color", Color("DCC7A4"))
-			_hint.text = "Тапни, чтобы посмотреть"
+			_hint.text = "Кнопка «Посмотреть» или тап по экрану"
+			_glade_art.texture = null
 
 	_refresh_buttons()
 
@@ -418,6 +425,10 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 			% monster.display_name
 		_awaiting_result_swipe = true
 		_busy = false
+		# Подсказку меняем СРАЗУ, а не после закрытия боя: иначе под сценой
+		# боя остаётся приглашение «тапни, чтобы танцевать», и стоит игроку
+		# закрыть итог — карточка зовёт в бой, который уже проигран
+		_hint.text = HINT_NEXT
 		_refresh_buttons()
 
 
@@ -495,6 +506,14 @@ func _build_ui() -> void:
 	_card.size = Vector2(1080, 1920)
 	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_card)
+
+	# Кого встретил — видно, а не написано. Ребёнок 7 лет узнаёт поляну
+	# по картинке быстрее, чем прочитает название
+	_glade_art = Sprite2D.new()
+	_glade_art.position = Vector2(540, 420)
+	_glade_art.scale = Vector2(4.0, 4.0)
+	_glade_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_card.add_child(_glade_art)
 
 	_depth_label = _make_label(Vector2(60, 140), 44, Color("ADA99F"))
 	_headline = _make_label(Vector2(60, 620), 76, Color("DCC7A4"))
