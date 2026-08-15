@@ -8,5 +8,5 @@ id = "mossy_plot"
 display_name = "Мшистая грядка"
 slot = 3
 rarity = 0
-price_chords = 90
+price_gold = 90
 in_crates = true

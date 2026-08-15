@@ -46,7 +46,7 @@ const DISADVANTAGE_MULTIPLIER := 0.7
 @export var favorite_fruit_id: String = ""
 
 @export var base_vibe: int = 100
-@export var base_groove: int = 100
+@export var base_health: int = 100
 ## Урон по Настрою за идеальное попадание.
 @export var base_power: float = 4.0
 

@@ -8,5 +8,5 @@ id = "watering_can"
 display_name = "Лейка с бантом"
 slot = 2
 rarity = 0
-price_chords = 80
+price_gold = 80
 in_crates = true

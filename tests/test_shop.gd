@@ -53,8 +53,8 @@ func check_eq(actual: Variant, expected: Variant, description: String) -> void:
 func _test_cosmetics_cannot_affect_gameplay() -> void:
 	print("Косметика не может влиять на геймплей")
 	var forbidden := [
-		"window_scale", "power_bonus", "groove_bonus", "shield_reduction",
-		"base_power", "base_vibe", "base_groove", "friendship_bonus",
+		"window_scale", "power_bonus", "health_bonus", "shield_reduction",
+		"base_power", "base_vibe", "base_health", "friendship_bonus",
 	]
 	var items := Registry.all_cosmetics()
 	check(items.size() >= 10, "косметика загрузилась (%d)" % items.size())
@@ -74,12 +74,12 @@ func _test_every_crate_item_sold_directly() -> void:
 	var pool := ShopState.crate_pool()
 	check(not pool.is_empty(), "пул сундука не пуст (%d)" % pool.size())
 	for item in pool:
-		check(item.price_chords > 0,
-			"%s имеет цену прямой покупки (%d)" % [item.id, item.price_chords])
+		check(item.price_gold > 0,
+			"%s имеет цену прямой покупки (%d)" % [item.id, item.price_gold])
 
 	# И наоборот: предмет вне сундуков тоже должен быть доступен
 	for item in Registry.all_cosmetics():
-		check(item.price_chords > 0, "%s можно купить напрямую" % item.id)
+		check(item.price_gold > 0, "%s можно купить напрямую" % item.id)
 
 
 ## Правило 1: публикуемые шансы обязаны быть настоящими.
@@ -108,7 +108,7 @@ func _test_pity_guarantees_rare() -> void:
 	print("Pity гарантирует редкий предмет")
 	ShopState.reset()
 	ShopState.set_seed(99)
-	ShopState.add_chords(ShopState.CRATE_PRICE * ShopState.PITY_THRESHOLD * 2)
+	ShopState.add_gold(ShopState.CRATE_PRICE * ShopState.PITY_THRESHOLD * 2)
 	ShopState.daily_limit = 999999
 
 	var best_seen := -1
@@ -139,19 +139,19 @@ func _test_duplicates_never_wasted() -> void:
 
 	# Скупаем весь пул напрямую, чтобы гарантировать дубль из сундука
 	var pool := ShopState.crate_pool()
-	ShopState.add_chords(1000000)
+	ShopState.add_gold(1000000)
 	for item in pool:
 		ShopState.buy_direct(item.id)
 	check_eq(ShopState.owned.size(), pool.size(), "весь пул куплен")
 
-	var before := ShopState.chords
+	var before := ShopState.gold
 	var id := ShopState.open_crate()
 	check(not id.is_empty(), "сундук открылся")
 
 	# Потратили CRATE_PRICE, но получили возврат — итог мягче полной потери
-	var spent := before - ShopState.chords
+	var spent := before - ShopState.gold
 	check(spent < ShopState.CRATE_PRICE,
-		"дубль вернул часть Аккордов (потрачено %d из %d)" % [spent, ShopState.CRATE_PRICE])
+		"дубль вернул часть золота (потрачено %d из %d)" % [spent, ShopState.CRATE_PRICE])
 
 	for rarity: MonsterData.Rarity in ShopState.DUPLICATE_REFUND:
 		check(ShopState.DUPLICATE_REFUND[rarity] > 0,
@@ -162,15 +162,15 @@ func _test_duplicates_never_wasted() -> void:
 func _test_region_ban_blocks_crates() -> void:
 	print("Региональный запрет лутбоксов")
 	ShopState.reset()
-	ShopState.add_chords(100000)
+	ShopState.add_gold(100000)
 	ShopState.daily_limit = 999999
 
 	for region in ShopState.LOOTBOX_BANNED_REGIONS:
 		ShopState.region = region
 		check(ShopState.lootboxes_banned(), "%s: сундуки запрещены" % region)
-		var before := ShopState.chords
+		var before := ShopState.gold
 		check_eq(ShopState.open_crate(), "", "%s: сундук не открылся" % region)
-		check_eq(ShopState.chords, before, "%s: деньги не списаны" % region)
+		check_eq(ShopState.gold, before, "%s: деньги не списаны" % region)
 
 		# Но весь состав остаётся доступен прямой покупкой.
 		# Владение сбрасываем: иначе второй регион уткнётся в «уже куплено»
@@ -190,7 +190,7 @@ func _test_region_ban_blocks_crates() -> void:
 func _test_daily_limit() -> void:
 	print("Дневной лимит трат")
 	ShopState.reset()
-	ShopState.add_chords(100000)
+	ShopState.add_gold(100000)
 	ShopState.daily_limit = 200
 
 	check_eq(ShopState.remaining_today(), 200, "лимит на старте дня полный")
@@ -205,9 +205,9 @@ func _test_daily_limit() -> void:
 	var blocked: Array[String] = []
 	ShopState.purchase_blocked.connect(func(reason): blocked.append(reason))
 
-	var before := ShopState.chords
+	var before := ShopState.gold
 	check(not ShopState.open_crate(), "сундук за лимитом не открылся")
-	check_eq(ShopState.chords, before, "деньги не списаны")
+	check_eq(ShopState.gold, before, "деньги не списаны")
 	check(not blocked.is_empty(), "игроку объяснили причину")
 
 
@@ -215,29 +215,29 @@ func _cheapest() -> CosmeticData:
 	var all := Registry.all_cosmetics()
 	var best: CosmeticData = all[0]
 	for item in all:
-		if item.price_chords < best.price_chords:
+		if item.price_gold < best.price_gold:
 			best = item
 	return best
 
 
 func _test_no_purchase_without_funds() -> void:
-	print("Без Аккордов покупки нет")
+	print("Без золота покупки нет")
 	ShopState.reset()
 	ShopState.daily_limit = 999999
 	var item := _cheapest()
 
 	check(not ShopState.buy_direct(item.id), "покупка без средств отклонена")
 	check(not ShopState.is_owned(item.id), "предмет не выдан")
-	check_eq(ShopState.chords, 0, "баланс не ушёл в минус")
+	check_eq(ShopState.gold, 0, "баланс не ушёл в минус")
 
 	check_eq(ShopState.open_crate(), "", "сундук без средств не открылся")
-	check_eq(ShopState.chords, 0, "баланс по-прежнему ноль")
+	check_eq(ShopState.gold, 0, "баланс по-прежнему ноль")
 
 
 func _test_save_roundtrip() -> void:
 	print("Сейв магазина")
 	ShopState.reset()
-	ShopState.add_chords(777)
+	ShopState.add_gold(777)
 	ShopState.daily_limit = 999999
 	var item := _cheapest()
 	ShopState.buy_direct(item.id)

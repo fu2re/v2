@@ -8,5 +8,5 @@ id = "moonwalk_emote"
 display_name = "Лунная походка"
 slot = 5
 rarity = 3
-price_chords = 420
+price_gold = 420
 in_crates = true

@@ -8,7 +8,8 @@ extends CanvasLayer
 ## даже на пёстрой поляне (GDD §11.1.1).
 
 const VIBE_COLOR := Color("FF57C4")     # Настрой монстра
-const GROOVE_COLOR := Color("1ED8FF")   # Ритм игрока
+const HEALTH_COLOR := Color("1ED8FF")   # здоровье игрока, сквозное на забег
+const SHIELD_COLOR := Color("2E9BFF")   # щит, буфер одного боя
 const WINDUP_COLOR := Color("FF5C7A")   # тревога: монстр замахнулся
 const TRACK_COLOR := Color(0, 0, 0, 0.45)
 
@@ -18,26 +19,34 @@ const MARGIN := 40.0
 const FRAME_THICKNESS := 46.0
 
 var _vibe_fill: ColorRect = null
-var _groove_fill: ColorRect = null
+var _health_fill: ColorRect = null
+var _shield_fill: ColorRect = null
 var _combo_label: Label = null
 var _warning_parts: Array[ColorRect] = []
 var _vibe_width := 0.0
-var _groove_width := 0.0
+var _health_width := 0.0
+var _shield_width := 0.0
 
 
 func _ready() -> void:
 	layer = 10
 	var width := 1080.0 - MARGIN * 2.0
 	_vibe_width = width
-	_groove_width = width
+	_health_width = width
+	_shield_width = width
 
 	_vibe_fill = _make_bar(Vector2(MARGIN, 120.0), width, VIBE_COLOR)
-	_groove_fill = _make_bar(Vector2(MARGIN, 1740.0), width, GROOVE_COLOR)
+	# Щит над здоровьем: урон съедает его первым, и порядок сверху вниз
+	# повторяет порядок, в котором они теряются
+	_shield_fill = _make_bar(Vector2(MARGIN, 1700.0), width, SHIELD_COLOR)
+	_health_fill = _make_bar(Vector2(MARGIN, 1760.0), width, HEALTH_COLOR)
+	_add_caption(Vector2(MARGIN, 1660.0), "Щит", SHIELD_COLOR)
+	_add_caption(Vector2(MARGIN + 200.0, 1660.0), "Здоровье", HEALTH_COLOR)
 
 	_combo_label = Label.new()
-	_combo_label.position = Vector2(MARGIN, 1640.0)
+	_combo_label.position = Vector2(MARGIN, 1570.0)
 	_combo_label.add_theme_font_size_override("font_size", 56)
-	_combo_label.add_theme_color_override("font_color", GROOVE_COLOR)
+	_combo_label.add_theme_color_override("font_color", HEALTH_COLOR)
 	_combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_combo_label.add_theme_constant_override("outline_size", 10)
 	add_child(_combo_label)
@@ -60,12 +69,25 @@ func _make_bar(pos: Vector2, width: float, color: Color) -> ColorRect:
 	return fill
 
 
+func _add_caption(pos: Vector2, text: String, colour: Color) -> void:
+	var label := Label.new()
+	label.position = pos
+	label.text = text
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", colour)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("outline_size", 8)
+	add_child(label)
+
+
 func bind(state: BattleState) -> void:
 	state.vibe_changed.connect(_on_vibe_changed)
-	state.groove_changed.connect(_on_groove_changed)
+	state.health_changed.connect(_on_health_changed)
+	state.shield_changed.connect(_on_shield_changed)
 	state.combo_changed.connect(_on_combo_changed)
 	_on_vibe_changed(state.vibe, state.max_vibe)
-	_on_groove_changed(state.groove, state.max_groove)
+	_on_health_changed(state.health, state.max_health)
+	_on_shield_changed(state.shield, state.max_shield)
 	_on_combo_changed(state.combo, 1.0)
 
 
@@ -73,8 +95,12 @@ func _on_vibe_changed(current: int, maximum: int) -> void:
 	_set_fill(_vibe_fill, _vibe_width, current, maximum)
 
 
-func _on_groove_changed(current: int, maximum: int) -> void:
-	_set_fill(_groove_fill, _groove_width, current, maximum)
+func _on_health_changed(current: int, maximum: int) -> void:
+	_set_fill(_health_fill, _health_width, current, maximum)
+
+
+func _on_shield_changed(current: int, maximum: int) -> void:
+	_set_fill(_shield_fill, _shield_width, current, maximum)
 
 
 func _set_fill(fill: ColorRect, full_width: float, current: int, maximum: int) -> void:

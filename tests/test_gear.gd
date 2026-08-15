@@ -89,7 +89,7 @@ func _test_bonuses_stack() -> void:
 	GameState.reset()
 	var clean := GameState.gear_bonuses("disco_sprout")
 	check_eq(clean.window_scale, 1.0, "без снаряжения окна обычные")
-	check_eq(clean.groove_bonus, 0, "без снаряжения Ритм обычный")
+	check_eq(clean.health_bonus, 0, "без снаряжения Ритм обычный")
 
 	GameState.add_gear("spring_boots")
 	GameState.add_gear("brass_bell")
@@ -101,7 +101,7 @@ func _test_bonuses_stack() -> void:
 	var full := GameState.gear_bonuses("disco_sprout")
 	check(full.window_scale > 1.0, "обувь расширила окна")
 	check(full.power_bonus > 0.0, "аксессуар усилил удар")
-	check(full.groove_bonus > 0, "амулет добавил Ритма")
+	check(full.health_bonus > 0, "амулет добавил Ритма")
 	check(full.shield_reduction > 0.0, "амулет смягчил пропуск щита")
 
 
@@ -111,7 +111,7 @@ func _test_gear_affects_battle() -> void:
 	var bare := BattleState.new()
 	bare.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
 	var bare_damage := bare.register_hit(Judge.Grade.PERFECT)
-	var bare_groove := bare.max_groove
+	var bare_groove := bare.max_health
 
 	GameState.add_gear("thunder_pick")
 	GameState.add_gear("river_stone")
@@ -121,7 +121,7 @@ func _test_gear_affects_battle() -> void:
 	var geared := BattleState.new()
 	geared.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
 	check(geared.register_hit(Judge.Grade.PERFECT) > bare_damage, "аксессуар усилил удар в бою")
-	check(geared.max_groove > bare_groove, "амулет поднял максимум Ритма")
+	check(geared.max_health > bare_groove, "амулет поднял максимум Ритма")
 
 	# Обувь расширяет окна: то, что было Good, становится Perfect
 	GameState.add_gear("cloud_shoes")
@@ -142,18 +142,21 @@ func _test_shield_never_free() -> void:
 
 	var s := BattleState.new()
 	s.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
-	var before := s.groove
+
+	# Урон меряем суммарно: он гасится щитом раньше здоровья, и смотреть
+	# только на здоровье значит не увидеть удар вовсе
+	var before := s.shield + s.health
 	s.take_strike()
-	var damage := before - s.groove
+	var damage := before - (s.shield + s.health)
 
 	check(damage > 0, "пропущенный щит всё равно бьёт — механика обязана остаться")
 	check(damage < BattleState.STRIKE_DAMAGE, "но амулет смягчил удар")
 
 	# Даже при абсурдном снижении урон не уходит в ноль
 	s.shield_reduction = 5.0
-	var mid := s.groove
+	var mid := s.shield + s.health
 	s.take_strike()
-	check(mid - s.groove >= 1, "урон не обнуляется ни при каком снаряжении")
+	check(mid - (s.shield + s.health) >= 1, "урон не обнуляется ни при каком снаряжении")
 
 
 func _test_gear_is_per_monster() -> void:

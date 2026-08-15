@@ -8,14 +8,24 @@ extends RefCounted
 ## отражено в именах, а не только в текстах на экране.
 
 signal vibe_changed(current: int, maximum: int)
-signal groove_changed(current: int, maximum: int)
+signal health_changed(current: int, maximum: int)
+signal shield_changed(current: int, maximum: int)
 signal combo_changed(combo: int, multiplier: float)
 signal victory()
 signal defeat()
 
-## Урон по Ритму за пропущенный щит. Единственный способ потерять Ритм:
-## обычный промах не наказывает, а лишь замедляет (GDD §4.3).
-const STRIKE_DAMAGE := 12
+## Урон за пропущенный щит — атака монстра дошла до цели.
+const STRIKE_DAMAGE := 10
+## Урон за обычный промах. Мал намеренно: щит гасит его несколько раз подряд,
+## и ребёнок успевает поймать ритм прежде, чем это станет больно.
+const MISS_DAMAGE := 3
+## Сколько щита возвращает попадание по ноте-щиту.
+const SHIELD_RESTORE := 8
+
+## Базовый запас щита. Щит — буфер ОДНОГО боя: он полон на входе на поляну
+## и восстанавливается только нотами-щитами. Здоровье, в отличие от него,
+## сквозное на весь забег и само не возвращается.
+const BASE_SHIELD := 40
 
 ## Рост Настроя монстра с глубиной забега (GDD §8.3).
 const VIBE_DEPTH_SCALE := 0.12
@@ -26,8 +36,10 @@ var depth: int = 0
 
 var max_vibe: int = 100
 var vibe: int = 100
-var max_groove: int = 100
-var groove: int = 100
+var max_health: int = 100
+var health: int = 100
+var max_shield: int = BASE_SHIELD
+var shield: int = BASE_SHIELD
 
 ## Суммарный эффект надетого на гуардиана. Считается один раз на бой
 ## и дальше не пересчитывается — снаряжение внутри боя не меняется.
@@ -52,7 +64,7 @@ var did_win: bool = false
 
 
 func setup(new_monster: MonsterData, new_guardian: MonsterData,
-		starting_groove: int, run_depth: int = 0) -> void:
+		starting_health: int, run_depth: int = 0) -> void:
 	monster = new_monster
 	guardian = new_guardian
 	depth = run_depth
@@ -65,11 +77,15 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 	power_bonus = bonuses.get("power_bonus", 0.0)
 	shield_reduction = bonuses.get("shield_reduction", 0.0)
 
-	# Ритм сквозной: он НЕ восстанавливается между полянами сам по себе,
-	# только перекусами и событиями. В этом всё напряжение забега (GDD §4.4)
-	max_groove = (guardian.base_groove if guardian != null else 100) \
-		+ int(bonuses.get("groove_bonus", 0))
-	groove = clampi(starting_groove, 0, max_groove)
+	# Здоровье сквозное: между полянами само не восстанавливается,
+	# только у костра и перекусами. В этом всё напряжение забега
+	max_health = (guardian.base_health if guardian != null else 100) \
+		+ int(bonuses.get("health_bonus", 0))
+	health = clampi(starting_health, 0, max_health)
+
+	# Щит — буфер одного боя: на каждую поляну входим с полным
+	max_shield = BASE_SHIELD
+	shield = max_shield
 
 	combo = 0
 	max_combo = 0
@@ -98,6 +114,7 @@ func register_hit(grade: int) -> int:
 	if grade == Judge.Grade.MISS:
 		combo = 0
 		combo_changed.emit(combo, 1.0)
+		_take_damage(MISS_DAMAGE)
 		return 0
 
 	combo += 1
@@ -112,7 +129,11 @@ func register_hit(grade: int) -> int:
 	return amount
 
 
-## Щит принят вовремя — атака монстра погашена.
+## Щит принят вовремя — атака погашена и щит немного восстановлен.
+##
+## Это единственный источник восстановления щита в бою, поэтому ноты-щиты
+## превращаются из угрозы в возможность: за ними следят не только чтобы
+## не пропустить, но и чтобы починить буфер.
 func block_strike() -> void:
 	if is_over:
 		return
@@ -120,9 +141,10 @@ func block_strike() -> void:
 	combo += 1
 	max_combo = maxi(max_combo, combo)
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+	restore_shield(SHIELD_RESTORE)
 
 
-## Щит пропущен — единственная ситуация, где игрок теряет Ритм.
+## Щит пропущен — атака монстра дошла до цели.
 func take_strike() -> void:
 	if is_over:
 		return
@@ -130,22 +152,46 @@ func take_strike() -> void:
 	grade_counts[Judge.Grade.MISS] += 1
 	combo = 0
 	combo_changed.emit(combo, 1.0)
+	_take_damage(STRIKE_DAMAGE)
 
-	# Амулет смягчает пропущенную атаку, но никогда не обнуляет её:
-	# щит обязан оставаться механикой, за которой следят
-	var damage := maxi(int(round(STRIKE_DAMAGE * (1.0 - shield_reduction))), 1)
-	groove = maxi(groove - damage, 0)
-	groove_changed.emit(groove, max_groove)
-	if groove <= 0:
+
+## Урон идёт СНАЧАЛА в щит и только потом в здоровье.
+##
+## Щит — это прощение: пока он держится, промахи стоят внимания, но не
+## прогресса. Здоровье трогается только когда буфер выбит полностью.
+func _take_damage(amount: int) -> void:
+	# Амулет смягчает урон, но никогда не обнуляет его: механика,
+	# за которой не надо следить, перестаёт быть механикой
+	var damage := maxi(int(round(amount * (1.0 - shield_reduction))), 1)
+
+	var absorbed := mini(shield, damage)
+	if absorbed > 0:
+		shield -= absorbed
+		damage -= absorbed
+		shield_changed.emit(shield, max_shield)
+
+	if damage <= 0:
+		return
+
+	health = maxi(health - damage, 0)
+	health_changed.emit(health, max_health)
+	if health <= 0:
 		_finish(false)
 
 
-## Перекус восстанавливает Ритм.
-func restore_groove(amount: int) -> void:
+func restore_shield(amount: int) -> void:
 	if is_over:
 		return
-	groove = mini(groove + amount, max_groove)
-	groove_changed.emit(groove, max_groove)
+	shield = mini(shield + amount, max_shield)
+	shield_changed.emit(shield, max_shield)
+
+
+## Перекус восстанавливает Ритм.
+func restore_health(amount: int) -> void:
+	if is_over:
+		return
+	health = mini(health + amount, max_health)
+	health_changed.emit(health, max_health)
 
 
 func _reduce_vibe(amount: int) -> void:
@@ -165,7 +211,7 @@ func _finish(won: bool) -> void:
 
 
 ## Трек кончился, а Настрой не сбит. Монстр устоял — но это не поражение:
-## Ритм цел, значит забег продолжается.
+## Здоровье цело, значит забег продолжается.
 func finish_by_timeout() -> void:
 	if not is_over:
 		_finish(false)

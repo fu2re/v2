@@ -9,7 +9,7 @@ extends Node
 signal friendship_changed(monster_id: String, value: int, threshold: int)
 signal monster_tamed(monster_id: String)
 signal fruits_changed()
-signal seeds_changed(amount: int)
+signal silver_changed(amount: int)
 signal gear_changed()
 signal guardian_changed(monster_id: String)
 
@@ -27,8 +27,8 @@ var friendship: Dictionary = {}
 var tamed: Array[String] = []
 ## Фрукты в сумке: "fruit_id:quality" -> количество.
 var fruits: Dictionary = {}
-## Мягкая валюта.
-var seeds: int = 0
+## Заработанная валюта: серебро.
+var silver: int = 0
 
 ## Снаряжение в сундуке: gear_id -> количество.
 var gear_owned: Dictionary = {}
@@ -44,7 +44,7 @@ func reset() -> void:
 	friendship.clear()
 	tamed.clear()
 	fruits.clear()
-	seeds = 0
+	silver = 0
 	gear_owned.clear()
 	equipped.clear()
 	active_guardian_id = ""
@@ -130,9 +130,9 @@ func consume_fruit(fruit_id: String, quality: FruitData.Quality) -> bool:
 	return true
 
 
-func add_seeds(amount: int) -> void:
-	seeds = maxi(seeds + amount, 0)
-	seeds_changed.emit(seeds)
+func add_silver(amount: int) -> void:
+	silver = maxi(silver + amount, 0)
+	silver_changed.emit(silver)
 
 
 # --- снаряжение --------------------------------------------------------------
@@ -206,7 +206,7 @@ func gear_bonuses(monster_id: String) -> Dictionary:
 	var total := {
 		"window_scale": 1.0,
 		"power_bonus": 0.0,
-		"groove_bonus": 0,
+		"health_bonus": 0,
 		"shield_reduction": 0.0,
 	}
 	for slot in [GearData.Slot.BOOTS, GearData.Slot.ACCESSORY, GearData.Slot.AMULET]:
@@ -217,7 +217,7 @@ func gear_bonuses(monster_id: String) -> Dictionary:
 		# на окна не дают линейного взрыва прощения промахов
 		total.window_scale *= item.window_scale
 		total.power_bonus += item.power_bonus
-		total.groove_bonus += item.groove_bonus
+		total.health_bonus += item.health_bonus
 		total.shield_reduction = minf(total.shield_reduction + item.shield_reduction, 0.75)
 	return total
 
@@ -245,7 +245,7 @@ func to_dict() -> Dictionary:
 		"friendship": friendship.duplicate(),
 		"tamed": tamed.duplicate(),
 		"fruits": fruits.duplicate(),
-		"seeds": seeds,
+		"silver": silver,
 		"gear_owned": gear_owned.duplicate(),
 		"equipped": equipped.duplicate(true),
 		"active_guardian": active_guardian_id,
@@ -262,7 +262,7 @@ func from_dict(d: Dictionary) -> void:
 
 	friendship = d.get("friendship", {})
 	fruits = d.get("fruits", {})
-	seeds = int(d.get("seeds", 0))
+	silver = int(d.get("silver", 0))
 	gear_owned = d.get("gear_owned", {})
 	active_guardian_id = d.get("active_guardian", "")
 

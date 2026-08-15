@@ -6,7 +6,7 @@ extends Node
 ## регулирования (GDD §12.3). Требования встроены в код, а не в инструкцию
 ## для разработчика: инструкцию можно забыть, инвариант — нет.
 
-signal chords_changed(amount: int)
+signal gold_changed(amount: int)
 signal cosmetic_unlocked(cosmetic_id: String)
 signal crate_opened(cosmetic_id: String, was_duplicate: bool, pity_hit: bool)
 signal purchase_blocked(reason: String)
@@ -26,7 +26,7 @@ const PITY_THRESHOLD := 30
 const PITY_MIN_RARITY := MonsterData.Rarity.RARE
 
 const CRATE_PRICE := 120
-## Дубль конвертируется в Аккорды: открытие сундука не может пропасть впустую.
+## Дубль конвертируется в Золото: открытие сундука не может пропасть впустую.
 const DUPLICATE_REFUND := {
 	MonsterData.Rarity.COMMON: 15,
 	MonsterData.Rarity.UNCOMMON: 35,
@@ -39,10 +39,10 @@ const DUPLICATE_REFUND := {
 ## а их состав остаётся доступен прямой покупкой.
 const LOOTBOX_BANNED_REGIONS := ["BE", "NL"]
 
-## Родительский контроль: дневной предел трат в Аккордах.
+## Родительский контроль: дневной предел трат в золоте.
 const DEFAULT_DAILY_LIMIT := 500
 
-var chords: int = 0
+var gold: int = 0
 var owned: Array[String] = []
 var equipped: Dictionary = {}
 var pity_counter: int = 0
@@ -64,7 +64,7 @@ func set_seed(value: int) -> void:
 
 
 func reset() -> void:
-	chords = 0
+	gold = 0
 	owned.clear()
 	equipped.clear()
 	pity_counter = 0
@@ -108,9 +108,9 @@ func odds_disclosure() -> String:
 
 # --- валюта и лимиты ---------------------------------------------------------
 
-func add_chords(amount: int) -> void:
-	chords = maxi(chords + amount, 0)
-	chords_changed.emit(chords)
+func add_gold(amount: int) -> void:
+	gold = maxi(gold + amount, 0)
+	gold_changed.emit(gold)
 
 
 func _today() -> int:
@@ -134,8 +134,8 @@ func remaining_today() -> int:
 func _blocking_reason(cost: int) -> String:
 	if cost <= 0:
 		return "Некорректная цена"
-	if chords < cost:
-		return "Не хватает Аккордов"
+	if gold < cost:
+		return "Не хватает золота"
 	if remaining_today() < cost:
 		return "Дневной лимит трат исчерпан. Загляни завтра."
 	return ""
@@ -147,9 +147,9 @@ func _spend(cost: int) -> bool:
 		purchase_blocked.emit(reason)
 		return false
 	_roll_day_if_needed()
-	chords -= cost
+	gold -= cost
 	spent_today += cost
-	chords_changed.emit(chords)
+	gold_changed.emit(gold)
 	return true
 
 
@@ -171,7 +171,7 @@ func buy_direct(cosmetic_id: String) -> bool:
 	var item := Registry.cosmetic(cosmetic_id)
 	if item == null or is_owned(cosmetic_id):
 		return false
-	if not _spend(item.price_chords):
+	if not _spend(item.price_gold):
 		return false
 	unlock(cosmetic_id)
 	SaveManager.mark_dirty()
@@ -225,8 +225,8 @@ func open_crate() -> String:
 
 	var duplicate := is_owned(item.id)
 	if duplicate:
-		# Дубль не пропадает: возвращается Аккордами (GDD §12.3, правило 3)
-		add_chords(DUPLICATE_REFUND.get(item.rarity, 10))
+		# Дубль не пропадает: возвращается золотом (GDD §12.3, правило 3)
+		add_gold(DUPLICATE_REFUND.get(item.rarity, 10))
 	else:
 		unlock(item.id)
 
@@ -262,7 +262,7 @@ func _pick_from(rarity: MonsterData.Rarity) -> CosmeticData:
 
 func to_dict() -> Dictionary:
 	return {
-		"chords": chords,
+		"gold": gold,
 		"owned": owned.duplicate(),
 		"equipped": equipped.duplicate(),
 		"pity": pity_counter,
@@ -274,7 +274,7 @@ func to_dict() -> Dictionary:
 
 
 func from_dict(d: Dictionary) -> void:
-	chords = int(d.get("chords", 0))
+	gold = int(d.get("gold", 0))
 	pity_counter = int(d.get("pity", 0))
 	region = d.get("region", "XX")
 	daily_limit = int(d.get("daily_limit", DEFAULT_DAILY_LIMIT))

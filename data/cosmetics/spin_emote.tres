@@ -8,5 +8,5 @@ id = "spin_emote"
 display_name = "Разворот на пятке"
 slot = 5
 rarity = 1
-price_chords = 180
+price_gold = 180
 in_crates = true

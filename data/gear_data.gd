@@ -19,7 +19,7 @@ const SLOT_NAMES := {
 const SLOT_HINTS := {
 	Slot.BOOTS: "Шире окно попадания",
 	Slot.ACCESSORY: "Сильнее удар и комбо",
-	Slot.AMULET: "Больше Ритма и крепче щит",
+	Slot.AMULET: "Больше здоровья и крепче щит",
 }
 
 @export var id: String = ""
@@ -31,8 +31,8 @@ const SLOT_HINTS := {
 @export var window_scale: float = 1.0
 ## Прибавка к урону по Настрою.
 @export var power_bonus: float = 0.0
-## Прибавка к максимальному Ритму.
-@export var groove_bonus: int = 0
+## Прибавка к максимальному здоровью.
+@export var health_bonus: int = 0
 ## Насколько слабее бьёт пропущенная атака. 0.25 — на четверть слабее.
 @export var shield_reduction: float = 0.0
 ## Цена у торговца в семечках.
@@ -54,8 +54,8 @@ func effect_text() -> String:
 		parts.append("окно +%d%%" % int(round((window_scale - 1.0) * 100.0)))
 	if power_bonus > 0.0:
 		parts.append("удар +%.1f" % power_bonus)
-	if groove_bonus > 0:
-		parts.append("Ритм +%d" % groove_bonus)
+	if health_bonus > 0:
+		parts.append("Здоровье +%d" % health_bonus)
 	if shield_reduction > 0.0:
 		parts.append("защита +%d%%" % int(round(shield_reduction * 100.0)))
 	return ", ".join(parts) if not parts.is_empty() else "без эффекта"

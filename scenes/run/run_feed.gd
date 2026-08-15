@@ -17,7 +17,7 @@ var _headline: Label = null
 var _subline: Label = null
 var _hint: Label = null
 var _depth_label: Label = null
-var _groove_fill: ColorRect = null
+var _health_fill: ColorRect = null
 var _home_button: Button = null
 
 var _battle: Node2D = null
@@ -30,6 +30,8 @@ var _busy := false
 ## Забег окончен, ждём тап для нового. Флаг, а не цикл с await:
 ## опрос в корутине пережил бы выгрузку сцены и остался бы висеть.
 var _awaiting_restart := false
+## Пройдена ли текущая поляна. Пока бой не окончен, свайп заблокирован.
+var _glade_cleared := false
 
 
 func _ready() -> void:
@@ -39,7 +41,7 @@ func _ready() -> void:
 	add_child(_taming)
 	_taming.finished.connect(_on_taming_finished)
 
-	RunManager.groove_changed.connect(_on_groove_changed)
+	RunManager.health_changed.connect(_on_health_changed)
 	RunManager.run_ended.connect(_on_run_ended)
 
 	_start_run()
@@ -50,7 +52,7 @@ func _start_run() -> void:
 	var chosen := guardian_id if not guardian_id.is_empty() else GameState.guardian_id()
 	if not RunManager.start_run(chosen):
 		return
-	_on_groove_changed(RunManager.groove, RunManager.max_groove)
+	_on_health_changed(RunManager.health, RunManager.max_health)
 	_show_glade(RunManager.advance())
 
 
@@ -74,13 +76,14 @@ func _show_glade(glade: Glade) -> void:
 			]
 			_headline.add_theme_color_override("font_color",
 				MonsterData.rarity_color(monster.rarity))
-			_hint.text = "Тапни, чтобы танцевать\nСвайп вверх — пройти мимо"
+			# Мимо монстра не пройти — это не пропускаемая поляна
+			_hint.text = "Тапни, чтобы танцевать"
 		Glade.Type.WILD_BUSH:
 			_subline.text = "Здесь можно собрать семена"
 			_headline.add_theme_color_override("font_color", Color("97C46A"))
 			_hint.text = "Тапни, чтобы собрать"
 		Glade.Type.CAMPFIRE:
-			_subline.text = "Можно перевести дух\n+%d к Ритму" % RunManager.CAMPFIRE_RESTORE
+			_subline.text = "Можно перевести дух\n+%d к здоровью" % RunManager.CAMPFIRE_RESTORE
 			_headline.add_theme_color_override("font_color", Color("FF5C7A"))
 			_hint.text = "Тапни: отдохнуть или сменить друга"
 		Glade.Type.MERCHANT:
@@ -119,7 +122,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_return_to_farm()
 				return
 			if travel < -SWIPE_THRESHOLD:
-				_next_glade()
+				_try_next_glade()
 			elif absf(travel) < 40.0:
 				_resolve_glade()
 
@@ -130,7 +133,35 @@ func _return_to_farm() -> void:
 	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
 
 
+## Поляну с монстром пропустить нельзя.
+##
+## Встретил — танцуй. Иначе главное решение забега («идти дальше или уйти
+## с добычей») подменялось бы бесплатным листанием мимо всего опасного,
+## и лента переставала быть выбором.
+func _try_next_glade() -> void:
+	if _blocks_swipe():
+		_hint.text = "%s не отпускает.\nТапни, чтобы танцевать" \
+			% Registry.monster(RunManager.current_glade.monster_id).display_name
+		_shake_card()
+		return
+	_next_glade()
+
+
+## Держит ли текущая поляна игрока на месте.
+func _blocks_swipe() -> bool:
+	var glade := RunManager.current_glade
+	return glade != null and glade.type == Glade.Type.BATTLE and not _glade_cleared
+
+
+func _shake_card() -> void:
+	var tween := create_tween()
+	tween.tween_property(_card, "position:x", 22.0, 0.06)
+	tween.tween_property(_card, "position:x", -22.0, 0.06)
+	tween.tween_property(_card, "position:x", 0.0, 0.06)
+
+
 func _next_glade() -> void:
+	_glade_cleared = false
 	_show_glade(RunManager.advance())
 
 
@@ -149,7 +180,7 @@ func _resolve_glade() -> void:
 			# способ завести новую культуру, и он замыкает контур лес→ферма
 			RunManager.add_loot_fruit(glade.fruit_id, FruitData.Quality.PLAIN, 2)
 			RunManager.add_loot_seed(glade.fruit_id, 1)
-			RunManager.add_loot_seeds(glade.seeds_reward)
+			RunManager.add_loot_silver(glade.silver_reward)
 			var fruit := Registry.fruit(glade.fruit_id)
 			var name := fruit.display_name if fruit != null else glade.fruit_id
 			var known := FarmState.known_seeds.has(glade.fruit_id)
@@ -162,12 +193,12 @@ func _resolve_glade() -> void:
 			RunManager.rest_at_campfire()
 			_open_campfire()
 		_:
-			RunManager.add_loot_seeds(glade.seeds_reward)
-			_hint.text = "+%d семечек\nСвайп вверх — дальше" % glade.seeds_reward
+			RunManager.add_loot_silver(glade.silver_reward)
+			_hint.text = "+%d серебра\nСвайп вверх — дальше" % glade.silver_reward
 			_busy = false
 
 
-## Торговец. Продаёт снаряжение за семечки, найденные в этом же забеге —
+## Торговец. Продаёт снаряжение за серебро, найденные в этом же забеге —
 ## значит уйти домой пораньше и потратить всё здесь это настоящий выбор.
 func _open_merchant(glade: Glade) -> void:
 	var stock := _merchant_stock(glade.depth)
@@ -176,13 +207,13 @@ func _open_merchant(glade: Glade) -> void:
 	if stock.is_empty():
 		_add_panel_label("Сегодня всё раскуплено.")
 	for item: GearData in stock:
-		var affordable := RunManager.run_seeds >= item.price
-		var button := _add_panel_button("%s — %d семечек\n%s" % [
+		var affordable := RunManager.run_silver >= item.price
+		var button := _add_panel_button("%s — %d серебра\n%s" % [
 			item.display_name, item.price, item.effect_text(),
 		], _buy_gear.bind(item))
 		button.disabled = not affordable
 
-	_add_panel_label("Семечек в кармане: %d" % RunManager.run_seeds)
+	_add_panel_label("Серебра в кармане: %d" % RunManager.run_silver)
 	_add_panel_button("Идти дальше", _close_panel)
 
 
@@ -199,9 +230,9 @@ func _merchant_stock(depth: int) -> Array:
 
 
 func _buy_gear(item: GearData) -> void:
-	if RunManager.run_seeds < item.price:
+	if RunManager.run_silver < item.price:
 		return
-	RunManager.add_loot_seeds(-item.price)
+	RunManager.add_loot_silver(-item.price)
 	GameState.add_gear(item.id)
 	_open_merchant(RunManager.current_glade)
 
@@ -209,7 +240,7 @@ func _buy_gear(item: GearData) -> void:
 ## Костёр — единственная точка смены гуардиана внутри забега (GDD §15.1).
 func _open_campfire() -> void:
 	_open_panel("Костёр")
-	_add_panel_label("Ритм восстановлен: %d / %d" % [RunManager.groove, RunManager.max_groove])
+	_add_panel_label("Здоровье восстановлено: %d / %d" % [RunManager.health, RunManager.max_health])
 
 	var friends := GameState.tamed
 	if friends.size() <= 1:
@@ -277,7 +308,7 @@ func _start_battle(glade: Glade) -> void:
 	_battle.difficulty = "normal"
 	_battle.monster_id = glade.monster_id
 	_battle.guardian_id = RunManager.guardian_id
-	_battle.starting_groove = RunManager.groove
+	_battle.starting_health = RunManager.health
 	_battle.depth = glade.depth
 	_battle.autostart = true
 	_battle.battle_finished.connect(_on_battle_finished)
@@ -285,8 +316,9 @@ func _start_battle(glade: Glade) -> void:
 
 
 func _on_battle_finished(won: bool, state: BattleState) -> void:
-	# Ритм сквозной: сколько осталось после боя, столько и уходит на следующую поляну
-	RunManager.set_groove(state.groove)
+	# Здоровье сквозное: сколько осталось после боя, столько и уходит на следующую поляну
+	_glade_cleared = true
+	RunManager.set_health(state.health)
 
 	var monster := state.monster
 	var perfect := state.is_perfect_run()
@@ -297,15 +329,15 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 	_card.visible = true
 	_home_button.visible = true
 
-	if RunManager.groove <= 0:
+	if RunManager.health <= 0:
 		RunManager.die()
 		return
 
 	if won:
-		RunManager.add_loot_seeds(RunManager.current_glade.seeds_reward)
+		RunManager.add_loot_silver(RunManager.current_glade.silver_reward)
 		_taming.show_for(monster, perfect)
 	else:
-		# Монстр устоял, но Ритм цел — забег продолжается
+		# Монстр устоял, но Здоровье цело — забег продолжается
 		_hint.text = "%s устоял.\nСвайп вверх — дальше" % monster.display_name
 		_busy = false
 
@@ -315,11 +347,11 @@ func _on_taming_finished() -> void:
 	_busy = false
 
 
-func _on_groove_changed(current: int, maximum: int) -> void:
-	if _groove_fill == null:
+func _on_health_changed(current: int, maximum: int) -> void:
+	if _health_fill == null:
 		return
 	var ratio := clampf(float(current) / maxf(maximum, 1.0), 0.0, 1.0)
-	_groove_fill.size.x = 900.0 * ratio
+	_health_fill.size.x = 900.0 * ratio
 
 
 func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
@@ -330,7 +362,7 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	# а «гуардиан устал» (GDD §8.4)
 	_headline.text = "Гуардиан устал" if died else "Домой с добычей"
 	_headline.add_theme_color_override("font_color", Color("DCC7A4"))
-	_subline.text = "Принесли домой:\n%d фруктов, %d семечек" % [kept_fruits, kept_seeds]
+	_subline.text = "Принесли домой:\n%d фруктов, %d серебра" % [kept_fruits, kept_seeds]
 	_hint.text = "Тапни, чтобы вернуться на ферму"
 	_busy = true
 
@@ -363,11 +395,11 @@ func _build_ui() -> void:
 	track.color = Color(0, 0, 0, 0.45)
 	add_child(track)
 
-	_groove_fill = ColorRect.new()
-	_groove_fill.position = track.position
-	_groove_fill.size = Vector2(900, 34)
-	_groove_fill.color = Color("1ED8FF")
-	add_child(_groove_fill)
+	_health_fill = ColorRect.new()
+	_health_fill.position = track.position
+	_health_fill.size = Vector2(900, 34)
+	_health_fill.color = Color("1ED8FF")
+	add_child(_health_fill)
 
 	_panel_bg = ColorRect.new()
 	_panel_bg.size = Vector2(1080, 1920)

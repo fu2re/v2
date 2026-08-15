@@ -29,7 +29,7 @@ var depth: int = 0
 var monster_id: String = ""
 ## Для куста: какое семя можно унести.
 var fruit_id: String = ""
-var seeds_reward: int = 0
+var silver_reward: int = 0
 
 
 func type_name() -> String:

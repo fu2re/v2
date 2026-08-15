@@ -7,7 +7,7 @@ extends Node
 ## игра для детей не имеет права использовать.
 
 signal plots_changed()
-signal seeds_changed()
+signal silver_changed()
 signal plot_ready(index: int)
 
 const STARTING_PLOTS := 4
@@ -208,9 +208,9 @@ func buy_plot() -> bool:
 	if plots.size() >= MAX_PLOTS:
 		return false
 	var cost := next_plot_cost()
-	if GameState.seeds < cost:
+	if GameState.silver < cost:
 		return false
-	GameState.add_seeds(-cost)
+	GameState.add_silver(-cost)
 	plots.append(_empty_plot())
 	plots_changed.emit()
 	SaveManager.mark_dirty()
@@ -230,7 +230,7 @@ func add_seed(fruit_id: String, count: int = 1) -> void:
 	seed_bag[fruit_id] = seed_count(fruit_id) + count
 	if not known_seeds.has(fruit_id):
 		known_seeds.append(fruit_id)
-	seeds_changed.emit()
+	silver_changed.emit()
 	SaveManager.mark_dirty()
 
 
@@ -240,7 +240,7 @@ func _take_seed(fruit_id: String) -> void:
 		seed_bag.erase(fruit_id)
 	else:
 		seed_bag[fruit_id] = have - 1
-	seeds_changed.emit()
+	silver_changed.emit()
 
 
 func available_seeds() -> Array[String]:

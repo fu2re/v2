@@ -11,6 +11,6 @@ rarity = 2
 silhouette = 2
 favorite_fruit_id = "loop_fig"
 base_vibe = 120
-base_groove = 110
+base_health = 110
 base_power = 5.0
 sprite_path = "res://art/placeholder/monster_banjo_moth.png"

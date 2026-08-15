@@ -2,9 +2,9 @@ extends Node
 
 ## Проверки боевой логики.
 ##
-## Главное, что здесь охраняется — обещание из GDD §4.3: обычный промах
-## НЕ отнимает у игрока ничего, наказывает только пропущенный щит.
-## Если это сломается, игра станет злой к детям, а тесты обязаны упасть.
+## Главное, что здесь охраняется: щит — это буфер прощения. Промахи
+## стоят внимания, но не прогресса, пока он держится. Здоровье трогается
+## только когда буфер выбит полностью — иначе игра станет злой к детям.
 
 var _failed := 0
 var _passed := 0
@@ -13,7 +13,9 @@ var _passed := 0
 func _ready() -> void:
 	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
 	SaveManager.enter_test_mode()
-	_test_groove_only_lost_to_shields()
+	_test_shield_absorbs_before_health()
+	_test_shield_note_restores_shield()
+	_test_missed_shield_hurts_more()
 	_test_vibe_and_combo()
 	_test_genre_advantage()
 	_test_depth_scaling()
@@ -42,28 +44,79 @@ func check_eq(actual: Variant, expected: Variant, description: String) -> void:
 
 
 func _make(monster_id := "synth_slime", guardian_id := "disco_sprout",
-		groove := 100, depth := 0) -> BattleState:
+		health := 100, depth := 0) -> BattleState:
 	var s := BattleState.new()
-	s.setup(Registry.monster(monster_id), Registry.monster(guardian_id), groove, depth)
+	s.setup(Registry.monster(monster_id), Registry.monster(guardian_id), health, depth)
 	return s
 
 
-func _test_groove_only_lost_to_shields() -> void:
-	print("Ритм теряется только от пропущенного щита")
+## Щит — это прощение: промахи стоят внимания, но не прогресса,
+## пока буфер держится. Здоровье трогается только когда щит выбит.
+func _test_shield_absorbs_before_health() -> void:
+	print("Урон идёт сначала в щит, потом в здоровье")
 	var s := _make()
-	var before := s.groove
+	var health_before := s.health
+	check_eq(s.shield, s.max_shield, "щит полон на входе в бой")
 
-	for i in 30:
+	s.register_hit(Judge.Grade.MISS)
+	check(s.shield < s.max_shield, "промах съел щит")
+	check_eq(s.health, health_before, "здоровье не тронуто, пока держится щит")
+	check_eq(s.combo, 0, "комбо сбито")
+
+	# Пока щита хватает на весь удар, здоровье не должно шелохнуться.
+	# Излишек последнего удара честно перетекает в здоровье — это верно,
+	# и тест обязан это допускать, а не считать поломкой
+	var guard := 0
+	while s.shield >= BattleState.MISS_DAMAGE and guard < 100:
+		guard += 1
 		s.register_hit(Judge.Grade.MISS)
-	check_eq(s.groove, before, "30 обычных промахов не отняли Ритм")
-	check_eq(s.combo, 0, "но комбо сбито")
+		check_eq(s.health, health_before,
+			"здоровье цело, пока щит покрывает удар (осталось щита %d)" % s.shield)
 
-	s.take_strike()
-	check_eq(s.groove, before - BattleState.STRIKE_DAMAGE, "пропущенный щит отнял Ритм")
+	# Добиваем остаток щита
+	while s.shield > 0 and guard < 200:
+		guard += 1
+		s.register_hit(Judge.Grade.MISS)
+	check_eq(s.shield, 0, "щит выбит")
+
+	var health_at_zero_shield := s.health
+	s.register_hit(Judge.Grade.MISS)
+	check(s.health < health_at_zero_shield, "без щита промахи бьют прямо по здоровью")
+	check_eq(health_at_zero_shield - s.health, BattleState.MISS_DAMAGE,
+		"без щита промах стоит ровно свою цену")
+
+
+func _test_shield_note_restores_shield() -> void:
+	print("Попадание по ноте-щиту чинит щит")
+	var s := _make()
+	for i in 3:
+		s.register_hit(Judge.Grade.MISS)
+	var damaged := s.shield
+	check(damaged < s.max_shield, "щит повреждён")
 
 	s.block_strike()
-	check_eq(s.groove, before - BattleState.STRIKE_DAMAGE, "принятый щит Ритм не отнимает")
-	check(s.combo > 0, "принятый щит наращивает комбо")
+	check(s.shield > damaged, "принятый щит восстановил буфер")
+	check(s.combo > 0, "и нарастил комбо")
+
+	# Восстановление не переливается через край
+	for i in 20:
+		s.block_strike()
+	check_eq(s.shield, s.max_shield, "щит не превышает максимум")
+
+
+func _test_missed_shield_hurts_more() -> void:
+	print("Пропущенный щит бьёт сильнее обычного промаха")
+	var a := _make()
+	a.register_hit(Judge.Grade.MISS)
+	var miss_damage := a.max_shield - a.shield
+
+	var b := _make()
+	b.take_strike()
+	var strike_damage := b.max_shield - b.shield
+
+	check(strike_damage > miss_damage,
+		"атака монстра дороже обычного промаха (%d против %d)"
+			% [strike_damage, miss_damage])
 
 
 func _test_vibe_and_combo() -> void:
@@ -135,12 +188,13 @@ func _test_victory_and_defeat() -> void:
 	check_eq(won.vibe, vibe_after, "после победы попадания уже не считаются")
 
 	var lost := _make("synth_slime", "disco_sprout", BattleState.STRIKE_DAMAGE)
+	lost.shield = 0  # щит уже выбит: урон пойдёт прямо в здоровье
 	var defeats := [0]
 	lost.defeat.connect(func(): defeats[0] += 1)
 	lost.take_strike()
-	check(lost.is_over and not lost.did_win, "Ритм кончился — поражение")
+	check(lost.is_over and not lost.did_win, "здоровье кончилось — поражение")
 	check_eq(defeats[0], 1, "сигнал поражения ровно один")
-	check_eq(lost.groove, 0, "Ритм обнулён, не ушёл в минус")
+	check_eq(lost.health, 0, "здоровье обнулено, не ушло в минус")
 
 
 func _test_perfect_run() -> void:
@@ -161,10 +215,10 @@ func _test_perfect_run() -> void:
 
 
 func _test_snack() -> void:
-	print("Перекус восстанавливает Ритм")
+	print("Перекус восстанавливает здоровье")
 	var s := _make("synth_slime", "disco_sprout", 50)
-	s.restore_groove(15)
-	check_eq(s.groove, 65, "Ритм восстановлен")
+	s.restore_health(15)
+	check_eq(s.health, 65, "Здоровье восстановлено")
 
-	s.restore_groove(9999)
-	check_eq(s.groove, s.max_groove, "Ритм не превышает максимум")
+	s.restore_health(9999)
+	check_eq(s.health, s.max_health, "Здоровье не превышает максимум")

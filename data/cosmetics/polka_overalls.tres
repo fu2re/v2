@@ -8,5 +8,5 @@ id = "polka_overalls"
 display_name = "Комбинезон в горошек"
 slot = 0
 rarity = 0
-price_chords = 100
+price_gold = 100
 in_crates = true

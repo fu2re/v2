@@ -1,15 +1,15 @@
 extends Node
 
-## Состояние забега: глубина, сквозной Ритм, добыча.
+## Состояние забега: глубина, сквозное здоровье, добыча.
 ##
 ## Добыча копится ОТДЕЛЬНО от постоянного инвентаря и переносится в него
 ## только при выходе. Так работает мягкая смерть (GDD §8.4): при обнулении
-## Ритма теряется половина добычи забега, но не коллекция и не дружба.
+## здоровья теряется половина добычи забега, но не коллекция и не дружба.
 
 signal run_started(guardian_id: String)
 signal glade_entered(glade: Glade)
 signal run_ended(died: bool, kept_fruits: int, kept_seeds: int)
-signal groove_changed(current: int, maximum: int)
+signal health_changed(current: int, maximum: int)
 
 ## Доля добычи, теряемая при смерти. Половина, а не всё: ребёнок должен
 ## уносить домой хоть что-то с каждого забега.
@@ -29,8 +29,8 @@ const CAMPFIRE_RESTORE := 25
 var is_active: bool = false
 var depth: int = 0
 var guardian_id: String = ""
-var groove: int = 100
-var max_groove: int = 100
+var health: int = 100
+var max_health: int = 100
 var current_glade: Glade = null
 
 ## Добыча забега: ключ фрукта -> количество.
@@ -38,7 +38,7 @@ var run_fruits: Dictionary = {}
 ## Семена для грядок: fruit_id -> количество. Отдельно от фруктов,
 ## потому что это разные сущности: семя сажают, фрукт скармливают монстру.
 var run_seed_bag: Dictionary = {}
-var run_seeds: int = 0
+var run_silver: int = 0
 
 var _rng := RandomNumberGenerator.new()
 
@@ -59,18 +59,18 @@ func start_run(new_guardian_id: String) -> bool:
 		return false
 
 	guardian_id = new_guardian_id
-	max_groove = guardian.base_groove \
-		+ int(GameState.gear_bonuses(new_guardian_id).get("groove_bonus", 0))
-	groove = max_groove
+	max_health = guardian.base_health \
+		+ int(GameState.gear_bonuses(new_guardian_id).get("health_bonus", 0))
+	health = max_health
 	depth = 0
 	run_fruits.clear()
 	run_seed_bag.clear()
-	run_seeds = 0
+	run_silver = 0
 	current_glade = null
 	is_active = true
 
 	run_started.emit(guardian_id)
-	groove_changed.emit(groove, max_groove)
+	health_changed.emit(health, max_health)
 	return true
 
 
@@ -90,7 +90,7 @@ func _generate(for_depth: int) -> Glade:
 	var glade := Glade.new()
 	glade.depth = for_depth
 	glade.type = _pick_type()
-	glade.seeds_reward = int(round(BASE_SEEDS * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
+	glade.silver_reward = int(round(BASE_SEEDS * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
 
 	match glade.type:
 		Glade.Type.BATTLE:
@@ -152,24 +152,24 @@ func _pick_monster(for_depth: int) -> String:
 	return all[0].id if not all.is_empty() else ""
 
 
-# --- Ритм --------------------------------------------------------------------
+# --- здоровье --------------------------------------------------------------------
 
-func set_groove(value: int) -> void:
-	groove = clampi(value, 0, max_groove)
-	groove_changed.emit(groove, max_groove)
+func set_health(value: int) -> void:
+	health = clampi(value, 0, max_health)
+	health_changed.emit(health, max_health)
 
 
-func restore_groove(amount: int) -> void:
-	set_groove(groove + amount)
+func restore_health(amount: int) -> void:
+	set_health(health + amount)
 
 
 func rest_at_campfire() -> void:
-	restore_groove(CAMPFIRE_RESTORE)
+	restore_health(CAMPFIRE_RESTORE)
 
 
 ## Сменить гуардиана у костра — единственная точка смены внутри забега.
 ##
-## Ритм переносится ДОЛЕЙ, а не числом: иначе смена на существо с большим
+## Здоровье переносится ДОЛЕЙ, а не числом: иначе смена на существо с большим
 ## запасом лечила бы бесплатно, и костёр превратился бы в кнопку хила.
 func swap_guardian(monster_id: String) -> bool:
 	if not is_active or not GameState.is_tamed(monster_id):
@@ -178,10 +178,10 @@ func swap_guardian(monster_id: String) -> bool:
 	if monster == null:
 		return false
 
-	var ratio := float(groove) / maxf(max_groove, 1.0)
+	var ratio := float(health) / maxf(max_health, 1.0)
 	guardian_id = monster_id
-	max_groove = monster.base_groove + int(GameState.gear_bonuses(monster_id).get("groove_bonus", 0))
-	set_groove(int(round(max_groove * ratio)))
+	max_health = monster.base_health + int(GameState.gear_bonuses(monster_id).get("health_bonus", 0))
+	set_health(int(round(max_health * ratio)))
 	return true
 
 
@@ -196,8 +196,8 @@ func add_loot_seed(fruit_id: String, count: int = 1) -> void:
 	run_seed_bag[fruit_id] = run_seed_bag.get(fruit_id, 0) + count
 
 
-func add_loot_seeds(amount: int) -> void:
-	run_seeds += amount
+func add_loot_silver(amount: int) -> void:
+	run_silver += amount
 
 
 func total_loot_fruits() -> int:
@@ -214,7 +214,7 @@ func go_home() -> void:
 	_end(false)
 
 
-## Ритм кончился. Гуардиан устал, половина добычи теряется.
+## Здоровье кончилось. Гуардиан устал, половина добычи теряется.
 func die() -> void:
 	_end(true)
 
@@ -233,8 +233,8 @@ func _end(died: bool) -> void:
 		GameState.add_fruit(parts[0], int(parts[1]) as FruitData.Quality, kept)
 		kept_fruits += kept
 
-	var kept_seeds := int(floor(run_seeds * (1.0 - DEATH_LOSS))) if died else run_seeds
-	GameState.add_seeds(kept_seeds)
+	var kept_seeds := int(floor(run_silver * (1.0 - DEATH_LOSS))) if died else run_silver
+	GameState.add_silver(kept_seeds)
 
 	# Семена новых культур переживают смерть целиком.
 	# Потерять только что открытый вид — это откат прогресса, а не потеря
@@ -246,7 +246,7 @@ func _end(died: bool) -> void:
 	current_glade = null
 	run_fruits.clear()
 	run_seed_bag.clear()
-	run_seeds = 0
+	run_silver = 0
 
 	SaveManager.save_game()
 	run_ended.emit(died, kept_fruits, kept_seeds)

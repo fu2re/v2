@@ -8,5 +8,5 @@ id = "starlight_cloak"
 display_name = "Плащ звездопада"
 slot = 0
 rarity = 3
-price_chords = 450
+price_gold = 450
 in_crates = true

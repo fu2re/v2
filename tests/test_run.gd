@@ -51,7 +51,7 @@ func _test_start_run() -> void:
 	check(RunManager.start_run("disco_sprout"), "забег стартовал")
 	check(RunManager.is_active, "забег активен")
 	check_eq(RunManager.depth, 0, "глубина ноль до первого свайпа")
-	check_eq(RunManager.groove, RunManager.max_groove, "Ритм полный")
+	check_eq(RunManager.health, RunManager.max_health, "Здоровье полное")
 
 	check(not RunManager.start_run("no_such_monster"), "несуществующий гуардиан отклонён")
 
@@ -110,10 +110,10 @@ func _test_rewards_grow_with_depth() -> void:
 	print("Награды растут с глубиной")
 	RunManager.start_run("disco_sprout")
 	var first := RunManager.advance()
-	var shallow_reward := first.seeds_reward
+	var shallow_reward := first.silver_reward
 	for i in 14:
 		RunManager.advance()
-	var deep_reward := RunManager.current_glade.seeds_reward
+	var deep_reward := RunManager.current_glade.silver_reward
 	RunManager.go_home()
 
 	check(deep_reward > shallow_reward,
@@ -126,12 +126,12 @@ func _test_go_home_keeps_everything() -> void:
 	RunManager.start_run("disco_sprout")
 	RunManager.advance()
 	RunManager.add_loot_fruit("drum_berry", FruitData.Quality.PLAIN, 8)
-	RunManager.add_loot_seeds(100)
+	RunManager.add_loot_silver(100)
 	RunManager.go_home()
 
 	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PLAIN), 8,
 		"все фрукты дошли до сумки")
-	check_eq(GameState.seeds, 100, "все семечки дошли")
+	check_eq(GameState.silver, 100, "все серебро дошли")
 	check(not RunManager.is_active, "забег закрыт")
 
 
@@ -144,7 +144,7 @@ func _test_death_keeps_collection() -> void:
 
 	RunManager.start_run("disco_sprout")
 	RunManager.advance()
-	RunManager.add_loot_seeds(50)
+	RunManager.add_loot_silver(50)
 	RunManager.die()
 
 	check_eq(GameState.get_friendship("bass_bear"), friendship_before,
@@ -158,12 +158,12 @@ func _test_death_halves_loot() -> void:
 	RunManager.start_run("disco_sprout")
 	RunManager.advance()
 	RunManager.add_loot_fruit("drum_berry", FruitData.Quality.PLAIN, 10)
-	RunManager.add_loot_seeds(80)
+	RunManager.add_loot_silver(80)
 	RunManager.die()
 
 	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PLAIN), 5,
 		"половина фруктов сохранилась")
-	check_eq(GameState.seeds, 40, "половина семечек сохранилась")
+	check_eq(GameState.silver, 40, "половина серебра сохранилась")
 
 	# Даже с одним фруктом игрок не должен уходить с пустыми руками навсегда:
 	# проверяем, что округление не уводит в минус
@@ -177,22 +177,22 @@ func _test_death_halves_loot() -> void:
 
 
 func _test_groove_is_shared_across_glades() -> void:
-	print("Ритм сквозной между полянами")
+	print("Здоровье сквозное между полянами")
 	RunManager.start_run("disco_sprout")
-	var full := RunManager.groove
+	var full := RunManager.health
 
 	RunManager.advance()
-	RunManager.set_groove(full - 40)
+	RunManager.set_health(full - 40)
 	RunManager.advance()
-	check_eq(RunManager.groove, full - 40,
-		"Ритм не восстановился сам на новой поляне — в этом всё напряжение забега")
+	check_eq(RunManager.health, full - 40,
+		"Здоровье не восстановилось сам на новой поляне — в этом всё напряжение забега")
 
 	RunManager.rest_at_campfire()
-	check_eq(RunManager.groove, full - 40 + RunManager.CAMPFIRE_RESTORE,
+	check_eq(RunManager.health, full - 40 + RunManager.CAMPFIRE_RESTORE,
 		"костёр восстанавливает Ритм")
 
-	RunManager.restore_groove(9999)
-	check_eq(RunManager.groove, RunManager.max_groove, "Ритм не превышает максимум")
+	RunManager.restore_health(9999)
+	check_eq(RunManager.health, RunManager.max_health, "Здоровье не превышает максимум")
 	RunManager.go_home()
 
 
@@ -249,9 +249,9 @@ func _test_seeds_survive_death() -> void:
 	RunManager.start_run("disco_sprout")
 	RunManager.advance()
 	RunManager.add_loot_seed("chord_apple", 2)
-	RunManager.add_loot_seeds(100)
+	RunManager.add_loot_silver(100)
 	RunManager.die()
 
 	check_eq(FarmState.seed_count("chord_apple"), 2, "семена дошли целиком")
 	check(FarmState.known_seeds.has("chord_apple"), "культура осталась открытой")
-	check_eq(GameState.seeds, 50, "а вот семечек половина — это добыча")
+	check_eq(GameState.silver, 50, "а вот серебра половина — это добыча")

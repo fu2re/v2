@@ -30,9 +30,12 @@ var _feedback: Label = null
 func _ready() -> void:
 	layer = 40
 	visible = false
+	# Интерфейс строится ПЕРВЫМ, пул нот добавляется после.
+	# Соседи рисуются в порядке дерева, и фон во весь экран, добавленный
+	# позже, просто закрывал ноты — они были, но их не было видно
+	_build_ui()
 	_pool = NotePool.new()
 	add_child(_pool)
-	_build_ui()
 	Conductor.finished.connect(_on_track_finished)
 
 
@@ -176,6 +179,8 @@ func _build_ui() -> void:
 	var bg := ColorRect.new()
 	bg.size = Vector2(1080, 1920)
 	bg.color = Color("24391F").darkened(0.15)
+	# Подстраховка на случай перестановки узлов: фон всегда позади
+	bg.z_index = -10
 	add_child(bg)
 
 	_title = Label.new()

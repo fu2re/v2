@@ -201,12 +201,12 @@ func _test_plot_purchase() -> void:
 	print("Расширение фермы")
 	_fresh()
 	var before := FarmState.plot_count()
-	check(not FarmState.buy_plot(), "без семечек грядку не купить")
+	check(not FarmState.buy_plot(), "без серебра грядку не купить")
 
-	GameState.add_seeds(FarmState.next_plot_cost())
+	GameState.add_silver(FarmState.next_plot_cost())
 	check(FarmState.buy_plot(), "грядка куплена")
 	check_eq(FarmState.plot_count(), before + 1, "грядок стало больше")
-	check_eq(GameState.seeds, 0, "семечки списаны")
+	check_eq(GameState.silver, 0, "серебро списаны")
 	check(FarmState.next_plot_cost() > FarmState.PLOT_BASE_COST, "следующая дороже")
 
 

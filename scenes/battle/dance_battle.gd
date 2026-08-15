@@ -20,7 +20,7 @@ const SNACK_RESTORE := 15
 @export var difficulty: String = "normal"
 @export var monster_id: String = "synth_slime"
 @export var guardian_id: String = "disco_sprout"
-@export var starting_groove: int = 100
+@export var starting_health: int = 100
 @export var depth: int = 0
 @export var autostart: bool = true
 
@@ -73,7 +73,7 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 		push_error("Не найден монстр '%s' или гуардиан '%s'" % [monster_id, guardian_id])
 		return
 
-	state.setup(monster, guardian, starting_groove, depth)
+	state.setup(monster, guardian, starting_health, depth)
 	# Обучение занижает Настрой, чтобы первый бой заведомо кончился победой
 	if vibe_override > 0:
 		state.max_vibe = vibe_override
@@ -192,7 +192,7 @@ func _judge_tap() -> void:
 			state.block_strike()
 		ChartData.NoteType.SNACK:
 			state.register_hit(grade)
-			state.restore_groove(SNACK_RESTORE)
+			state.restore_health(SNACK_RESTORE)
 		_:
 			state.register_hit(grade)
 
@@ -225,7 +225,7 @@ func _shake_screen() -> void:
 
 
 ## Трек кончился, а Настрой не сбит: монстр устоял. Это не поражение —
-## Ритм цел, забег продолжается.
+## Здоровье цело, забег продолжается.
 func _on_track_finished() -> void:
 	if state.is_over:
 		return

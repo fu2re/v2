@@ -8,5 +8,5 @@ id = "disco_overalls"
 display_name = "Диско-комбинезон"
 slot = 0
 rarity = 1
-price_chords = 200
+price_gold = 200
 in_crates = true

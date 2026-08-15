@@ -74,8 +74,9 @@ func _combo_line() -> String:
 	var s := _state()
 	if s == null:
 		return ""
-	return "комбо          %d (макс %d)\nНастрой        %d / %d\nРитм           %d / %d" % [
-		s.combo, s.max_combo, s.vibe, s.max_vibe, s.groove, s.max_groove,
+	return "комбо          %d (макс %d)\nНастрой        %d / %d\nЩит            %d / %d\nЗдоровье       %d / %d" % [
+		s.combo, s.max_combo, s.vibe, s.max_vibe,
+		s.shield, s.max_shield, s.health, s.max_health,
 	]
 
 

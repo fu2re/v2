@@ -11,6 +11,6 @@ rarity = 0
 silhouette = 0
 favorite_fruit_id = "drum_berry"
 base_vibe = 90
-base_groove = 100
+base_health = 100
 base_power = 4.0
 sprite_path = "res://art/placeholder/monster_disco_sprout.png"

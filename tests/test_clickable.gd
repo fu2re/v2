@@ -23,6 +23,7 @@ func _ready() -> void:
 		"res://scenes/farm/Farm.tscn",
 		"res://scenes/collection/Collection.tscn",
 		"res://scenes/shop/Shop.tscn",
+		"res://scenes/inventory/Inventory.tscn",
 		"res://scenes/run/RunFeed.tscn",
 		"res://tools/chart_forge/ChartForge.tscn",
 	]:
@@ -56,8 +57,8 @@ func _prepare_state() -> void:
 	GameState.add_friendship("bass_bear", Registry.monster("bass_bear").friendship_threshold())
 	GameState.set_guardian("disco_sprout")
 	GameState.add_gear("spring_boots")
-	GameState.add_seeds(500)
-	ShopState.add_chords(500)
+	GameState.add_silver(500)
+	ShopState.add_gold(500)
 
 
 func check(condition: bool, description: String) -> void:

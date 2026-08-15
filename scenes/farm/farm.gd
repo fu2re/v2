@@ -30,8 +30,8 @@ func _ready() -> void:
 	_dance.finished.connect(_on_dance_finished)
 
 	FarmState.plots_changed.connect(_refresh)
-	FarmState.seeds_changed.connect(_refresh)
-	GameState.seeds_changed.connect(func(_v): _refresh())
+	FarmState.silver_changed.connect(_refresh)
+	GameState.silver_changed.connect(func(_v): _refresh())
 
 	_refresh()
 
@@ -42,8 +42,8 @@ func _process(_delta: float) -> void:
 
 func _refresh() -> void:
 	_sync_grid()
-	_seeds_label.text = "Семечки: %d      Семена: %d" % [
-		GameState.seeds, _total_seeds(),
+	_seeds_label.text = "Серебро %d    Золото %d    Семян %d" % [
+		GameState.silver, ShopState.gold, _total_seeds(),
 	]
 
 	var guardian := Registry.monster(GameState.guardian_id())
@@ -223,6 +223,10 @@ func _go_to_shop() -> void:
 	get_tree().change_scene_to_file("res://scenes/shop/Shop.tscn")
 
 
+func _go_to_inventory() -> void:
+	get_tree().change_scene_to_file("res://scenes/inventory/Inventory.tscn")
+
+
 func _build_ui() -> void:
 	var bg := ColorRect.new()
 	bg.size = Vector2(1080, 1920)
@@ -258,14 +262,15 @@ func _build_ui() -> void:
 	# Три входа с фермы: друзья, лавка, лес
 	var nav := [
 		["Друзья", Vector2(60, 460), _go_to_collection],
-		["Лавка", Vector2(390, 460), _go_to_shop],
-		["В лес", Vector2(720, 460), _go_to_forest],
+		["Сумка", Vector2(310, 460), _go_to_inventory],
+		["Лавка", Vector2(560, 460), _go_to_shop],
+		["В лес", Vector2(810, 460), _go_to_forest],
 	]
 	for entry: Array in nav:
 		var button := Button.new()
 		button.text = entry[0]
 		button.position = entry[1]
-		button.size = Vector2(300, 130)
+		button.size = Vector2(210, 130)
 		button.add_theme_font_size_override("font_size", 42)
 		button.pressed.connect(entry[2])
 		add_child(button)

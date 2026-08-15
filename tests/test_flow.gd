@@ -40,6 +40,7 @@ func _ready() -> void:
 
 	await _test_planting_several_plots()
 	await _test_home_button_does_not_start_battle()
+	await _test_monster_glade_blocks_swipe()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -176,5 +177,64 @@ func _test_home_button_does_not_start_battle() -> void:
 	check(not RunManager.is_active, "забег закрыт")
 	check(feed._battle == null, "бой не начался вместо ухода домой")
 
+	feed.queue_free()
+	await _frames(2)
+
+
+## Поляну с монстром пропустить нельзя: встретил — танцуй.
+##
+## Без этого главное решение забега подменялось бы бесплатным листанием
+## мимо всего опасного, и лента переставала быть выбором.
+func _test_monster_glade_blocks_swipe() -> void:
+	print("Поляну с монстром нельзя пропустить")
+	GameState.reset()
+	FarmState.reset()
+	var starter := Registry.monster("disco_sprout")
+	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
+	GameState.set_guardian("disco_sprout")
+	RunManager.set_seed(7)
+
+	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
+	add_child(feed)
+	await _frames(3)
+
+	# Доходим до боевой поляны
+	var guard := 0
+	while RunManager.current_glade != null \
+			and RunManager.current_glade.type != Glade.Type.BATTLE and guard < 60:
+		guard += 1
+		feed._next_glade()
+		await _frames(1)
+
+	check(RunManager.current_glade != null
+		and RunManager.current_glade.type == Glade.Type.BATTLE,
+		"боевая поляна найдена")
+
+	var depth_before := RunManager.depth
+	check(feed._blocks_swipe(), "боевая поляна держит игрока")
+	feed._try_next_glade()
+	await _frames(2)
+	check_eq(RunManager.depth, depth_before, "свайп не сработал — поляна не пройдена")
+
+	# После прохождения свайп разблокируется
+	feed._glade_cleared = true
+	check(not feed._blocks_swipe(), "пройденная поляна отпускает")
+	feed._try_next_glade()
+	await _frames(2)
+	check(RunManager.depth > depth_before, "после боя свайп работает")
+
+	# Небоевые поляны пропускаются свободно
+	guard = 0
+	while RunManager.current_glade != null \
+			and RunManager.current_glade.type == Glade.Type.BATTLE and guard < 60:
+		guard += 1
+		feed._glade_cleared = true
+		feed._try_next_glade()
+		await _frames(1)
+	if RunManager.current_glade != null:
+		check(not feed._blocks_swipe(),
+			"поляна типа «%s» пропускается свободно" % RunManager.current_glade.type_name())
+
+	RunManager.go_home()
 	feed.queue_free()
 	await _frames(2)

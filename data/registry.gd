@@ -116,5 +116,5 @@ static func all_cosmetics() -> Array[CosmeticData]:
 	var out: Array[CosmeticData] = []
 	for c: CosmeticData in _cosmetics.values():
 		out.append(c)
-	out.sort_custom(func(a, b): return a.price_chords < b.price_chords)
+	out.sort_custom(func(a, b): return a.price_gold < b.price_gold)
 	return out

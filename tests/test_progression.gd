@@ -107,7 +107,7 @@ func _test_friendship_never_lost() -> void:
 
 	# Имитация смерти в забеге: теряется добыча, но не дружба (GDD §8.4)
 	GameState.fruits.clear()
-	GameState.add_seeds(-GameState.seeds)
+	GameState.add_silver(-GameState.silver)
 
 	check_eq(GameState.get_friendship("bass_bear"), before,
 		"после смерти в забеге дружба сохранилась")
@@ -146,9 +146,9 @@ func _test_inventory() -> void:
 
 	check(not GameState.consume_fruit("loop_fig", Q.PLAIN), "нельзя потратить то, чего нет")
 
-	GameState.add_seeds(50)
-	GameState.add_seeds(-80)
-	check_eq(GameState.seeds, 0, "семечки не уходят в минус")
+	GameState.add_silver(50)
+	GameState.add_silver(-80)
+	check_eq(GameState.silver, 0, "серебро не уходят в минус")
 
 
 func _test_save_roundtrip() -> void:
@@ -156,7 +156,7 @@ func _test_save_roundtrip() -> void:
 	GameState.reset()
 	GameState.add_friendship("banjo_moth", 75)
 	GameState.add_fruit("loop_fig", FruitData.Quality.JUICY, 4)
-	GameState.add_seeds(120)
+	GameState.add_silver(120)
 	GameState.add_friendship("disco_sprout", 100)
 
 	var snapshot := GameState.to_dict()
@@ -166,11 +166,11 @@ func _test_save_roundtrip() -> void:
 	GameState.from_dict(snapshot)
 	check_eq(GameState.get_friendship("banjo_moth"), 75, "дружба восстановилась")
 	check_eq(GameState.fruit_count("loop_fig", FruitData.Quality.JUICY), 4, "фрукты восстановились")
-	check_eq(GameState.seeds, 120, "семечки восстановились")
+	check_eq(GameState.silver, 120, "серебро восстановились")
 	check(GameState.is_tamed("disco_sprout"), "коллекция восстановилась")
 
 	# Сейв из будущей версии не должен ронять игру
 	var future := snapshot.duplicate()
 	future["version"] = 999
 	GameState.from_dict(future)
-	check_eq(GameState.seeds, 120, "сейв новой версии читается без падения")
+	check_eq(GameState.silver, 120, "сейв новой версии читается без падения")

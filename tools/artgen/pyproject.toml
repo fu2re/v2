@@ -4,21 +4,21 @@ version = "0.1.0"
 description = "Палитра, плейсхолдеры и пиксель-постобработка ассетов BEATROOT"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "numpy>=1.26",
-    "pillow>=10.0",
+	"numpy>=1.26",
+	"pillow>=10.0",
 ]
 
 [project.optional-dependencies]
 # Клиент ComfyUI. Ставится отдельно: uv sync --extra comfy
 comfy = [
-    "requests>=2.31",
+	"requests>=2.31",
 ]
 # Нейросетевая вырезка фона. Нужна, когда модель не слушается промпта
 # про белый фон — так ведут себя все дистиллированные модели.
 # Первый запуск докачивает модель сегментации (~180 МБ).
 cutout = [
-    "rembg>=2.0",
-    "onnxruntime>=1.17",
+	"rembg>=2.0",
+	"onnxruntime>=1.17",
 ]
 
 [project.scripts]

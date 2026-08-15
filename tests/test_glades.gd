@@ -50,9 +50,9 @@ func _test_campfire_restores() -> void:
 	GameState.reset()
 	_tame(["disco_sprout"])
 	RunManager.start_run("disco_sprout")
-	RunManager.set_groove(30)
+	RunManager.set_health(30)
 	RunManager.rest_at_campfire()
-	check_eq(RunManager.groove, 30 + RunManager.CAMPFIRE_RESTORE, "Ритм поднялся")
+	check_eq(RunManager.health, 30 + RunManager.CAMPFIRE_RESTORE, "Ритм поднялся")
 	RunManager.go_home()
 
 
@@ -62,21 +62,21 @@ func _test_swap_carries_ratio_not_amount() -> void:
 	_tame(["disco_sprout", "beat_serpent"])
 
 	RunManager.start_run("disco_sprout")
-	var small_max := RunManager.max_groove
-	RunManager.set_groove(int(small_max * 0.5))
+	var small_max := RunManager.max_health
+	RunManager.set_health(int(small_max * 0.5))
 
 	check(RunManager.swap_guardian("beat_serpent"), "смена прошла")
 	check_eq(RunManager.guardian_id, "beat_serpent", "гуардиан сменился")
 
-	var big_max := RunManager.max_groove
+	var big_max := RunManager.max_health
 	check(big_max > small_max, "у змея запас больше")
 
-	var ratio := float(RunManager.groove) / float(big_max)
+	var ratio := float(RunManager.health) / float(big_max)
 	check(absf(ratio - 0.5) < 0.02,
 		"перенеслась доля 50%%, а не число (получено %.2f)" % ratio)
 
 	# Если бы переносилось число, смена на крупного стала бы кнопкой хила
-	check(RunManager.groove < big_max, "смена не долечила до полного — костёр не хил")
+	check(RunManager.health < big_max, "смена не долечила до полного — костёр не хил")
 	RunManager.go_home()
 
 
@@ -97,14 +97,14 @@ func _test_gear_raises_run_groove() -> void:
 	GameState.reset()
 	_tame(["disco_sprout"])
 	RunManager.start_run("disco_sprout")
-	var bare := RunManager.max_groove
+	var bare := RunManager.max_health
 	RunManager.go_home()
 
 	GameState.add_gear("heartwood_amulet")
 	GameState.equip("disco_sprout", "heartwood_amulet")
 	RunManager.start_run("disco_sprout")
-	check(RunManager.max_groove > bare,
-		"амулет поднял запас забега (%d против %d)" % [RunManager.max_groove, bare])
+	check(RunManager.max_health > bare,
+		"амулет поднял запас забега (%d против %d)" % [RunManager.max_health, bare])
 	RunManager.go_home()
 
 

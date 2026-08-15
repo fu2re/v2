@@ -22,7 +22,7 @@ var _pending_since: float = 0.0
 
 func _ready() -> void:
 	_build_ui()
-	ShopState.chords_changed.connect(func(_v): _refresh())
+	ShopState.gold_changed.connect(func(_v): _refresh())
 	ShopState.purchase_blocked.connect(_on_blocked)
 	ShopState.crate_opened.connect(_on_crate_opened)
 	_refresh()
@@ -39,8 +39,8 @@ func _process(_delta: float) -> void:
 
 
 func _refresh() -> void:
-	_balance.text = "Аккорды: %d      Сегодня можно потратить: %d" % [
-		ShopState.chords, ShopState.remaining_today(),
+	_balance.text = "Золото: %d      Сегодня можно потратить: %d" % [
+		ShopState.gold, ShopState.remaining_today(),
 	]
 
 	var allowed := ShopState.lootboxes_allowed()
@@ -80,10 +80,10 @@ func _make_row(item: CosmeticData) -> Control:
 			ShopState.equip(item.id)
 			_refresh())
 	elif _pending == item.id:
-		button.text = "Купить за %d ♪? Нажми ещё раз" % item.price_chords
+		button.text = "Купить за %d ♪? Нажми ещё раз" % item.price_gold
 		button.pressed.connect(_confirm_buy.bind(item))
 	else:
-		button.text = "%d ♪" % item.price_chords
+		button.text = "%d ♪" % item.price_gold
 		button.pressed.connect(func():
 			_pending = item.id
 			_pending_since = Time.get_ticks_msec() / 1000.0
@@ -118,7 +118,7 @@ func _on_crate_opened(cosmetic_id: String, was_duplicate: bool, pity_hit: bool) 
 	if item == null:
 		return
 	if was_duplicate:
-		_status.text = "%s уже есть — вернулись Аккорды: %d" % [
+		_status.text = "%s уже есть — вернулись Золото: %d" % [
 			item.display_name, ShopState.DUPLICATE_REFUND.get(item.rarity, 0),
 		]
 	elif pity_hit:

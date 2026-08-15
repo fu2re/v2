@@ -10,6 +10,6 @@ slot = 0
 rarity = 3
 window_scale = 1.5
 power_bonus = 0.5
-groove_bonus = 0
+health_bonus = 0
 shield_reduction = 0.0
 price = 220

@@ -65,6 +65,7 @@ func _test_all_scenes_instantiate() -> void:
 		"res://scenes/farm/Farm.tscn",
 		"res://scenes/collection/Collection.tscn",
 		"res://scenes/shop/Shop.tscn",
+		"res://scenes/inventory/Inventory.tscn",
 		"res://scenes/run/RunFeed.tscn",
 		"res://scenes/battle/DanceBattle.tscn",
 		"res://scenes/battle/TamingScreen.tscn",
@@ -124,7 +125,7 @@ func _test_full_player_journey() -> void:
 	# 3. Бой до победы
 	var monster := Registry.monster(battle_glade.monster_id)
 	var state := BattleState.new()
-	state.setup(monster, Registry.monster(RunManager.guardian_id), RunManager.groove,
+	state.setup(monster, Registry.monster(RunManager.guardian_id), RunManager.health,
 		battle_glade.depth)
 	var swings := 0
 	while not state.is_over and swings < 500:
@@ -139,14 +140,14 @@ func _test_full_player_journey() -> void:
 	check(GameState.get_friendship(monster.id) > before, "дружба выросла после боя")
 
 	# 5. Ритм переносится на следующую поляну
-	RunManager.set_groove(state.groove)
-	RunManager.add_loot_seeds(battle_glade.seeds_reward)
+	RunManager.set_health(state.health)
+	RunManager.add_loot_silver(battle_glade.silver_reward)
 	RunManager.add_loot_seed("drum_berry", 2)
 
 	# 6. Домой с добычей
-	var seeds_before := GameState.seeds
+	var seeds_before := GameState.silver
 	RunManager.go_home()
-	check(GameState.seeds > seeds_before, "семечки доехали домой")
+	check(GameState.silver > seeds_before, "серебро доехали домой")
 	check(FarmState.seed_count("drum_berry") >= 2, "семена доехали на ферму")
 
 	# 7. Ферма: посадить, станцевать, вырастить, собрать
@@ -160,7 +161,7 @@ func _test_full_player_journey() -> void:
 		"идеальный танец дал идеальный фрукт")
 
 	# 8. Лавка: купить и надеть косметику
-	ShopState.add_chords(1000)
+	ShopState.add_gold(1000)
 	ShopState.daily_limit = 999999
 	var cosmetic := Registry.all_cosmetics()[0]
 	check(ShopState.buy_direct(cosmetic.id), "косметика куплена")
@@ -174,7 +175,7 @@ func _test_full_player_journey() -> void:
 	var geared := BattleState.new()
 	geared.setup(monster, Registry.monster("disco_sprout"), 100, 0)
 	var damage_with_cosmetics := geared.register_hit(Judge.Grade.PERFECT)
-	var groove_with_cosmetics := geared.max_groove
+	var groove_with_cosmetics := geared.max_health
 
 	var owned_backup := ShopState.owned.duplicate()
 	var equipped_backup := ShopState.equipped.duplicate()
@@ -188,7 +189,7 @@ func _test_full_player_journey() -> void:
 	check_eq(damage_with_cosmetics, damage_bare,
 		"косметика не изменила урон (%d против %d) — pay-to-win не просочился"
 			% [damage_with_cosmetics, damage_bare])
-	check_eq(groove_with_cosmetics, bare.max_groove, "косметика не изменила Ритм")
+	check_eq(groove_with_cosmetics, bare.max_health, "косметика не изменила Ритм")
 	check_eq(geared.window_scale, bare.window_scale, "косметика не изменила окна")
 
 	ShopState.owned = owned_backup
@@ -219,7 +220,7 @@ func _test_deep_run_survives() -> void:
 			continue
 
 		var state := BattleState.new()
-		state.setup(monster, Registry.monster("disco_sprout"), RunManager.groove, glade.depth)
+		state.setup(monster, Registry.monster("disco_sprout"), RunManager.health, glade.depth)
 		check(state.max_vibe > 0, "глубина %d: Настрой положителен" % glade.depth)
 
 		var swings := 0
@@ -241,7 +242,7 @@ func _test_whole_state_survives_save() -> void:
 	GameState.add_friendship("disco_sprout", 999)
 	GameState.set_guardian("disco_sprout")
 	GameState.add_fruit("loop_fig", FruitData.Quality.JUICY, 3)
-	GameState.add_seeds(250)
+	GameState.add_silver(250)
 	GameState.add_gear("spring_boots")
 	GameState.equip("disco_sprout", "spring_boots")
 
@@ -249,7 +250,7 @@ func _test_whole_state_survives_save() -> void:
 	FarmState.plant(0, "echo_pear")
 	FarmState.apply_dance(0, DanceGrade.Level.GOOD)
 
-	ShopState.add_chords(600)
+	ShopState.add_gold(600)
 	ShopState.daily_limit = 999999
 	var cosmetic := Registry.all_cosmetics()[0]
 	ShopState.buy_direct(cosmetic.id)
@@ -270,7 +271,7 @@ func _test_whole_state_survives_save() -> void:
 	check_eq(GameState.get_friendship("bass_bear"), 70, "дружба восстановилась")
 	check_eq(GameState.guardian_id(), "disco_sprout", "гуардиан восстановился")
 	check_eq(GameState.fruit_count("loop_fig", FruitData.Quality.JUICY), 3, "фрукты на месте")
-	check_eq(GameState.seeds, 250, "семечки на месте")
+	check_eq(GameState.silver, 250, "серебро на месте")
 	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS) != null,
 		"снаряжение осталось надетым")
 	check(not FarmState.is_empty_plot(0), "грядка засажена")
