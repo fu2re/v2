@@ -130,7 +130,7 @@ func _test_full_player_journey() -> void:
 	var swings := 0
 	while not state.is_over and swings < 500:
 		swings += 1
-		state.register_hit(Judge.Grade.PERFECT)
+		_clean_attack(state)
 	check(state.did_win, "бой выигран за %d попаданий" % swings)
 	check(swings < 500, "победа достижима, а не бесконечна")
 
@@ -174,7 +174,7 @@ func _test_full_player_journey() -> void:
 	# Мутационный прогон это показал, и тест переписан под факт.
 	var geared := BattleState.new()
 	geared.setup(monster, Registry.monster("disco_sprout"), 100, 0)
-	var damage_with_cosmetics := geared.register_hit(Judge.Grade.PERFECT)
+	var damage_with_cosmetics := _clean_attack(geared)
 	var groove_with_cosmetics := geared.max_health
 
 	var owned_backup := ShopState.owned.duplicate()
@@ -184,7 +184,7 @@ func _test_full_player_journey() -> void:
 
 	var bare := BattleState.new()
 	bare.setup(monster, Registry.monster("disco_sprout"), 100, 0)
-	var damage_bare := bare.register_hit(Judge.Grade.PERFECT)
+	var damage_bare := _clean_attack(bare)
 
 	check_eq(damage_with_cosmetics, damage_bare,
 		"косметика не изменила урон (%d против %d) — pay-to-win не просочился"
@@ -226,7 +226,7 @@ func _test_deep_run_survives() -> void:
 		var swings := 0
 		while not state.is_over and swings < 5000:
 			swings += 1
-			state.register_hit(Judge.Grade.PERFECT)
+			_clean_attack(state)
 		check(state.is_over, "глубина %d: бой завершим" % glade.depth)
 
 	check(battles > 20, "за 60 полян было больше 20 боёв (%d)" % battles)
@@ -328,3 +328,11 @@ func _test_new_player_can_reach_first_taming() -> void:
 
 	check(not tamed_new.is_empty(), "новый друг достижим за разумное число боёв")
 	check(GameState.tamed.size() >= 2, "коллекция выросла (%d)" % GameState.tamed.size())
+
+
+## Провести чистую серию и ударить. Обычные биты урона не наносят,
+## поэтому победить можно только так (GDD §4.3).
+func _clean_attack(state: BattleState, grade := Judge.Grade.PERFECT) -> int:
+	for i in BattleState.MIN_SERIES_LENGTH:
+		state.register_hit(Judge.Grade.PERFECT)
+	return state.register_attack(grade)

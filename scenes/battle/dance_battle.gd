@@ -21,6 +21,7 @@ const SNACK_RESTORE := 15
 @export var monster_id: String = "synth_slime"
 @export var guardian_id: String = "disco_sprout"
 @export var starting_health: int = 100
+@export var starting_shield: int = -1
 @export var depth: int = 0
 @export var autostart: bool = true
 
@@ -33,6 +34,8 @@ var _active: Array[Note] = []
 var _next_index: int = 0
 var _next_pattern_index: int = 0
 var _monster_sprite: Sprite2D = null
+var _knocked_out: Node2D = null
+var _outcome_label: Label = null
 
 
 func _ready() -> void:
@@ -73,7 +76,7 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 		push_error("Не найден монстр '%s' или гуардиан '%s'" % [monster_id, guardian_id])
 		return
 
-	state.setup(monster, guardian, starting_health, depth)
+	state.setup(monster, guardian, starting_health, depth, starting_shield)
 	# Обучение занижает Настрой, чтобы первый бой заведомо кончился победой
 	if vibe_override > 0:
 		state.max_vibe = vibe_override
@@ -142,14 +145,35 @@ func _expire_missed() -> void:
 			i += 1
 
 
-## Пропуск щита — единственный способ потерять Ритм.
 func _miss(note: Note) -> void:
-	if note.type == ChartData.NoteType.SHIELD:
-		state.take_strike()
-		_shake_screen()
-	else:
-		state.register_hit(Judge.Grade.MISS)
+	match note.type:
+		ChartData.NoteType.SHIELD:
+			state.take_strike()
+			_shake_screen()
+		ChartData.NoteType.ATTACK:
+			state.register_attack(Judge.Grade.MISS)
+		_:
+			state.register_hit(Judge.Grade.MISS)
 	note_judged.emit(Judge.Grade.MISS, Judge.LATE_WINDOW)
+
+
+## Показать, сработала атака или прошла вхолостую.
+##
+## Разница обязана читаться мгновенно: игрок должен связать «вёл серию чисто»
+## с «монстру прилетело», иначе правило серии останется невидимым.
+func _flash_attack(landed: bool) -> void:
+	if _monster_sprite == null:
+		return
+	var tween := create_tween()
+	if landed:
+		_monster_sprite.modulate = Color("FF6BDE")
+		tween.tween_property(_monster_sprite, "scale", Vector2(3.2, 3.2), 0.08)
+		tween.tween_property(_monster_sprite, "scale", Vector2(4.0, 4.0), 0.22)
+		tween.parallel().tween_property(_monster_sprite, "modulate", Color.WHITE, 0.22)
+	else:
+		# Холостая атака: монстр даже не дрогнул
+		tween.tween_property(_monster_sprite, "modulate", Color(0.6, 0.6, 0.6), 0.1)
+		tween.tween_property(_monster_sprite, "modulate", Color.WHITE, 0.2)
 
 
 func _retire(index: int) -> void:
@@ -193,6 +217,9 @@ func _judge_tap() -> void:
 		ChartData.NoteType.SNACK:
 			state.register_hit(grade)
 			state.restore_health(SNACK_RESTORE)
+		ChartData.NoteType.ATTACK:
+			var dealt := state.register_attack(grade)
+			_flash_attack(dealt > 0)
 		_:
 			state.register_hit(grade)
 
@@ -244,7 +271,50 @@ func _end_battle(won: bool) -> void:
 	Conductor.stop()
 	_pool.release_all()
 	_active.clear()
+	_show_outcome(won)
 	battle_finished.emit(won, state)
+
+
+## Итог боя показывается ЗДЕСЬ ЖЕ, а не отдельным экраном.
+##
+## Победа: монстр падает, вместо глаз крестики. Не победа: он убегает.
+## Разница обязана читаться без слов — от неё зависит, поймёт ли ребёнок,
+## почему приручение доступно в одном случае и недоступно в другом.
+func _show_outcome(won: bool) -> void:
+	if _monster_sprite == null:
+		return
+
+	var tween := create_tween()
+	if won:
+		tween.tween_property(_monster_sprite, "rotation", PI * 0.5, 0.45)
+		tween.parallel().tween_property(_monster_sprite, "position:y",
+			_monster_sprite.position.y + 120.0, 0.45)
+		tween.tween_callback(func(): _knocked_out.visible = true)
+		_outcome_label.text = "Наплясался!"
+		_outcome_label.add_theme_color_override("font_color", Color("FFD24D"))
+	else:
+		# Убегает вбок и растворяется
+		tween.tween_property(_monster_sprite, "position:x", -300.0, 0.7)
+		tween.parallel().tween_property(_monster_sprite, "modulate:a", 0.0, 0.7)
+		_outcome_label.text = "Убежал…"
+		_outcome_label.add_theme_color_override("font_color", Color("ADA99F"))
+	_outcome_label.visible = true
+
+
+## Крестики вместо глаз. Рисуются поверх спрайта, потому что плейсхолдеры
+## одинаковых глаз не имеют, а знак «монстр наплясался» нужен уже сейчас.
+func _build_knocked_out() -> void:
+	_knocked_out = Node2D.new()
+	_knocked_out.visible = false
+	_knocked_out.z_index = 5
+	_knocked_out.position = Vector2(LANE_X, 300)
+	_knocked_out.draw.connect(func():
+		for side in [-1.0, 1.0]:
+			var c := Vector2(side * 34.0, -18.0)
+			var r := 18.0
+			_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 7.0)
+			_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 7.0))
+	add_child(_knocked_out)
 
 
 func _build_stage() -> void:
@@ -266,3 +336,14 @@ func _build_stage() -> void:
 	_monster_sprite.scale = Vector2(4, 4)
 	_monster_sprite.position = Vector2(LANE_X, 300)
 	add_child(_monster_sprite)
+	_build_knocked_out()
+
+	_outcome_label = Label.new()
+	_outcome_label.position = Vector2(60, 560)
+	_outcome_label.size = Vector2(960, 120)
+	_outcome_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_outcome_label.add_theme_font_size_override("font_size", 72)
+	_outcome_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_outcome_label.add_theme_constant_override("outline_size", 12)
+	_outcome_label.visible = false
+	add_child(_outcome_label)

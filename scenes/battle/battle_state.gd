@@ -22,13 +22,28 @@ const MISS_DAMAGE := 3
 ## Сколько щита возвращает попадание по ноте-щиту.
 const SHIELD_RESTORE := 8
 
-## Базовый запас щита. Щит — буфер ОДНОГО боя: он полон на входе на поляну
-## и восстанавливается только нотами-щитами. Здоровье, в отличие от него,
-## сквозное на весь забег и само не возвращается.
+## Базовый запас щита.
+##
+## Щит СКВОЗНОЙ, как и здоровье: забег — это испытание на выносливость,
+## и буфер не обновляется на каждой поляне. Разница между ними в том,
+## что щит чинится в бою нотами-щитами, а здоровье — только у костра.
 const BASE_SHIELD := 40
 
 ## Рост Настроя монстра с глубиной забега (GDD §8.3).
 const VIBE_DEPTH_SCALE := 0.12
+
+## Сколько нот подряд обязана содержать серия, чтобы атака в её конце
+## считалась заслуженной. Ниже — атака проходит, но слабее не бывает:
+## короткие связки не должны давать тот же результат, что длинные.
+const MIN_SERIES_LENGTH := 3
+
+## Множитель атаки.
+##
+## Подобран так, чтобы чистое прохождение всего трека выбивало монстра
+## примерно к его концу, а не на середине. Слишком крупный множитель
+## обрывал бой раньше мелодии — это чинится здесь, а не в чарте.
+## Охраняется тестом на длину боя.
+const ATTACK_MULTIPLIER := 1.35
 
 var monster: MonsterData = null
 var guardian: MonsterData = null
@@ -52,6 +67,12 @@ var max_combo: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
 
+## Текущая серия. Атака в её конце сработает, только если серия чиста.
+var series_length: int = 0
+var series_clean: bool = true
+var attacks_landed: int = 0
+var attacks_wasted: int = 0
+
 var grade_counts := {
 	Judge.Grade.PERFECT: 0,
 	Judge.Grade.GOOD: 0,
@@ -64,7 +85,7 @@ var did_win: bool = false
 
 
 func setup(new_monster: MonsterData, new_guardian: MonsterData,
-		starting_health: int, run_depth: int = 0) -> void:
+		starting_health: int, run_depth: int = 0, starting_shield: int = -1) -> void:
 	monster = new_monster
 	guardian = new_guardian
 	depth = run_depth
@@ -83,14 +104,19 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 		+ int(bonuses.get("health_bonus", 0))
 	health = clampi(starting_health, 0, max_health)
 
-	# Щит — буфер одного боя: на каждую поляну входим с полным
+	# Щит переносится с прошлой поляны. -1 означает «начать с полного»
+	# и нужен только для отдельных боёв вне забега: обучение, тесты
 	max_shield = BASE_SHIELD
-	shield = max_shield
+	shield = max_shield if starting_shield < 0 else clampi(starting_shield, 0, max_shield)
 
 	combo = 0
 	max_combo = 0
 	blocked = 0
 	strikes_taken = 0
+	series_length = 0
+	series_clean = true
+	attacks_landed = 0
+	attacks_wasted = 0
 	is_over = false
 	did_win = false
 	for key in grade_counts:
@@ -104,7 +130,11 @@ func genre_multiplier() -> float:
 	return MonsterData.genre_multiplier(guardian.genre, monster.genre)
 
 
-## Учесть оценку обычной ноты. Возвращает, насколько сбит Настрой.
+## Учесть оценку обычной ноты.
+##
+## Обычный бит НЕ сбивает Настрой — он копит серию. Урон наносит только
+## атака в конце серии (GDD §4.3). Возвращает всегда 0 — значение оставлено
+## ради единообразия вызовов, урон приходит из register_attack.
 func register_hit(grade: int) -> int:
 	if is_over:
 		return 0
@@ -114,19 +144,70 @@ func register_hit(grade: int) -> int:
 	if grade == Judge.Grade.MISS:
 		combo = 0
 		combo_changed.emit(combo, 1.0)
+		# Промах пачкает серию: атака в её конце уже не сработает
+		series_clean = false
 		_take_damage(MISS_DAMAGE)
 		return 0
 
 	combo += 1
 	max_combo = maxi(max_combo, combo)
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+	series_length += 1
+	return 0
 
+
+## Атакующий бит — единственный источник урона по Настрою.
+##
+## Срабатывает только если серия перед ним пройдена без промахов. Иначе
+## удар проходит вхолостую: смысл в том, чтобы вести связку чисто, а не
+## ждать одну ноту.
+func register_attack(grade: int) -> int:
+	if is_over:
+		return 0
+
+	grade_counts[grade] += 1
+
+	if grade == Judge.Grade.MISS:
+		combo = 0
+		combo_changed.emit(combo, 1.0)
+		series_clean = false
+		_take_damage(MISS_DAMAGE)
+		_reset_series()
+		return 0
+
+	combo += 1
+	max_combo = maxi(max_combo, combo)
+	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+
+	if not series_clean or series_length < MIN_SERIES_LENGTH:
+		attacks_wasted += 1
+		_reset_series()
+		return 0
+
+	# Урон растёт от снаряжения гуардиана: собирать предметы — это и есть
+	# способ бить сильнее (GDD §9.1)
 	var power := (guardian.base_power if guardian != null else 4.0) + power_bonus
 	var amount := int(round(
-		power * Judge.effect(grade) * Judge.combo_multiplier(combo) * genre_multiplier()
+		power * ATTACK_MULTIPLIER * Judge.effect(grade)
+			* Judge.combo_multiplier(combo) * genre_multiplier()
 	))
+	attacks_landed += 1
+	_reset_series()
 	_reduce_vibe(amount)
 	return amount
+
+
+## Пауза в музыке обрывает серию.
+##
+## Атака никогда не ставится сразу после паузы (правило разметки), поэтому
+## обрыв здесь означает именно «связка кончилась», а не «игрок не успел».
+func break_series() -> void:
+	_reset_series()
+
+
+func _reset_series() -> void:
+	series_length = 0
+	series_clean = true
 
 
 ## Щит принят вовремя — атака погашена и щит немного восстановлен.
@@ -141,6 +222,9 @@ func block_strike() -> void:
 	combo += 1
 	max_combo = maxi(max_combo, combo)
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+	# Принятый щит продолжает серию: это тоже точное движение в такт,
+	# и разрывать связку из-за него было бы несправедливо
+	series_length += 1
 	restore_shield(SHIELD_RESTORE)
 
 

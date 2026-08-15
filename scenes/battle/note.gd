@@ -14,6 +14,9 @@ const COLORS := {
 	ChartData.NoteType.SKILL: Color("FF6BDE"),
 	ChartData.NoteType.SHIELD: Color("2E9BFF"),
 	ChartData.NoteType.SNACK: Color("B87AFF"),
+	# Атака — единственная нота, наносящая урон. Она обязана отличаться
+	# и цветом, и формой: игрок должен узнавать её краем глаза
+	ChartData.NoteType.ATTACK: Color("FFD24D"),
 }
 
 var beat: float = 0.0
@@ -43,6 +46,8 @@ func _draw() -> void:
 			_draw_diamond()
 		ChartData.NoteType.SHIELD:
 			_draw_shield()
+		ChartData.NoteType.ATTACK:
+			_draw_star()
 		_:
 			draw_circle(Vector2.ZERO, RADIUS, _color)
 			draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, _color.lightened(0.4), 5.0, true)
@@ -55,6 +60,17 @@ func _draw_diamond() -> void:
 	])
 	draw_colored_polygon(points, _color)
 	draw_polyline(points + PackedVector2Array([points[0]]), _color.lightened(0.4), 5.0, true)
+
+
+## Звезда — форма атаки. Острые лучи читаются как «удар» даже в движении.
+func _draw_star() -> void:
+	var points := PackedVector2Array()
+	for i in 10:
+		var angle := -PI * 0.5 + i * PI / 5.0
+		var r := RADIUS * 1.25 if i % 2 == 0 else RADIUS * 0.5
+		points.append(Vector2(cos(angle), sin(angle)) * r)
+	draw_colored_polygon(points, _color)
+	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 4.0, true)
 
 
 func _draw_shield() -> void:

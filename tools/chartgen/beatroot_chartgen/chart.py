@@ -8,7 +8,29 @@ from pathlib import Path
 
 from .song import Song
 
-NOTE_TYPES = ("beat", "skill", "shield", "snack")
+NOTE_TYPES = ("beat", "skill", "shield", "snack", "attack")
+
+# Серия — это связка нот без длинной паузы. Атака ЗАВЕРШАЕТ серию: следующая
+# нота начинает новую. Поэтому в длинной связке атак несколько, а не одна.
+# Пауза длиннее половины такта обрывает связку. Одна доля была слишком строгой:
+# на спокойных треках с редкими нотами серии не набирались вовсе, и чарт
+# оставался без единой атаки — то есть непроходимым.
+SERIES_GAP = 2.0
+# Короче — не серия, а обрывок; атака после такого не заслужена.
+MIN_SERIES_NOTES = 3
+# Через столько нот связку пора венчать ударом, даже если пауза не подошла.
+# Без этого на плотных чартах вся песня складывалась в одну серию с единственной
+# атакой в конце, и монстра было нечем побеждать.
+#
+# Значение разное по сложностям НАМЕРЕННО. Монстр одинаково крепкий на всех
+# уровнях, поэтому число атак должно быть примерно равным: иначе на лёгком
+# чарте с вдвое меньшим числом нот его просто нечем добить. Сложность меняет
+# то, насколько трудно вести серию чисто, а не то, сколько урона доступно.
+TARGET_SERIES_NOTES = {
+    "easy": 4,
+    "normal": 6,
+    "hard": 8,
+}
 
 # Максимальная плотность нот в секунду. Ограничение из GDD §10.3 —
 # верхняя граница подобрана под то, что успевает семилетний ребёнок.
@@ -121,6 +143,7 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     notes = [ChartNote(b, t) for b, t in beats.items()]
     notes = _ease_in(notes, until=bpb * 2)
     notes = _thin(notes, MAX_DENSITY[difficulty], song.sec_per_beat)
+    notes = _mark_attacks(notes, TARGET_SERIES_NOTES.get(difficulty, 6))
 
     return Chart(
         id=song.id,
@@ -143,6 +166,43 @@ def _retype(beats: dict[float, str], at: float, new_type: str, avoid: list[float
     nearest = min(plain, key=lambda b: abs(b - at))
     if abs(nearest - at) <= 2.0:
         beats[nearest] = new_type
+
+
+def _mark_attacks(notes: list[ChartNote], target: int) -> list[ChartNote]:
+    """Расставить атакующие ноты — единственный источник урона по монстру.
+
+    Атака завершает серию: игрок ведёт связку чисто и «выстреливает» в конце.
+    Ставится либо перед паузой (естественный конец связки), либо после
+    TARGET_SERIES_NOTES нот, если пауза так и не наступила.
+
+    Сразу после паузы атаки не бывает: перед ней тогда нет серии, и правило
+    «чистая серия» становится бессмысленным.
+    """
+    notes = sorted(notes, key=lambda n: n.beat)
+    out = list(notes)
+    since = 0
+
+    for i, note in enumerate(notes):
+        gap = note.beat - notes[i - 1].beat if i > 0 else 1e9
+        if gap > SERIES_GAP:
+            since = 1  # первая нота новой связки, атакой быть не может
+            continue
+
+        since += 1
+        # since считает и саму ноту, а правило требует MIN_SERIES_NOTES нот
+        # ПЕРЕД атакой — отсюда +1. Без этой поправки генератор ставил атаки,
+        # которые бой отвергал как «серия слишком коротка», и на лёгком чарте
+        # три четверти ударов проходили вхолостую.
+        if note.type != "beat" or since < MIN_SERIES_NOTES + 1:
+            continue
+
+        next_gap = notes[i + 1].beat - note.beat if i + 1 < len(notes) else 1e9
+        ends_series = next_gap > SERIES_GAP
+        if ends_series or since >= target:
+            out[i] = ChartNote(note.beat, "attack")
+            since = 0
+
+    return out
 
 
 def _ease_in(notes: list[ChartNote], until: float) -> list[ChartNote]:
@@ -226,5 +286,42 @@ def validate(chart: Chart) -> list[str]:
     for a, b in zip(notes, notes[1:]):
         if abs(a.beat - b.beat) < 1e-6 and "shield" in (a.type, b.type):
             problems.append(f"доля {a.beat}: щит совпадает с нотой '{a.type}/{b.type}'")
+
+    # 7. Атака стоит только в конце связки и никогда сразу после паузы
+    problems.extend(_check_attacks(notes))
+
+    return problems
+
+
+def _check_attacks(notes: list[ChartNote]) -> list[str]:
+    """Перед каждой атакой обязана быть серия минимум из MIN_SERIES_NOTES нот.
+
+    Серия считается от предыдущей атаки или от паузы — смотря что ближе,
+    ровно так же, как её считает бой. Атака сразу после паузы запрещена:
+    серии перед ней нет, и правило «чистая серия» становится бессмысленным.
+    """
+    problems: list[str] = []
+    since = 0
+
+    for i, note in enumerate(notes):
+        gap = note.beat - notes[i - 1].beat if i > 0 else 1e9
+        if gap > SERIES_GAP:
+            since = 1
+        else:
+            since += 1
+
+        if note.type != "attack":
+            continue
+
+        if i == 0 or gap > SERIES_GAP:
+            problems.append(
+                f"доля {note.beat}: атака в начале связки — серии перед ней нет"
+            )
+        elif since - 1 < MIN_SERIES_NOTES:
+            problems.append(
+                f"доля {note.beat}: связка перед атакой всего {since - 1} нот, "
+                f"нужно {MIN_SERIES_NOTES}"
+            )
+        since = 0
 
     return problems

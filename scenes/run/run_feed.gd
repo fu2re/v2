@@ -32,6 +32,9 @@ var _busy := false
 var _awaiting_restart := false
 ## Пройдена ли текущая поляна. Пока бой не окончен, свайп заблокирован.
 var _glade_cleared := false
+## Бой окончен, итог показан, ждём свайпа. Сцена боя ещё на экране.
+var _awaiting_result_swipe := false
+var _pending_result := ""
 
 
 func _ready() -> void:
@@ -101,7 +104,12 @@ func _show_glade(glade: Glade) -> void:
 ## одновременно разрешал поляну: забег закрывался и тут же начинался бой.
 ## _unhandled_input вызывается только если событие не забрал ни один Control.
 func _unhandled_input(event: InputEvent) -> void:
-	if _busy or _battle != null or (_taming != null and _taming.visible):
+	if _taming != null and _taming.visible:
+		return
+	# Пока показан итог боя, ввод обслуживает только уход с него
+	if _battle != null and not _awaiting_result_swipe:
+		return
+	if _busy and not _awaiting_result_swipe:
 		return
 
 	if event is InputEventScreenDrag or event is InputEventMouseMotion:
@@ -116,6 +124,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif _dragging:
 			_dragging = false
 			var travel := pos_y - _drag_start
+			# Итог боя убирается любым осмысленным жестом: и свайпом,
+			# и тапом. Застрять на экране результата нельзя
+			if _awaiting_result_swipe:
+				if travel < -SWIPE_THRESHOLD or absf(travel) < 40.0:
+					_dismiss_battle()
+				return
 			if _awaiting_restart:
 				if absf(travel) < 40.0:
 					_awaiting_restart = false
@@ -309,6 +323,7 @@ func _start_battle(glade: Glade) -> void:
 	_battle.monster_id = glade.monster_id
 	_battle.guardian_id = RunManager.guardian_id
 	_battle.starting_health = RunManager.health
+	_battle.starting_shield = RunManager.shield
 	_battle.depth = glade.depth
 	_battle.autostart = true
 	_battle.battle_finished.connect(_on_battle_finished)
@@ -319,31 +334,50 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 	# Здоровье сквозное: сколько осталось после боя, столько и уходит на следующую поляну
 	_glade_cleared = true
 	RunManager.set_health(state.health)
+	RunManager.set_shield(state.shield)
 
 	var monster := state.monster
 	var perfect := state.is_perfect_run()
 
-	if _battle != null:
-		_battle.queue_free()
-		_battle = null
-	_card.visible = true
-	_home_button.visible = true
-
 	if RunManager.health <= 0:
+		_dismiss_battle()
 		RunManager.die()
 		return
 
 	if won:
 		RunManager.add_loot_silver(RunManager.current_glade.silver_reward)
+		# Экран угощения поверх боя: монстр остаётся лежать на виду,
+		# и связь «победил → можно подружиться» читается сразу
 		_taming.show_for(monster, perfect)
 	else:
-		# Монстр устоял, но Здоровье цело — забег продолжается
-		_hint.text = "%s устоял.\nСвайп вверх — дальше" % monster.display_name
+		# Монстр не побеждён — он убегает, и приручить его нельзя.
+		# Дружба не начисляется вовсе: подружиться можно только с тем,
+		# кто дослушал танец до конца (GDD §6.1)
+		_pending_result = "%s убежал.\nПодружиться можно только с тем,\nкто дослушал до конца." \
+			% monster.display_name
+		_awaiting_result_swipe = true
 		_busy = false
 
 
+## Убрать сцену боя и вернуть карточку поляны.
+##
+## Вызывается по свайпу, а не сразу после боя: итог обязан оставаться
+## на экране, пока игрок сам не решит идти дальше.
+func _dismiss_battle() -> void:
+	if _battle != null:
+		_battle.queue_free()
+		_battle = null
+	_awaiting_result_swipe = false
+	_card.visible = true
+	_home_button.visible = true
+	if not _pending_result.is_empty():
+		_hint.text = "%s\n\nСвайп вверх — дальше" % _pending_result
+		_pending_result = ""
+
+
 func _on_taming_finished() -> void:
-	_hint.text = "Свайп вверх — следующая поляна"
+	_pending_result = "Свайп вверх — следующая поляна"
+	_dismiss_battle()
 	_busy = false
 
 

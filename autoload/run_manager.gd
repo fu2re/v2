@@ -31,6 +31,10 @@ var depth: int = 0
 var guardian_id: String = ""
 var health: int = 100
 var max_health: int = 100
+## Щит тоже сквозной: забег на выносливость, и буфер не обновляется
+## на каждой поляне. Чинится только попаданиями по нотам-щитам.
+var shield: int = BattleState.BASE_SHIELD
+var max_shield: int = BattleState.BASE_SHIELD
 var current_glade: Glade = null
 
 ## Добыча забега: ключ фрукта -> количество.
@@ -62,6 +66,8 @@ func start_run(new_guardian_id: String) -> bool:
 	max_health = guardian.base_health \
 		+ int(GameState.gear_bonuses(new_guardian_id).get("health_bonus", 0))
 	health = max_health
+	max_shield = BattleState.BASE_SHIELD
+	shield = max_shield
 	depth = 0
 	run_fruits.clear()
 	run_seed_bag.clear()
@@ -157,6 +163,10 @@ func _pick_monster(for_depth: int) -> String:
 func set_health(value: int) -> void:
 	health = clampi(value, 0, max_health)
 	health_changed.emit(health, max_health)
+
+
+func set_shield(value: int) -> void:
+	shield = clampi(value, 0, max_shield)
 
 
 func restore_health(amount: int) -> void:

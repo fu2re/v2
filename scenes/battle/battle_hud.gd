@@ -22,6 +22,9 @@ var _vibe_fill: ColorRect = null
 var _health_fill: ColorRect = null
 var _shield_fill: ColorRect = null
 var _combo_label: Label = null
+var _vibe_label: Label = null
+var _shield_label: Label = null
+var _health_label: Label = null
 var _warning_parts: Array[ColorRect] = []
 var _vibe_width := 0.0
 var _health_width := 0.0
@@ -36,12 +39,16 @@ func _ready() -> void:
 	_shield_width = width
 
 	_vibe_fill = _make_bar(Vector2(MARGIN, 120.0), width, VIBE_COLOR)
+	_vibe_label = _add_caption(Vector2(MARGIN, 62.0), "", VIBE_COLOR)
+
 	# Щит над здоровьем: урон съедает его первым, и порядок сверху вниз
-	# повторяет порядок, в котором они теряются
+	# повторяет порядок, в котором они теряются.
+	# У каждой полоски своя подпись С ЧИСЛОМ — без неё тёмная подложка
+	# читалась как ещё одна непонятная шкала
 	_shield_fill = _make_bar(Vector2(MARGIN, 1700.0), width, SHIELD_COLOR)
-	_health_fill = _make_bar(Vector2(MARGIN, 1760.0), width, HEALTH_COLOR)
-	_add_caption(Vector2(MARGIN, 1660.0), "Щит", SHIELD_COLOR)
-	_add_caption(Vector2(MARGIN + 200.0, 1660.0), "Здоровье", HEALTH_COLOR)
+	_health_fill = _make_bar(Vector2(MARGIN, 1790.0), width, HEALTH_COLOR)
+	_shield_label = _add_caption(Vector2(MARGIN, 1660.0), "", SHIELD_COLOR)
+	_health_label = _add_caption(Vector2(MARGIN, 1750.0), "", HEALTH_COLOR)
 
 	_combo_label = Label.new()
 	_combo_label.position = Vector2(MARGIN, 1570.0)
@@ -69,7 +76,7 @@ func _make_bar(pos: Vector2, width: float, color: Color) -> ColorRect:
 	return fill
 
 
-func _add_caption(pos: Vector2, text: String, colour: Color) -> void:
+func _add_caption(pos: Vector2, text: String, colour: Color) -> Label:
 	var label := Label.new()
 	label.position = pos
 	label.text = text
@@ -78,6 +85,7 @@ func _add_caption(pos: Vector2, text: String, colour: Color) -> void:
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	label.add_theme_constant_override("outline_size", 8)
 	add_child(label)
+	return label
 
 
 func bind(state: BattleState) -> void:
@@ -93,14 +101,17 @@ func bind(state: BattleState) -> void:
 
 func _on_vibe_changed(current: int, maximum: int) -> void:
 	_set_fill(_vibe_fill, _vibe_width, current, maximum)
+	_vibe_label.text = "Настрой монстра   %d / %d" % [current, maximum]
 
 
 func _on_health_changed(current: int, maximum: int) -> void:
 	_set_fill(_health_fill, _health_width, current, maximum)
+	_health_label.text = "Здоровье   %d / %d" % [current, maximum]
 
 
 func _on_shield_changed(current: int, maximum: int) -> void:
 	_set_fill(_shield_fill, _shield_width, current, maximum)
+	_shield_label.text = "Щит   %d / %d" % [current, maximum]
 
 
 func _set_fill(fill: ColorRect, full_width: float, current: int, maximum: int) -> void:

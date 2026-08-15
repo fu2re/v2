@@ -17,7 +17,7 @@ func _ready() -> void:
 	_test_campfire_restores()
 	_test_swap_carries_ratio_not_amount()
 	_test_swap_requires_tamed()
-	_test_gear_raises_run_groove()
+	_test_gear_raises_run_health()
 	_test_merchant_stock_is_stable()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
@@ -92,7 +92,7 @@ func _test_swap_requires_tamed() -> void:
 	check(not RunManager.swap_guardian("disco_sprout"), "вне забега смена не работает")
 
 
-func _test_gear_raises_run_groove() -> void:
+func _test_gear_raises_run_health() -> void:
 	print("Амулет поднимает Ритм в забеге")
 	GameState.reset()
 	_tame(["disco_sprout"])

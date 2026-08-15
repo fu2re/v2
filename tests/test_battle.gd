@@ -16,7 +16,12 @@ func _ready() -> void:
 	_test_shield_absorbs_before_health()
 	_test_shield_note_restores_shield()
 	_test_missed_shield_hurts_more()
-	_test_vibe_and_combo()
+	_test_plain_beats_do_not_damage()
+	_test_attack_needs_clean_series()
+	_test_series_resets_after_attack()
+	_test_pause_breaks_series()
+	_test_gear_raises_attack_damage()
+	_test_attack_quality_matters()
 	_test_genre_advantage()
 	_test_depth_scaling()
 	_test_victory_and_defeat()
@@ -119,27 +124,110 @@ func _test_missed_shield_hurts_more() -> void:
 			% [strike_damage, miss_damage])
 
 
-func _test_vibe_and_combo() -> void:
-	print("Настрой сбивается с учётом комбо")
+## Обычные биты НЕ бьют монстра. Это ядро новой боевой модели:
+## они собирают серию, а урон приходит только с атакой в её конце.
+func _test_plain_beats_do_not_damage() -> void:
+	print("Обычные биты не сбивают Настрой")
 	var s := _make()
+	var before := s.vibe
 
-	var first := s.register_hit(Judge.Grade.PERFECT)
-	check(first > 0, "идеальное попадание сбивает Настрой")
+	for i in 20:
+		s.register_hit(Judge.Grade.PERFECT)
+	check_eq(s.vibe, before, "20 идеальных обычных попаданий не тронули Настрой")
+	check_eq(s.series_length, 20, "но серия набрана")
+	check(s.series_clean, "серия чиста")
 
-	var good := _make().register_hit(Judge.Grade.GOOD)
-	check(good < first, "Good слабее Perfect")
 
-	var late := _make().register_hit(Judge.Grade.EARLY_LATE)
-	check(late < good, "Early/Late слабее Good")
-	check_eq(_make().register_hit(Judge.Grade.MISS), 0, "промах не сбивает Настрой")
+func _test_attack_needs_clean_series() -> void:
+	print("Атака срабатывает только после чистой серии")
 
-	# Комбо усиливает: на 10-м попадании множитель 1.5
-	var s2 := _make()
-	var hits: Array[int] = []
-	for i in 12:
-		hits.append(s2.register_hit(Judge.Grade.PERFECT))
-	check(hits[10] > hits[0], "с ростом комбо урон по Настрою растёт")
-	check_eq(s2.max_combo, 12, "максимум комбо запомнен")
+	# Чистая серия достаточной длины — атака проходит
+	var clean := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		clean.register_hit(Judge.Grade.PERFECT)
+	var dealt := clean.register_attack(Judge.Grade.PERFECT)
+	check(dealt > 0, "после чистой серии атака нанесла урон (%d)" % dealt)
+	check(clean.vibe < clean.max_vibe, "Настрой сбит")
+	check_eq(clean.attacks_landed, 1, "атака засчитана")
+
+	# Один промах в серии — атака вхолостую
+	var dirty := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		dirty.register_hit(Judge.Grade.PERFECT)
+	dirty.register_hit(Judge.Grade.MISS)
+	for i in BattleState.MIN_SERIES_LENGTH:
+		dirty.register_hit(Judge.Grade.PERFECT)
+	var wasted := dirty.register_attack(Judge.Grade.PERFECT)
+	check_eq(wasted, 0, "промах в серии обнулил атаку")
+	check_eq(dirty.vibe, dirty.max_vibe, "Настрой не тронут")
+	check_eq(dirty.attacks_wasted, 1, "холостая атака посчитана")
+
+	# Слишком короткая серия — атака тоже вхолостую
+	var short := _make()
+	short.register_hit(Judge.Grade.PERFECT)
+	check_eq(short.register_attack(Judge.Grade.PERFECT), 0,
+		"после серии из одной ноты атака не проходит")
+
+
+func _test_series_resets_after_attack() -> void:
+	print("Атака завершает серию")
+	var s := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		s.register_hit(Judge.Grade.PERFECT)
+	s.register_attack(Judge.Grade.PERFECT)
+	check_eq(s.series_length, 0, "серия обнулена")
+	check(s.series_clean, "новая серия начинается чистой")
+
+	# Сразу вторая атака без новой серии не проходит
+	check_eq(s.register_attack(Judge.Grade.PERFECT), 0,
+		"вторая атака подряд не проходит — серии перед ней нет")
+
+
+func _test_pause_breaks_series() -> void:
+	print("Пауза обрывает серию")
+	var s := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		s.register_hit(Judge.Grade.PERFECT)
+	s.break_series()
+	check_eq(s.series_length, 0, "пауза обнулила серию")
+	check_eq(s.register_attack(Judge.Grade.PERFECT), 0,
+		"атака после паузы не проходит")
+
+
+func _test_gear_raises_attack_damage() -> void:
+	print("Снаряжение усиливает атаку")
+	GameState.reset()
+	var bare := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		bare.register_hit(Judge.Grade.PERFECT)
+	var bare_damage := bare.register_attack(Judge.Grade.PERFECT)
+
+	GameState.add_gear("thunder_pick")
+	GameState.equip("disco_sprout", "thunder_pick")
+	var geared := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		geared.register_hit(Judge.Grade.PERFECT)
+	var geared_damage := geared.register_attack(Judge.Grade.PERFECT)
+
+	check(geared_damage > bare_damage,
+		"собранные предметы бьют сильнее (%d против %d)" % [geared_damage, bare_damage])
+	GameState.reset()
+
+
+func _test_attack_quality_matters() -> void:
+	print("Точность атаки влияет на урон")
+	var damages := {}
+	for grade in [Judge.Grade.PERFECT, Judge.Grade.GOOD, Judge.Grade.EARLY_LATE]:
+		var s := _make()
+		for i in BattleState.MIN_SERIES_LENGTH:
+			s.register_hit(Judge.Grade.PERFECT)
+		damages[grade] = s.register_attack(grade)
+
+	check(damages[Judge.Grade.PERFECT] > damages[Judge.Grade.GOOD],
+		"идеальная атака сильнее хорошей")
+	check(damages[Judge.Grade.GOOD] > damages[Judge.Grade.EARLY_LATE],
+		"хорошая сильнее приблизительной")
+	check(damages[Judge.Grade.EARLY_LATE] > 0, "даже приблизительная что-то делает")
 
 
 func _test_genre_advantage() -> void:
@@ -154,7 +242,12 @@ func _test_genre_advantage() -> void:
 	check_eq(strong.genre_multiplier(), MonsterData.ADVANTAGE_MULTIPLIER,
 		"рок в преимуществе над диско")
 
-	check(strong.register_hit(Judge.Grade.PERFECT) > weak.register_hit(Judge.Grade.PERFECT),
+	# Урон приходит только с атакой, поэтому сравниваем её, а не обычный бит
+	for i in BattleState.MIN_SERIES_LENGTH:
+		strong.register_hit(Judge.Grade.PERFECT)
+		weak.register_hit(Judge.Grade.PERFECT)
+	check(strong.register_attack(Judge.Grade.PERFECT)
+		> weak.register_attack(Judge.Grade.PERFECT),
 		"выгодный жанр бьёт сильнее")
 
 
@@ -177,14 +270,16 @@ func _test_victory_and_defeat() -> void:
 	var victories := [0]
 	won.victory.connect(func(): victories[0] += 1)
 	while not won.is_over:
-		won.register_hit(Judge.Grade.PERFECT)
+		for i in BattleState.MIN_SERIES_LENGTH:
+			won.register_hit(Judge.Grade.PERFECT)
+		won.register_attack(Judge.Grade.PERFECT)
 	check(won.did_win, "Настрой сбит — победа")
 	check_eq(victories[0], 1, "сигнал победы ровно один")
 	check_eq(won.vibe, 0, "Настрой обнулён, не ушёл в минус")
 
 	# После конца боя состояние не меняется
 	var vibe_after := won.vibe
-	won.register_hit(Judge.Grade.PERFECT)
+	won.register_attack(Judge.Grade.PERFECT)
 	check_eq(won.vibe, vibe_after, "после победы попадания уже не считаются")
 
 	var lost := _make("synth_slime", "disco_sprout", BattleState.STRIKE_DAMAGE)

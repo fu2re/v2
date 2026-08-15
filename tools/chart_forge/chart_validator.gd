@@ -21,6 +21,10 @@ const MIN_SHIELD_GAP := 2.0
 const WINDUP_LEAD := 2.0
 const MIN_CONTRAST_EPS := 0.0001
 
+## Серия — связка нот без длинной паузы. Атака её завершает.
+const SERIES_GAP := 2.0
+const MIN_SERIES_NOTES := 3
+
 
 class Problem:
 	var beat: float
@@ -49,9 +53,33 @@ static func validate(chart: ChartData) -> Array[Problem]:
 	_check_gentle_intro(chart, bpb, problems)
 	_check_not_too_early(chart, bpb, problems)
 	_check_shield_collisions(chart, problems)
+	_check_attacks(chart, problems)
 
 	problems.sort_custom(func(a, b): return a.beat < b.beat)
 	return problems
+
+
+## 7. Перед атакой обязана быть серия минимум из MIN_SERIES_NOTES нот.
+##
+## Серия считается от предыдущей атаки или от паузы — ровно так же, как её
+## считает бой. Атака сразу после паузы бессмысленна: серии перед ней нет,
+## и правило «чистая серия» проверять не на чем.
+static func _check_attacks(chart: ChartData, out: Array[Problem]) -> void:
+	var since := 0
+	for i in chart.note_count():
+		var beat := chart.note_beats[i]
+		var gap := beat - chart.note_beats[i - 1] if i > 0 else 1e9
+		since = 1 if gap > SERIES_GAP else since + 1
+
+		if chart.note_types[i] != ChartData.NoteType.ATTACK:
+			continue
+
+		if i == 0 or gap > SERIES_GAP:
+			out.append(Problem.new(beat, "атака в начале связки — серии перед ней нет"))
+		elif since - 1 < MIN_SERIES_NOTES:
+			out.append(Problem.new(beat,
+				"связка перед атакой всего %d нот, нужно %d" % [since - 1, MIN_SERIES_NOTES]))
+		since = 0
 
 
 ## 1. Каждому щиту предшествует видимый замах монстра.

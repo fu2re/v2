@@ -22,7 +22,7 @@
     },
     {
       "beat": 8.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 9.0,
@@ -38,7 +38,7 @@
     },
     {
       "beat": 13.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 14.0,
@@ -54,7 +54,7 @@
     },
     {
       "beat": 18.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 20.0,
@@ -70,7 +70,7 @@
     },
     {
       "beat": 23.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 24.0,
@@ -86,7 +86,7 @@
     },
     {
       "beat": 29.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 30.0,

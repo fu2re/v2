@@ -7,13 +7,19 @@ extends Resource
 ## в бою до 8 нот в секунду, и объект на ноту дал бы лишние аллокации
 ## и промахи кеша на слабых телефонах.
 
-enum NoteType { BEAT, SKILL, SHIELD, SNACK }
+## Типы нот.
+##
+## ATTACK — единственный источник урона по Настрою. Обычные биты его
+## не наносят: они собирают серию, а бьёт только атака в её конце,
+## и только если серия прошла без промахов (GDD §4.3).
+enum NoteType { BEAT, SKILL, SHIELD, SNACK, ATTACK }
 
 const TYPE_NAMES := {
 	"beat": NoteType.BEAT,
 	"skill": NoteType.SKILL,
 	"shield": NoteType.SHIELD,
 	"snack": NoteType.SNACK,
+	"attack": NoteType.ATTACK,
 }
 
 @export var id: String = ""

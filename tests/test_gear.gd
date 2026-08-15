@@ -53,9 +53,9 @@ func _test_registry() -> void:
 		var pool := Registry.gear_for_slot(slot)
 		check(pool.size() >= 2, "%s: есть выбор (%d)" % [GearData.slot_name(slot), pool.size()])
 
-	# Всё снаряжение продаётся за СЕМЕЧКИ — игровую валюту (GDD §12.1)
+	# Всё снаряжение продаётся за СЕРЕБРО — игровую валюту (GDD §12.1)
 	for item in all:
-		check(item.price > 0, "%s имеет цену в семечках" % item.id)
+		check(item.price > 0, "%s имеет цену в серебре" % item.id)
 
 
 func _test_equip_unequip() -> void:
@@ -89,7 +89,7 @@ func _test_bonuses_stack() -> void:
 	GameState.reset()
 	var clean := GameState.gear_bonuses("disco_sprout")
 	check_eq(clean.window_scale, 1.0, "без снаряжения окна обычные")
-	check_eq(clean.health_bonus, 0, "без снаряжения Ритм обычный")
+	check_eq(clean.health_bonus, 0, "без снаряжения здоровье обычное")
 
 	GameState.add_gear("spring_boots")
 	GameState.add_gear("brass_bell")
@@ -101,7 +101,7 @@ func _test_bonuses_stack() -> void:
 	var full := GameState.gear_bonuses("disco_sprout")
 	check(full.window_scale > 1.0, "обувь расширила окна")
 	check(full.power_bonus > 0.0, "аксессуар усилил удар")
-	check(full.health_bonus > 0, "амулет добавил Ритма")
+	check(full.health_bonus > 0, "амулет добавил здоровья")
 	check(full.shield_reduction > 0.0, "амулет смягчил пропуск щита")
 
 
@@ -110,8 +110,8 @@ func _test_gear_affects_battle() -> void:
 	GameState.reset()
 	var bare := BattleState.new()
 	bare.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
-	var bare_damage := bare.register_hit(Judge.Grade.PERFECT)
-	var bare_groove := bare.max_health
+	var bare_damage := _clean_attack(bare)
+	var bare_health := bare.max_health
 
 	GameState.add_gear("thunder_pick")
 	GameState.add_gear("river_stone")
@@ -120,8 +120,8 @@ func _test_gear_affects_battle() -> void:
 
 	var geared := BattleState.new()
 	geared.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
-	check(geared.register_hit(Judge.Grade.PERFECT) > bare_damage, "аксессуар усилил удар в бою")
-	check(geared.max_health > bare_groove, "амулет поднял максимум Ритма")
+	check(_clean_attack(geared) > bare_damage, "аксессуар усилил удар в бою")
+	check(geared.max_health > bare_health, "амулет поднял максимум здоровья")
 
 	# Обувь расширяет окна: то, что было Good, становится Perfect
 	GameState.add_gear("cloud_shoes")
@@ -213,3 +213,11 @@ func _test_save_roundtrip() -> void:
 		check_eq(boots.id, "cloud_shoes", "именно тот предмет")
 	check_eq(GameState.guardian_id(), "disco_sprout", "выбранный гуардиан восстановился")
 	check(GameState.gear_bonuses("disco_sprout").window_scale > 1.0, "бонусы снова считаются")
+
+
+## Провести чистую серию и ударить. Обычные биты урона не наносят,
+## поэтому победить можно только так (GDD §4.3).
+func _clean_attack(state: BattleState, grade := Judge.Grade.PERFECT) -> int:
+	for i in BattleState.MIN_SERIES_LENGTH:
+		state.register_hit(Judge.Grade.PERFECT)
+	return state.register_attack(grade)
