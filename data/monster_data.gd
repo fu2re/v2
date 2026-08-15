@@ -4,11 +4,38 @@ extends Resource
 ## Вид монстра. Правится в инспекторе как .tres — статы и пороги не хардкодятся,
 ## иначе баланс требует программиста на каждую правку.
 
-## Жанры вместо стихий (GDD §5). Трек боя играет в жанре монстра, поэтому
-## один мотив в пяти аранжировках даёт пять боевых треков.
+## Стихии вместо стихий-из-учебника: пять природных характеров.
+##
+## Внутренние имена остались музыкальными (ROCK, DISCO...), потому что за ними
+## закреплены аранжировки треков. На экране их видеть не должны: музыкальный
+## жаргон ничего не говорит семилетнему. Отображаемые имена — в ELEMENT_NAMES.
 enum Genre { ROCK, DISCO, FOLK, ELECTRO, HIPHOP }
 
-enum Rarity { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY }
+const ELEMENT_NAMES := ["Камень", "Солнце", "Листва", "Искра", "Ветер"]
+
+## Грейды монстра. Порядок = сила: чем выше, тем крепче и опаснее.
+enum Rarity { COMMON, UNCOMMON, RARE, UNIQUE, EPIC, LEGENDARY }
+
+const RARITY_NAMES := ["Обычный", "Необычный", "Редкий", "Уникальный",
+	"Эпический", "Легендарный"]
+
+## Цвета грейдов. Легендарный переливается — он один такой, и это должно
+## быть видно с первого взгляда на карточку поляны.
+const RARITY_COLORS := [
+	Color("F0F0F0"),  # белый
+	Color("57C46A"),  # зелёный
+	Color("2E9BFF"),  # синий
+	Color("B87AFF"),  # фиолетовый
+	Color("FFD24D"),  # золотой
+	Color("B8860B"),  # тёмно-золотой, переливается в интерфейсе
+]
+
+## Насколько крепче и злее монстр каждого следующего грейда.
+##
+## Растёт заметно, но не отвесно: легендарный обязан быть испытанием,
+## а не стеной, в которую упираются навсегда.
+const RARITY_VIBE_SCALE := [1.0, 1.25, 1.6, 2.0, 2.6, 3.4]
+const RARITY_POWER_SCALE := [1.0, 1.15, 1.35, 1.6, 1.9, 2.3]
 
 ## Силуэты соответствуют шаблонам ригов (GDD §11.2). Монстры одного силуэта
 ## делят библиотеку танцев — без этого сотня монстров недостижима.
@@ -20,11 +47,12 @@ const FRIENDSHIP_THRESHOLD := {
 	Rarity.COMMON: 100,
 	Rarity.UNCOMMON: 150,
 	Rarity.RARE: 200,
+	Rarity.UNIQUE: 250,
 	Rarity.EPIC: 300,
 	Rarity.LEGENDARY: 400,
 }
 
-## Кто кого бьёт. Хип-хоп нейтрален: без преимуществ и слабостей.
+## Кто кого бьёт. Ветер нейтрален: без преимуществ и слабостей.
 const BEATS := {
 	Genre.ROCK: Genre.DISCO,
 	Genre.DISCO: Genre.FOLK,
@@ -75,18 +103,27 @@ func sprite() -> Texture2D:
 
 
 static func genre_name(g: Genre) -> String:
-	return ["Рок", "Диско", "Фолк", "Электро", "Хип-хоп"][g]
+	return ELEMENT_NAMES[g]
 
 
 static func rarity_name(r: Rarity) -> String:
-	return ["Обычный", "Необычный", "Редкий", "Эпический", "Легендарный"][r]
+	return RARITY_NAMES[r]
 
 
 static func rarity_color(r: Rarity) -> Color:
-	return [
-		Color("ADA99F"),  # серый
-		Color("578744"),  # зелёный
-		Color("2E9BFF"),  # синий
-		Color("B87AFF"),  # фиолетовый
-		Color("FFD24D"),  # золотой
-	][r]
+	return RARITY_COLORS[r]
+
+
+## Множитель Настроя по грейду.
+static func rarity_vibe_scale(r: Rarity) -> float:
+	return RARITY_VIBE_SCALE[r]
+
+
+## Множитель силы удара монстра по грейду.
+static func rarity_power_scale(r: Rarity) -> float:
+	return RARITY_POWER_SCALE[r]
+
+
+## Легендарный переливается: единственный грейд с особой подачей.
+static func rarity_shimmers(r: Rarity) -> bool:
+	return r == Rarity.LEGENDARY

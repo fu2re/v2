@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "thunder_pick"
-display_name = "Громовой медиатор"
+display_name = "Плащ грозы"
 slot = 1
 rarity = 3
 window_scale = 1.0

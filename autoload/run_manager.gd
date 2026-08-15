@@ -19,10 +19,18 @@ const DEATH_LOSS := 0.5
 const REWARD_DEPTH_SCALE := 0.15
 const BASE_SEEDS := 8
 
-## Доли редкости на поверхности и предел сдвига вглубь (GDD §6.3).
-const BASE_RARITY_WEIGHTS := [50.0, 28.0, 15.0, 6.0, 1.0]
+## Доли грейдов на поверхности: обычный, необычный, редкий, уникальный,
+## эпический, легендарный.
+const BASE_RARITY_WEIGHTS := [52.0, 26.0, 13.0, 6.0, 2.5, 0.5]
 const RARITY_SHIFT_PER_GLADES := 10.0
 const MAX_RARITY_SHIFT := 3.0
+
+## Обычные монстры никогда не исчезают полностью.
+##
+## Даже на самой большой глубине шанс редкого не достигает 100%: встреча
+## с легендарным обязана оставаться удачей, а не расписанием. Гарантированная
+## редкость обесценила бы и её саму, и радость от неё.
+const MIN_COMMON_WEIGHT := 12.0
 
 const CAMPFIRE_RESTORE := 25
 
@@ -125,11 +133,12 @@ func _pick_type() -> Glade.Type:
 func rarity_weights(for_depth: int) -> Array:
 	var shift := minf(for_depth / RARITY_SHIFT_PER_GLADES, MAX_RARITY_SHIFT)
 	return [
-		maxf(BASE_RARITY_WEIGHTS[0] - 12.0 * shift, 10.0),
+		maxf(BASE_RARITY_WEIGHTS[0] - 11.0 * shift, MIN_COMMON_WEIGHT),
 		BASE_RARITY_WEIGHTS[1],
-		BASE_RARITY_WEIGHTS[2] + 5.0 * shift,
-		BASE_RARITY_WEIGHTS[3] + 5.0 * shift,
+		BASE_RARITY_WEIGHTS[2] + 3.5 * shift,
+		BASE_RARITY_WEIGHTS[3] + 3.0 * shift,
 		BASE_RARITY_WEIGHTS[4] + 2.0 * shift,
+		BASE_RARITY_WEIGHTS[5] + 0.8 * shift,
 	]
 
 

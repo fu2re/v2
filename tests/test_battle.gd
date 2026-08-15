@@ -27,6 +27,8 @@ func _ready() -> void:
 	_test_victory_and_defeat()
 	_test_perfect_run()
 	_test_snack()
+	_test_rarity_scales_monster()
+	_test_experience_raises_damage()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -317,3 +319,54 @@ func _test_snack() -> void:
 
 	s.restore_health(9999)
 	check_eq(s.health, s.max_health, "Здоровье не превышает максимум")
+
+
+## Грейд монстра меняет и его крепость, и его удар.
+func _test_rarity_scales_monster() -> void:
+	print("Грейд делает монстра крепче и злее")
+	GameState.reset()
+	var common := _make("disco_sprout", "disco_sprout")
+	var epic := _make("beat_serpent", "disco_sprout")
+
+	check(epic.max_vibe > common.max_vibe,
+		"монстр выше грейдом крепче (%d против %d)" % [epic.max_vibe, common.max_vibe])
+	check(epic.strike_scale > common.strike_scale,
+		"и бьёт сильнее (x%.2f против x%.2f)" % [epic.strike_scale, common.strike_scale])
+
+	# Шкала грейдов монотонна: каждый следующий не слабее предыдущего
+	var previous := 0.0
+	for r in MonsterData.Rarity.values():
+		var scale: float = MonsterData.rarity_vibe_scale(r)
+		check(scale >= previous, "грейд %s не слабее предыдущего" % MonsterData.rarity_name(r))
+		previous = scale
+	check_eq(MonsterData.RARITY_NAMES.size(), 6, "грейдов шесть")
+
+
+## Повторные встречи с видом усиливают удар по нему.
+func _test_experience_raises_damage() -> void:
+	print("Опыт против вида усиливает удар")
+	GameState.reset()
+	var fresh := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		fresh.register_hit(Judge.Grade.PERFECT)
+	var first := fresh.register_attack(Judge.Grade.PERFECT)
+
+	for i in 10:
+		GameState.add_battle_experience("synth_slime")
+	var learned := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		learned.register_hit(Judge.Grade.PERFECT)
+	var later := learned.register_attack(Judge.Grade.PERFECT)
+
+	check(later > first, "после 10 встреч удар сильнее (%d против %d)" % [later, first])
+
+	# Потолок есть: иначе сотая встреча превратит бой в формальность
+	for i in 500:
+		GameState.add_battle_experience("synth_slime")
+	check(GameState.experience_multiplier("synth_slime")
+		<= 1.0 + GameState.XP_DAMAGE_CAP + 0.001, "прибавка упирается в потолок")
+
+	# Опыт по одному виду не влияет на другой
+	check_eq(GameState.experience_multiplier("bass_bear"), 1.0,
+		"опыт не протекает на другие виды")
+	GameState.reset()

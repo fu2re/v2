@@ -103,7 +103,7 @@ func _make_card(monster: MonsterData) -> Control:
 
 func _gear_summary(monster_id: String) -> String:
 	var parts: Array[String] = []
-	for slot in [GearData.Slot.BOOTS, GearData.Slot.ACCESSORY, GearData.Slot.AMULET]:
+	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
 		var item := GameState.equipped_gear(monster_id, slot)
 		parts.append(item.display_name if item != null else "—")
 	return " / ".join(parts)
@@ -120,7 +120,7 @@ func _open_gear(monster_id: String) -> void:
 	header.text = "Снаряжение: %s" % (monster.display_name if monster != null else monster_id)
 	_gear_panel.add_child(header)
 
-	for slot in [GearData.Slot.BOOTS, GearData.Slot.ACCESSORY, GearData.Slot.AMULET]:
+	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
 		var current := GameState.equipped_gear(monster_id, slot)
 		var label := Label.new()
 		label.add_theme_font_size_override("font_size", 30)

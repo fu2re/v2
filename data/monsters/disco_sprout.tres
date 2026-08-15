@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "disco_sprout"
-display_name = "Дискоросток"
+display_name = "Ростик"
 genre = 1
 rarity = 0
 silhouette = 0

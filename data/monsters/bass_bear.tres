@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "bass_bear"
-display_name = "Бас-медведь"
+display_name = "Топотун"
 genre = 0
 rarity = 1
 silhouette = 1

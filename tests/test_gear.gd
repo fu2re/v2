@@ -49,7 +49,7 @@ func _test_registry() -> void:
 	check(all.size() >= 9, "снаряжение загрузилось (%d)" % all.size())
 
 	# В каждом слоте должно быть из чего выбирать, иначе слот бессмысленен
-	for slot in [GearData.Slot.BOOTS, GearData.Slot.ACCESSORY, GearData.Slot.AMULET]:
+	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
 		var pool := Registry.gear_for_slot(slot)
 		check(pool.size() >= 2, "%s: есть выбор (%d)" % [GearData.slot_name(slot), pool.size()])
 
@@ -66,21 +66,21 @@ func _test_equip_unequip() -> void:
 
 	check(GameState.equip("disco_sprout", "soft_slippers"), "надето")
 	check_eq(GameState.gear_count("soft_slippers"), 0, "из сундука ушло")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS) != null, "слот занят")
+	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null, "слот занят")
 
 	check(not GameState.equip("disco_sprout", "soft_slippers"), "второй раз то же самое нельзя")
 
-	check(GameState.unequip("disco_sprout", GearData.Slot.BOOTS), "снято")
+	check(GameState.unequip("disco_sprout", GearData.Slot.BELT), "снято")
 	check_eq(GameState.gear_count("soft_slippers"), 1, "вернулось в сундук — экипировка обратима")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS) == null, "слот пуст")
-	check(not GameState.unequip("disco_sprout", GearData.Slot.BOOTS), "снимать нечего")
+	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) == null, "слот пуст")
+	check(not GameState.unequip("disco_sprout", GearData.Slot.BELT), "снимать нечего")
 
 	# Замена в занятом слоте возвращает предыдущее в сундук
 	GameState.add_gear("spring_boots")
 	GameState.equip("disco_sprout", "soft_slippers")
 	GameState.equip("disco_sprout", "spring_boots")
 	check_eq(GameState.gear_count("soft_slippers"), 1, "вытесненное вернулось в сундук")
-	check_eq(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS).id, "spring_boots",
+	check_eq(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT).id, "spring_boots",
 		"в слоте новое")
 
 
@@ -165,9 +165,9 @@ func _test_gear_is_per_monster() -> void:
 	GameState.add_gear("spring_boots")
 	GameState.equip("disco_sprout", "spring_boots")
 
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS) != null,
+	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null,
 		"на первом надето")
-	check(GameState.equipped_gear("bass_bear", GearData.Slot.BOOTS) == null,
+	check(GameState.equipped_gear("bass_bear", GearData.Slot.BELT) == null,
 		"на втором пусто — смена гуардиана должна быть решением, а не сменой скина")
 
 	var other := GameState.gear_bonuses("bass_bear")
@@ -207,7 +207,7 @@ func _test_save_roundtrip() -> void:
 	GameState.from_dict(restored)
 
 	check_eq(GameState.gear_count("brass_bell"), 2, "сундук восстановился")
-	var boots := GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS)
+	var boots := GameState.equipped_gear("disco_sprout", GearData.Slot.BELT)
 	check(boots != null, "надетое нашлось после JSON-цикла")
 	if boots != null:
 		check_eq(boots.id, "cloud_shoes", "именно тот предмет")

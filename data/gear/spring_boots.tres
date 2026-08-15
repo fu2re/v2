@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "spring_boots"
-display_name = "Пружинные ботинки"
+display_name = "Кожаный пояс"
 slot = 0
 rarity = 1
 window_scale = 1.3

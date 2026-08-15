@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "banjo_moth"
-display_name = "Банджо-мотылёк"
+display_name = "Пыльца"
 genre = 2
 rarity = 2
 silhouette = 2

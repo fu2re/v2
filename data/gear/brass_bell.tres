@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "brass_bell"
-display_name = "Медный бубенец"
+display_name = "Тёплый плащ"
 slot = 1
 rarity = 1
 window_scale = 1.0

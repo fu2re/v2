@@ -339,6 +339,11 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 	var monster := state.monster
 	var perfect := state.is_perfect_run()
 
+	# Опыт начисляется за ЛЮБОЙ бой, даже проигранный: ты всё равно изучил
+	# повадки. Иначе неудача откатывала бы прогресс, а это ровно то,
+	# чего игра для детей делать не должна
+	GameState.add_battle_experience(monster.id)
+
 	if RunManager.health <= 0:
 		_dismiss_battle()
 		RunManager.die()

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "acorn_charm"
-display_name = "Жёлудь на нитке"
+display_name = "Шапочка из жёлудя"
 slot = 2
 rarity = 0
 window_scale = 1.0

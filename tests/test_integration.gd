@@ -272,7 +272,7 @@ func _test_whole_state_survives_save() -> void:
 	check_eq(GameState.guardian_id(), "disco_sprout", "гуардиан восстановился")
 	check_eq(GameState.fruit_count("loop_fig", FruitData.Quality.JUICY), 3, "фрукты на месте")
 	check_eq(GameState.silver, 250, "серебро на месте")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BOOTS) != null,
+	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null,
 		"снаряжение осталось надетым")
 	check(not FarmState.is_empty_plot(0), "грядка засажена")
 	check_eq(FarmState.plots[0].dance_level, DanceGrade.Level.GOOD, "танец запомнен")

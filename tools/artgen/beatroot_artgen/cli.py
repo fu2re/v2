@@ -22,6 +22,8 @@ DEMO_CREATURES = [
     ("beat_serpent", "serpent", "hiphop"),
 ]
 
+HERO = ("hero_kid", "biped", "folk")
+
 DEMO_FRUITS = ["drum_berry", "bass_plum", "echo_pear", "loop_fig", "chord_apple"]
 
 
@@ -59,6 +61,12 @@ def cmd_placeholders(args: argparse.Namespace) -> int:
         path = PLACEHOLDER_DIR / f"monster_{name}.png"
         img.save(path)
         print(f"  -> {path.relative_to(PROJECT_ROOT)}  {silhouette}/{genre}")
+
+    # Герой — отдельный силуэт: игрок должен отличать себя от защитника
+    hero = placeholder.creature(HERO[0], HERO[1], HERO[2], size=args.size)
+    hero_path = PLACEHOLDER_DIR / "hero.png"
+    hero.save(hero_path)
+    print(f"  -> {hero_path.relative_to(PROJECT_ROOT)}  герой")
 
     for name in DEMO_FRUITS:
         img = placeholder.fruit(name, size=args.size // 2)

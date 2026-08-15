@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "cloud_shoes"
-display_name = "Облачные туфли"
+display_name = "Пояс путешественника"
 slot = 0
 rarity = 3
 window_scale = 1.5

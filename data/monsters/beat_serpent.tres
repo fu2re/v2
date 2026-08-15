@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "beat_serpent"
-display_name = "Бит-змей"
+display_name = "Вьюн"
 genre = 4
 rarity = 3
 silhouette = 4

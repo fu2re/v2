@@ -62,6 +62,10 @@ var window_scale: float = 1.0
 var power_bonus: float = 0.0
 var shield_reduction: float = 0.0
 
+## Множитель урона монстра по грейду и множитель нашего урона от опыта.
+var strike_scale: float = 1.0
+var experience_scale: float = 1.0
+
 var combo: int = 0
 var max_combo: int = 0
 var blocked: int = 0
@@ -90,8 +94,22 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 	guardian = new_guardian
 	depth = run_depth
 
-	max_vibe = int(round(monster.base_vibe * (1.0 + VIBE_DEPTH_SCALE * depth)))
+	# Крепость монстра складывается из трёх вещей: его собственного запаса,
+	# грейда и глубины забега. Грейд — главный множитель: легендарный обязан
+	# ощущаться как событие, а не как обычный бой с другой рамкой
+	max_vibe = int(round(
+		monster.base_vibe
+		* MonsterData.rarity_vibe_scale(monster.rarity)
+		* (1.0 + VIBE_DEPTH_SCALE * depth)
+	))
 	vibe = max_vibe
+
+	# Урон монстра тоже растёт с грейдом
+	strike_scale = MonsterData.rarity_power_scale(monster.rarity)
+
+	# Опыт боёв против ВИДА: каждая встреча учит повадкам и добавляет урона.
+	# Это то, что делает повторные встречи осмысленными, а не рутиной
+	experience_scale = GameState.experience_multiplier(monster.id)
 
 	var bonuses := GameState.gear_bonuses(guardian.id) if guardian != null else {}
 	window_scale = bonuses.get("window_scale", 1.0)
@@ -189,7 +207,7 @@ func register_attack(grade: int) -> int:
 	var power := (guardian.base_power if guardian != null else 4.0) + power_bonus
 	var amount := int(round(
 		power * ATTACK_MULTIPLIER * Judge.effect(grade)
-			* Judge.combo_multiplier(combo) * genre_multiplier()
+			* Judge.combo_multiplier(combo) * genre_multiplier() * experience_scale
 	))
 	attacks_landed += 1
 	_reset_series()
@@ -246,7 +264,7 @@ func take_strike() -> void:
 func _take_damage(amount: int) -> void:
 	# Амулет смягчает урон, но никогда не обнуляет его: механика,
 	# за которой не надо следить, перестаёт быть механикой
-	var damage := maxi(int(round(amount * (1.0 - shield_reduction))), 1)
+	var damage := maxi(int(round(amount * strike_scale * (1.0 - shield_reduction))), 1)
 
 	var absorbed := mini(shield, damage)
 	if absorbed > 0:

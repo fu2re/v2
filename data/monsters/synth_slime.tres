@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "synth_slime"
-display_name = "Синт-слайм"
+display_name = "Кисель"
 genre = 3
 rarity = 0
 silhouette = 3

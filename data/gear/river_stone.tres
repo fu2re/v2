@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "river_stone"
-display_name = "Речной камешек"
+display_name = "Шляпка с пером"
 slot = 2
 rarity = 1
 window_scale = 1.0

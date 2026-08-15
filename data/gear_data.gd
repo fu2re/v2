@@ -7,24 +7,24 @@ extends Resource
 ## и микробафы, и это не мелочь: всё, что продаётся за реальные деньги,
 ## надевается на героя и потому физически не может быть pay-to-win.
 
-enum Slot { BOOTS, ACCESSORY, AMULET }
+enum Slot { BELT, CLOAK, HEADWEAR }
 
 const SLOT_NAMES := {
-	Slot.BOOTS: "Обувь",
-	Slot.ACCESSORY: "Аксессуар",
-	Slot.AMULET: "Амулет",
+	Slot.BELT: "Пояс",
+	Slot.CLOAK: "Плащ",
+	Slot.HEADWEAR: "Головной убор",
 }
 
 ## Насколько слот влияет на бой, для подсказки игроку.
 const SLOT_HINTS := {
-	Slot.BOOTS: "Шире окно попадания",
-	Slot.ACCESSORY: "Сильнее удар и комбо",
-	Slot.AMULET: "Больше здоровья и крепче щит",
+	Slot.BELT: "Шире окно попадания",
+	Slot.CLOAK: "Сильнее удар",
+	Slot.HEADWEAR: "Больше здоровья и крепче щит",
 }
 
 @export var id: String = ""
 @export var display_name: String = ""
-@export var slot: Slot = Slot.BOOTS
+@export var slot: Slot = Slot.BELT
 @export var rarity: MonsterData.Rarity = MonsterData.Rarity.COMMON
 
 ## Множитель окон тайминга. 1.2 означает окна на 20% шире — прощает промахи.

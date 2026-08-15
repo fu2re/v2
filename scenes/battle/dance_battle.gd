@@ -36,6 +36,8 @@ var _next_pattern_index: int = 0
 var _monster_sprite: Sprite2D = null
 var _knocked_out: Node2D = null
 var _outcome_label: Label = null
+var _hero: Dancer = null
+var _guardian_dancer: Dancer = null
 
 
 func _ready() -> void:
@@ -84,6 +86,8 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 	_hud.bind(state)
 	if _monster_sprite != null:
 		_monster_sprite.texture = monster.sprite()
+	_hero.setup(load("res://art/placeholder/hero.png") as Texture2D)
+	_guardian_dancer.setup(guardian.sprite(), GameState.equipped.get(guardian.id, {}))
 
 	_pool.release_all()
 	_active.clear()
@@ -220,8 +224,12 @@ func _judge_tap() -> void:
 		ChartData.NoteType.ATTACK:
 			var dealt := state.register_attack(grade)
 			_flash_attack(dealt > 0)
+			_hero.attack(dealt > 0)
+			_guardian_dancer.attack(dealt > 0)
 		_:
 			state.register_hit(grade)
+			_hero.nod()
+			_guardian_dancer.nod()
 
 	note_judged.emit(grade, best_delta)
 
@@ -234,6 +242,8 @@ func _on_beat(index: int) -> void:
 	var tween := create_tween()
 	tween.tween_property(_monster_sprite, "rotation", dir * 0.06, 0.12)
 	tween.tween_property(_monster_sprite, "rotation", 0.0, 0.12)
+	_hero.step()
+	_guardian_dancer.step()
 
 
 func _telegraph_monster() -> void:
@@ -336,6 +346,16 @@ func _build_stage() -> void:
 	_monster_sprite.scale = Vector2(4, 4)
 	_monster_sprite.position = Vector2(LANE_X, 300)
 	add_child(_monster_sprite)
+	# Герой и защитник внизу: игрок видит, что танцует не один,
+	# и что снаряжение на защитнике действительно надето
+	_hero = Dancer.new()
+	_hero.position = Vector2(LANE_X - 250.0, 1560.0)
+	add_child(_hero)
+
+	_guardian_dancer = Dancer.new()
+	_guardian_dancer.position = Vector2(LANE_X + 250.0, 1560.0)
+	add_child(_guardian_dancer)
+
 	_build_knocked_out()
 
 	_outcome_label = Label.new()

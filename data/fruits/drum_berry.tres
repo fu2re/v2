@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = "drum_berry"
-display_name = "Барабанная ягода"
+display_name = "Хрустяшка"
 tier = 0
 sprite_path = "res://art/placeholder/fruit_drum_berry.png"

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "soft_slippers"
-display_name = "Мягкие тапочки"
+display_name = "Верёвочный поясок"
 slot = 0
 rarity = 0
 window_scale = 1.15

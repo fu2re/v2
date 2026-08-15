@@ -23,6 +23,13 @@ const FRIENDSHIP_OTHER_FRUIT := 10
 
 ## Дружба по виду монстра: id -> накопленные очки.
 var friendship: Dictionary = {}
+## Опыт боёв против вида: id -> число встреч.
+##
+## Отдельно от дружбы намеренно. Дружба — про то, насколько монстр к тебе
+## расположен; опыт — про то, насколько ты изучил его повадки. Одно даёт
+## приручение, другое — урон, и смешивать их значило бы наказывать игрока
+## за приручение любимого вида.
+var battle_xp: Dictionary = {}
 ## Приручённые виды.
 var tamed: Array[String] = []
 ## Фрукты в сумке: "fruit_id:quality" -> количество.
@@ -42,6 +49,7 @@ var active_guardian_id: String = ""
 
 func reset() -> void:
 	friendship.clear()
+	battle_xp.clear()
 	tamed.clear()
 	fruits.clear()
 	silver = 0
@@ -92,6 +100,28 @@ func friendship_from_fruit(monster_id: String, fruit_id: String,
 	var base := FRIENDSHIP_FAVORITE_FRUIT if data.favorite_fruit_id == fruit_id \
 		else FRIENDSHIP_OTHER_FRUIT
 	return int(round(base * FruitData.quality_multiplier(quality)))
+
+
+# --- опыт боёв ---------------------------------------------------------------
+
+## Прибавка к урону за каждую встречу с видом.
+const XP_DAMAGE_STEP := 0.04
+## Потолок прибавки. Без него сотая встреча превращала бы бой в формальность,
+## а редкие виды обесценивались бы у того, кто их фармит.
+const XP_DAMAGE_CAP := 0.6
+
+
+func battle_experience(monster_id: String) -> int:
+	return battle_xp.get(monster_id, 0)
+
+
+func add_battle_experience(monster_id: String) -> void:
+	battle_xp[monster_id] = battle_experience(monster_id) + 1
+
+
+## Множитель урона по этому виду. Растёт от встреч и упирается в потолок.
+func experience_multiplier(monster_id: String) -> float:
+	return 1.0 + minf(battle_experience(monster_id) * XP_DAMAGE_STEP, XP_DAMAGE_CAP)
 
 
 # --- инвентарь фруктов -------------------------------------------------------
@@ -209,7 +239,7 @@ func gear_bonuses(monster_id: String) -> Dictionary:
 		"health_bonus": 0,
 		"shield_reduction": 0.0,
 	}
-	for slot in [GearData.Slot.BOOTS, GearData.Slot.ACCESSORY, GearData.Slot.AMULET]:
+	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
 		var item := equipped_gear(monster_id, slot)
 		if item == null:
 			continue
@@ -243,6 +273,7 @@ func to_dict() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"friendship": friendship.duplicate(),
+		"battle_xp": battle_xp.duplicate(),
 		"tamed": tamed.duplicate(),
 		"fruits": fruits.duplicate(),
 		"silver": silver,
@@ -261,6 +292,7 @@ func from_dict(d: Dictionary) -> void:
 			% [version, SAVE_VERSION])
 
 	friendship = d.get("friendship", {})
+	battle_xp = d.get("battle_xp", {})
 	fruits = d.get("fruits", {})
 	silver = int(d.get("silver", 0))
 	gear_owned = d.get("gear_owned", {})

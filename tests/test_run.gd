@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_groove_is_shared_across_glades()
 	_test_loop_is_closed()
 	_test_seeds_survive_death()
+	_test_rare_chance_never_reaches_certainty()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -255,3 +256,33 @@ func _test_seeds_survive_death() -> void:
 	check_eq(FarmState.seed_count("chord_apple"), 2, "семена дошли целиком")
 	check(FarmState.known_seeds.has("chord_apple"), "культура осталась открытой")
 	check_eq(GameState.silver, 50, "а вот серебра половина — это добыча")
+
+
+## Шанс редких растёт с глубиной, но обычные никогда не исчезают.
+##
+## Гарантированная редкость обесценила бы саму редкость: встреча
+## с легендарным обязана оставаться удачей, а не расписанием.
+func _test_rare_chance_never_reaches_certainty() -> void:
+	print("Редкость растёт с глубиной, но не до 100%")
+	for depth in [0, 10, 30, 100, 1000]:
+		var weights: Array = RunManager.rarity_weights(depth)
+		check_eq(weights.size(), MonsterData.RARITY_NAMES.size(),
+			"глубина %d: вес на каждый грейд" % depth)
+
+		var total := 0.0
+		for w: float in weights:
+			total += w
+		var common_share: float = weights[0] / total
+
+		check(common_share > 0.05,
+			"глубина %d: обычные остаются заметной долей (%.1f%%)"
+				% [depth, common_share * 100.0])
+		check(weights[0] >= RunManager.MIN_COMMON_WEIGHT,
+			"глубина %d: вес обычных не ниже дна" % depth)
+
+	# Вглубь редкие действительно становятся чаще
+	var shallow: Array = RunManager.rarity_weights(0)
+	var deep: Array = RunManager.rarity_weights(30)
+	var last := MonsterData.RARITY_NAMES.size() - 1
+	check(deep[last] > shallow[last], "легендарные вглубь встречаются чаще")
+	check(deep[0] < shallow[0], "обычные вглубь встречаются реже")

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = "tin_whistle"
-display_name = "Жестяная свистулька"
+display_name = "Лоскутный плащ"
 slot = 1
 rarity = 0
 window_scale = 1.0
