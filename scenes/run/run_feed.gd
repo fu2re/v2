@@ -92,7 +92,12 @@ func _show_glade(glade: Glade) -> void:
 			_hint.text = "Тапни, чтобы посмотреть"
 
 
-func _input(event: InputEvent) -> void:
+## Свайп и тап по поляне ловим в _unhandled_input, а НЕ в _input.
+##
+## _input срабатывает раньше интерфейса, поэтому тап по кнопке «Домой»
+## одновременно разрешал поляну: забег закрывался и тут же начинался бой.
+## _unhandled_input вызывается только если событие не забрал ни один Control.
+func _unhandled_input(event: InputEvent) -> void:
 	if _busy or _battle != null or (_taming != null and _taming.visible):
 		return
 

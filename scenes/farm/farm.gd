@@ -41,7 +41,7 @@ func _process(_delta: float) -> void:
 
 
 func _refresh() -> void:
-	_rebuild_grid()
+	_sync_grid()
 	_seeds_label.text = "Семечки: %d      Семена: %d" % [
 		GameState.seeds, _total_seeds(),
 	]
@@ -67,6 +67,24 @@ func _clear(parent: Node) -> void:
 	for child in parent.get_children():
 		parent.remove_child(child)
 		child.queue_free()
+
+
+## Обновить грядки, НЕ пересоздавая кнопки без нужды.
+##
+## Пока что-то растёт, FarmState.tick() шлёт plots_changed каждый кадр.
+## Полная пересборка на каждый сигнал уничтожала кнопку между нажатием
+## и отпусканием, и `pressed` не успевал сработать — ферма выглядела
+## мёртвой сразу после первой посадки.
+func _sync_grid() -> void:
+	if _plot_buttons.size() != FarmState.plot_count():
+		_rebuild_grid()
+		return
+	for i in _plot_buttons.size():
+		# Присваиваем только при изменении: пока грядка растёт, сюда
+		# заходят каждый кадр, а установка текста дёргает раскладку
+		var label := _plot_label(i)
+		if _plot_buttons[i].text != label:
+			_plot_buttons[i].text = label
 
 
 func _rebuild_grid() -> void:
