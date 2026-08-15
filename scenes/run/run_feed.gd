@@ -6,7 +6,15 @@ extends Node2D
 ## решение игры — свайпнуть ещё раз или уйти с добычей — повторяется
 ## десятки раз за забег (GDD §3).
 
-const SWIPE_THRESHOLD := 140.0
+## Пороги жестов — В ДОЛЯХ ВЫСОТЫ ЭКРАНА, а не в пикселях.
+##
+## Событие ввода приходит в координатах ОКНА, а не холста 1080×1920.
+## При stretch-режиме окно почти всегда меньше, поэтому свайп в 200 точек
+## холста доходил сюда как 100 точек экрана — ниже порога в 140. Жест
+## не считался ни свайпом, ни тапом, и игрок застревал на поляне;
+## а когда доходил до порога тапа — заново входил в тот же бой.
+const SWIPE_FRACTION := 0.07
+const TAP_FRACTION := 0.02
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
 ## Кого берём в лес. Пусто — берём выбранного в коллекции.
@@ -128,20 +136,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif _dragging:
 			_dragging = false
 			var travel := pos_y - _drag_start
+			# Пороги считаем от ВЫСОТЫ ОКНА: событие приходит в его
+			# координатах, а не в координатах холста 1080×1920
+			var height := maxf(get_viewport_rect().size.y, 1.0)
+			var swipe_up := travel < -height * SWIPE_FRACTION
+			var tapped := absf(travel) < height * TAP_FRACTION
+
 			# Итог боя убирается любым осмысленным жестом: и свайпом,
 			# и тапом. Застрять на экране результата нельзя
 			if _awaiting_result_swipe:
-				if travel < -SWIPE_THRESHOLD or absf(travel) < 40.0:
+				if swipe_up or tapped:
 					_dismiss_battle()
 				return
 			if _awaiting_restart:
-				if absf(travel) < 40.0:
+				if tapped:
 					_awaiting_restart = false
 					_return_to_farm()
 				return
-			if travel < -SWIPE_THRESHOLD:
+			if swipe_up:
 				_try_next_glade()
-			elif absf(travel) < 40.0:
+			elif tapped:
 				_resolve_glade()
 
 

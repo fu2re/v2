@@ -156,6 +156,11 @@ func _expire_missed() -> void:
 		var note: Note = _active[i]
 		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW * state.window_scale:
 			_miss(note)
+			# Пропуск может закончить бой, а _end_battle очищает список нот.
+			# Без этой проверки цикл продолжал работать с индексом в уже
+			# пустом массиве и падал — это и был краш при проигрыше
+			if state.is_over or _active.is_empty():
+				return
 			_retire(i)
 		elif note.is_judged:
 			_retire(i)

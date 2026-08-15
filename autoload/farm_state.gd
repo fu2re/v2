@@ -7,7 +7,9 @@ extends Node
 ## игра для детей не имеет права использовать.
 
 signal plots_changed()
-signal silver_changed()
+## Изменился запас семян. Это ПРЕДМЕТЫ, а не валюта: массовое
+## переименование валют однажды задело и этот сигнал, и инвентарь падал.
+signal seeds_changed()
 signal plot_ready(index: int)
 
 const STARTING_PLOTS := 4
@@ -230,7 +232,7 @@ func add_seed(fruit_id: String, count: int = 1) -> void:
 	seed_bag[fruit_id] = seed_count(fruit_id) + count
 	if not known_seeds.has(fruit_id):
 		known_seeds.append(fruit_id)
-	silver_changed.emit()
+	seeds_changed.emit()
 	SaveManager.mark_dirty()
 
 
@@ -240,7 +242,7 @@ func _take_seed(fruit_id: String) -> void:
 		seed_bag.erase(fruit_id)
 	else:
 		seed_bag[fruit_id] = have - 1
-	silver_changed.emit()
+	seeds_changed.emit()
 
 
 func available_seeds() -> Array[String]:

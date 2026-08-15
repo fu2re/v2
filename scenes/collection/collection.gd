@@ -109,39 +109,113 @@ func _gear_summary(monster_id: String) -> String:
 	return " / ".join(parts)
 
 
+## Экран экипировки: три слота сверху, сундук снизу.
+##
+## Раньше это был сплошной список, где надетое и лежащее в сундуке шли
+## вперемешку и отличались только словом «Снять». Понять, что на ком надето,
+## было нельзя. Теперь слоты — это ячейки: видно, что занято, что пусто
+## и что вообще подходит.
 func _open_gear(monster_id: String) -> void:
 	_selected_id = monster_id
 	UIUtil.clear_children(_gear_panel)
 
 	var monster := Registry.monster(monster_id)
 	var header := Label.new()
-	header.add_theme_font_size_override("font_size", 40)
-	header.add_theme_color_override("font_color", Color("DCC7A4"))
-	header.text = "Снаряжение: %s" % (monster.display_name if monster != null else monster_id)
+	header.add_theme_font_size_override("font_size", 44)
+	header.add_theme_color_override("font_color", Color("F0DEC0"))
+	header.text = monster.display_name if monster != null else monster_id
 	_gear_panel.add_child(header)
 
+	# Три ячейки слотов в ряд — как на персонаже
+	var slots := HBoxContainer.new()
+	slots.add_theme_constant_override("separation", 16)
+	_gear_panel.add_child(slots)
 	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
-		var current := GameState.equipped_gear(monster_id, slot)
-		var label := Label.new()
-		label.add_theme_font_size_override("font_size", 30)
-		label.add_theme_color_override("font_color", Color("ADA99F"))
-		label.text = "%s — %s" % [GearData.slot_name(slot), GearData.slot_hint(slot)]
-		_gear_panel.add_child(label)
+		slots.add_child(_make_slot_cell(monster_id, slot))
 
-		if current != null:
-			_add_gear_button("Снять: %s (%s)" % [current.display_name, current.effect_text()],
-				func(): GameState.unequip(monster_id, slot))
+	# Сводка эффектов: игрок должен видеть, что даёт весь комплект целиком
+	var bonuses := GameState.gear_bonuses(monster_id)
+	var summary := Label.new()
+	summary.add_theme_font_size_override("font_size", 28)
+	summary.add_theme_color_override("font_color", Color("1ED8FF"))
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summary.text = "Вместе: окно ×%.2f · удар +%.1f · здоровье +%d · защита +%d%%" % [
+		bonuses.window_scale, bonuses.power_bonus, bonuses.health_bonus,
+		int(round(bonuses.shield_reduction * 100.0)),
+	]
+	_gear_panel.add_child(summary)
 
-		for gear_id in GameState.owned_gear_ids():
-			var item := Registry.gear(gear_id)
-			if item == null or item.slot != slot:
-				continue
-			_add_gear_button("%s x%d — %s" % [
-					item.display_name, GameState.gear_count(gear_id), item.effect_text()],
-				func(): GameState.equip(monster_id, gear_id))
+	var chest := Label.new()
+	chest.add_theme_font_size_override("font_size", 34)
+	chest.add_theme_color_override("font_color", Color("DCC7A4"))
+	chest.text = "Сундук"
+	_gear_panel.add_child(chest)
+
+	var owned := GameState.owned_gear_ids()
+	if owned.is_empty():
+		var empty := Label.new()
+		empty.add_theme_font_size_override("font_size", 28)
+		empty.add_theme_color_override("font_color", Color("ADA99F"))
+		empty.text = "Пусто. Снаряжение выпадает за победу и продаётся у торговца."
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_gear_panel.add_child(empty)
+
+	for gear_id in owned:
+		var item := Registry.gear(gear_id)
+		if item == null:
+			continue
+		_add_gear_button("%s ×%d\n%s · %s" % [
+				item.display_name, GameState.gear_count(gear_id),
+				GearData.slot_name(item.slot), item.effect_text()],
+			func(): GameState.equip(monster_id, gear_id))
 
 	_add_gear_button("Закрыть", _close_gear)
 	_gear_panel.visible = true
+
+
+## Ячейка одного слота: что надето, что слот делает, как снять.
+func _make_slot_cell(monster_id: String, slot: GearData.Slot) -> Control:
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(300, 200)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	cell.add_child(box)
+
+	var title := Label.new()
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Color("F0DEC0"))
+	title.text = GearData.slot_name(slot)
+	box.add_child(title)
+
+	var hint := Label.new()
+	hint.add_theme_font_size_override("font_size", 20)
+	hint.add_theme_color_override("font_color", Color("ADA99F"))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = GearData.slot_hint(slot)
+	box.add_child(hint)
+
+	var item := GameState.equipped_gear(monster_id, slot)
+	var worn := Label.new()
+	worn.add_theme_font_size_override("font_size", 26)
+	worn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if item != null:
+		worn.text = item.display_name
+		worn.add_theme_color_override("font_color", MonsterData.rarity_color(item.rarity))
+	else:
+		worn.text = "— пусто —"
+		worn.add_theme_color_override("font_color", Color("6B6862"))
+	box.add_child(worn)
+
+	if item != null:
+		var take_off := Button.new()
+		take_off.text = "Снять"
+		take_off.custom_minimum_size = Vector2(0, 56)
+		take_off.add_theme_font_size_override("font_size", 24)
+		take_off.pressed.connect(func(): GameState.unequip(monster_id, slot))
+		box.add_child(take_off)
+
+	return cell
 
 
 func _add_gear_button(text: String, callback: Callable) -> void:

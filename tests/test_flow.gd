@@ -43,6 +43,8 @@ func _ready() -> void:
 	await _test_monster_glade_blocks_swipe()
 	await _test_defeat_does_not_freeze()
 	await _test_tutorial_notes_cover_whole_track()
+	await _test_defeat_during_miss_does_not_crash()
+	_test_swipe_thresholds_are_relative()
 
 	print("\n%d пройдено, %d провалено" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
@@ -324,3 +326,57 @@ func _test_tutorial_notes_cover_whole_track() -> void:
 	Conductor.stop()
 	lesson.queue_free()
 	await _frames(2)
+
+
+## Пропуск ноты может закончить бой, а конец боя очищает список нот.
+##
+## Именно здесь падала игра при проигрыше: цикл продолжал работать
+## с индексом в уже пустом массиве.
+func _test_defeat_during_miss_does_not_crash() -> void:
+	print("Поражение прямо в момент промаха не роняет бой")
+	GameState.reset()
+	var battle := preload("res://scenes/battle/DanceBattle.tscn").instantiate()
+	battle.autostart = false
+	add_child(battle)
+	await _frames(2)
+
+	var chart := ChartLoader.load_by_id("demo_disco", "normal")
+	battle.starting_health = 1
+	battle.starting_shield = 0
+	battle.begin(chart)
+	await _frames(2)
+
+	# Кладём ноту в список активных и добиваем здоровье её пропуском.
+	# Это ровно та последовательность, на которой игра падала: _miss
+	# заканчивает бой, _end_battle чистит список, а цикл идёт дальше.
+	battle.state.shield = 0
+	battle.state.health = 1
+	# Тип указан явно: acquire объявлен в другом скрипте, и вывод типа тут не работает
+	var note: Note = battle._pool.acquire(4.0, ChartData.NoteType.SHIELD)
+	check(note != null, "нота выдана из пула")
+	battle._active.append(note)
+
+	battle._miss(note)
+	check(battle.state.is_over, "пропуск добил здоровье — поражение")
+	check(battle._active.is_empty(), "конец боя очистил список нот")
+
+	# Повторный проход по пустому списку не должен ронять игру
+	battle._expire_missed()
+	check(is_instance_valid(battle), "сцена боя цела — падения не было")
+
+	Conductor.stop()
+	battle.queue_free()
+	await _frames(2)
+
+
+## Пороги жестов должны быть в долях экрана, а не в пикселях холста.
+func _test_swipe_thresholds_are_relative() -> void:
+	print("Пороги свайпа заданы в долях экрана")
+	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
+	var swipe: float = feed.SWIPE_FRACTION
+	var tap: float = feed.TAP_FRACTION
+	feed.free()
+	check(swipe > 0.0 and swipe < 0.5,
+		"порог свайпа — доля высоты (%.2f)" % swipe)
+	check(tap < swipe,
+		"порог тапа меньше порога свайпа")

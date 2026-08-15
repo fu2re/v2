@@ -30,7 +30,7 @@ func _ready() -> void:
 	_dance.finished.connect(_on_dance_finished)
 
 	FarmState.plots_changed.connect(_refresh)
-	FarmState.silver_changed.connect(_refresh)
+	FarmState.seeds_changed.connect(_refresh)
 	GameState.silver_changed.connect(func(_v): _refresh())
 
 	_refresh()
