@@ -10,6 +10,11 @@ offset_right = 1080.0
 offset_bottom = 1920.0
 color = Color(0.22745098, 0.16470589, 0.10980392, 1)
 
+[node name="Scenery" type="Sprite2D" parent="." unique_id=668315184]
+visible = false
+texture_filter = 1
+position = Vector2(540, 960)
+
 [node name="Title" type="Label" parent="." unique_id=759761012]
 offset_left = 60.0
 offset_top = 60.0
@@ -17,7 +22,7 @@ offset_right = 1020.0
 offset_bottom = 140.0
 theme_override_font_sizes/font_size = 58
 theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
-text = "Сумка"
+text = "Амбар"
 horizontal_alignment = 1
 
 [node name="Wallet" type="Label" parent="." unique_id=877512172]
@@ -46,4 +51,4 @@ offset_top = 1770.0
 offset_right = 1020.0
 offset_bottom = 1870.0
 theme_override_font_sizes/font_size = 40
-text = "На ферму"
+text = "← Во двор"

@@ -32,10 +32,23 @@ func reset() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
 
 
-## Куда идти при запуске игры.
+## Куда идти после заставки.
+##
+## Порядок: выбор персонажа (один раз в жизни) → встреча в лесу → ферма.
+## Пол спрашивается ДО интро, потому что герой в первом же бою танцует
+## на экране: выбирать его после было бы поздно.
 func entry_scene() -> String:
-	return "res://scenes/farm/Farm.tscn" if is_done \
-		else "res://scenes/onboarding/Onboarding.tscn"
+	if not GameState.has_chosen_hero():
+		return "res://scenes/intro/CharacterSelect.tscn"
+	if not is_done:
+		return "res://scenes/intro/Intro.tscn"
+	return LOBBY
+
+
+## Двор усадьбы — дом для всех экранов. Отсюда расходятся места и сюда же
+## возвращаются: раньше экраны были связаны кнопками друг с другом,
+## и «назад» означало разное в зависимости от того, откуда пришёл.
+const LOBBY := "res://scenes/lobby/Lobby.tscn"
 
 
 func _load() -> void:

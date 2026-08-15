@@ -10,6 +10,11 @@ offset_right = 1080.0
 offset_bottom = 1920.0
 color = Color(0.16470589, 0.25490198, 0.30980393, 1)
 
+[node name="Scenery" type="Sprite2D" parent="." unique_id=398333775]
+visible = false
+texture_filter = 1
+position = Vector2(540, 960)
+
 [node name="Title" type="Label" parent="." unique_id=2013729389]
 offset_left = 60.0
 offset_top = 80.0
@@ -17,7 +22,7 @@ offset_right = 1020.0
 offset_bottom = 170.0
 theme_override_font_sizes/font_size = 60
 theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
-text = "Друзья"
+text = "Дом защитников"
 horizontal_alignment = 1
 
 [node name="BackButton" type="Button" parent="." unique_id=2039462077]
@@ -26,7 +31,7 @@ offset_top = 1740.0
 offset_right = 1020.0
 offset_bottom = 1850.0
 theme_override_font_sizes/font_size = 44
-text = "На ферму"
+text = "← Во двор"
 
 [node name="ListScroll" type="ScrollContainer" parent="." unique_id=2104940294]
 offset_left = 60.0

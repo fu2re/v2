@@ -1,0 +1,258 @@
+{
+  "id": "folk_volna",
+  "genre": "folk",
+  "bpm": 132.0,
+  "difficulty": "rare",
+  "duration": 30.90909090909091,
+  "audio": "res://music/folk_volna_rare_132.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.5,
+      "type": "beat"
+    },
+    {
+      "beat": 9.0,
+      "type": "beat"
+    },
+    {
+      "beat": 9.5,
+      "type": "attack"
+    },
+    {
+      "beat": 10.0,
+      "type": "beat"
+    },
+    {
+      "beat": 12.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.5,
+      "type": "beat"
+    },
+    {
+      "beat": 14.0,
+      "type": "attack"
+    },
+    {
+      "beat": 15.0,
+      "type": "beat"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "beat"
+    },
+    {
+      "beat": 19.0,
+      "type": "beat"
+    },
+    {
+      "beat": 20.0,
+      "type": "attack"
+    },
+    {
+      "beat": 21.5,
+      "type": "beat"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 23.5,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "skill"
+    },
+    {
+      "beat": 24.5,
+      "type": "attack"
+    },
+    {
+      "beat": 25.0,
+      "type": "beat"
+    },
+    {
+      "beat": 26.0,
+      "type": "beat"
+    },
+    {
+      "beat": 28.0,
+      "type": "beat"
+    },
+    {
+      "beat": 28.5,
+      "type": "beat"
+    },
+    {
+      "beat": 29.0,
+      "type": "attack"
+    },
+    {
+      "beat": 29.5,
+      "type": "beat"
+    },
+    {
+      "beat": 30.0,
+      "type": "beat"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 34.0,
+      "type": "beat"
+    },
+    {
+      "beat": 35.0,
+      "type": "attack"
+    },
+    {
+      "beat": 36.0,
+      "type": "beat"
+    },
+    {
+      "beat": 38.0,
+      "type": "beat"
+    },
+    {
+      "beat": 40.0,
+      "type": "beat"
+    },
+    {
+      "beat": 41.0,
+      "type": "snack"
+    },
+    {
+      "beat": 42.0,
+      "type": "attack"
+    },
+    {
+      "beat": 44.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "beat"
+    },
+    {
+      "beat": 47.0,
+      "type": "beat"
+    },
+    {
+      "beat": 48.0,
+      "type": "shield"
+    },
+    {
+      "beat": 50.0,
+      "type": "attack"
+    },
+    {
+      "beat": 52.0,
+      "type": "beat"
+    },
+    {
+      "beat": 55.0,
+      "type": "beat"
+    },
+    {
+      "beat": 55.5,
+      "type": "beat"
+    },
+    {
+      "beat": 56.0,
+      "type": "beat"
+    },
+    {
+      "beat": 56.5,
+      "type": "beat"
+    },
+    {
+      "beat": 57.0,
+      "type": "attack"
+    },
+    {
+      "beat": 58.0,
+      "type": "skill"
+    },
+    {
+      "beat": 60.0,
+      "type": "beat"
+    },
+    {
+      "beat": 61.0,
+      "type": "beat"
+    },
+    {
+      "beat": 61.5,
+      "type": "beat"
+    },
+    {
+      "beat": 62.0,
+      "type": "attack"
+    },
+    {
+      "beat": 63.0,
+      "type": "beat"
+    },
+    {
+      "beat": 64.0,
+      "type": "beat"
+    },
+    {
+      "beat": 66.0,
+      "type": "beat"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    },
+    {
+      "beat": 46.0,
+      "action": "windup"
+    },
+    {
+      "beat": 48.0,
+      "action": "strike"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Проверки правил разметки в редакторе.
 ##
@@ -6,12 +6,7 @@ extends Node
 ## описанный в .claude/skills/chart/SKILL.md. Эти тесты следят, чтобы
 ## редакторская половина не разошлась с ним.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 
 	_test_shipped_charts_are_valid()
 	_test_catches_untelegraphed_shield()
@@ -21,17 +16,6 @@ func _ready() -> void:
 	_test_catches_shield_collision()
 	_test_density_limit_by_difficulty()
 	_test_forge_knows_every_note_type()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
 
 
 func _make(beats: Array, types: Array, difficulty := "normal") -> ChartData:

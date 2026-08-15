@@ -1,0 +1,172 @@
+{
+  "_readme": [
+    "Таблица ВСЕХ шансов дропа BEATROOT. Источник истины для баланса (GDD, Приложение B).",
+    "Код обязан совпадать с этим файлом: Glade.WEIGHTS (data/glade.gd),",
+    "RunManager (autoload/run_manager.gd), ShopState (autoload/shop_state.gd),",
+    "run_feed.gd (куст, встречи). Расхождение кода и таблицы — баг.",
+    "Все веса в процентах; сумма каждой таблицы — 100, если не сказано иное.",
+    "Секции с пометкой v0.4 спроектированы, но не реализованы (GDD §14, Фаза 6).",
+    "Цены торговца — в data/merchant.json, прогрессия — в data/progression.json."
+  ],
+
+  "glade_types": {
+    "description": "Шанс типа поляны при каждом свайпе (GDD §8.2). v0.4: торговец и событие объединены в тип «Встреча».",
+    "weights_percent": {
+      "battle": 65,
+      "wild_bush": 12,
+      "campfire": 8,
+      "encounter": 15
+    }
+  },
+
+  "encounter_types": {
+    "description": "Виды встреч внутри поляны «Встреча» (GDD §8.2.1, v0.4). Доля загадки до её реализации уходит торговцу.",
+    "weights_percent": {
+      "merchant": 45,
+      "loot_bush": 35,
+      "granny": 20,
+      "riddle": 0
+    }
+  },
+
+  "loot_bush": {
+    "description": "Куст с лутом (GDD §8.2.1, v0.4): потряси в такт. Лут всегда обычного грейда, сундук — редкая удача.",
+    "weights_percent": {
+      "potion": 35,
+      "seed_random_known": 25,
+      "silver_handful": 25,
+      "gear_chest_like_victory": 15
+    },
+    "silver_handful": "5 * (1 + 0.15 * depth), округление",
+    "chest_note": "Сундук роллится как victory_chest для монстра обычного грейда."
+  },
+
+  "granny": {
+    "description": "Бабка (GDD §8.2.1, v0.4): просит серебро, дар добровольный. Отказ ничем не наказывается.",
+    "ask_amount": "случайно от ask_min_fraction до ask_max_fraction от серебра игрока, округление вверх, минимум 1; НИКОГДА больше, чем есть у игрока; если серебра нет — бабка просто машет рукой",
+    "ask_min_fraction": 0.10,
+    "ask_max_fraction": 0.40,
+    "gift_weights_percent": {
+      "potion": 40,
+      "seed_tier_up": 35,
+      "gear_mid_tier": 25
+    },
+    "gift_notes": {
+      "seed_tier_up": "семя на тир выше лучшего известного игроку (потолок — максимальный тир)",
+      "gear_mid_tier": "случайный предмет из средней трети по цене (см. victory_chest.tiers.mid)"
+    },
+    "open_question": "GDD §15.13: проверить на плейтесте, что щедрость ощущается вознаграждённой."
+  },
+
+  "monster_rarity_by_depth": {
+    "description": "Веса грейда ЭКЗЕМПЛЯРА на боевой поляне (GDD §6.3, v0.4: грейд роллится на встречу, не закреплён за видом). Это ЕДИНСТВЕННОЕ влияние глубины на сложность (GDD §8.3): сама сложность боя — свойство грейда (темп ремикса + ×Статы).",
+    "base_weights": {
+      "common": 90.0,
+      "uncommon": 9.0,
+      "rare": 1.0,
+      "unique": 0.0,
+      "epic": 0.0,
+      "legendary": 0.0
+    },
+    "unlock_depth": {
+      "common": 0,
+      "uncommon": 0,
+      "rare": 0,
+      "unique": 5,
+      "epic": 12,
+      "legendary": 20,
+      "note": "До этой глубины грейд не встречается ВОВСЕ. Без порогов линейный сдвиг выдавал уникального уже на второй поляне: игрок утыкался в непроходимый бой, не успев понять правила."
+    },
+    "depth_shift": {
+      "formula": "shift = min(depth / divisor, max_shift); вес = base + per_shift * shift (и 0, пока depth < unlock_depth)",
+      "divisor": 10.0,
+      "max_shift": 3.0,
+      "per_shift": {
+        "common": -18.0,
+        "uncommon": 5.0,
+        "rare": 5.0,
+        "unique": 4.0,
+        "epic": 2.5,
+        "legendary": 1.0
+      },
+      "common_floor": 15.0,
+      "note": "После сдвига веса нормализуются к 100%. Обычные не исчезают никогда: приручение обычного должно оставаться лёгким на любой глубине."
+    },
+    "examples_percent": {
+      "_note": "Замерено на текущих числах. У поверхности почти всё обычное, старшие грейды не существуют до своей глубины.",
+      "depth_0": { "common": 90, "uncommon": 9, "rare": 1, "unique": 0, "epic": 0, "legendary": 0 },
+      "depth_5": { "common": 83, "uncommon": 12, "rare": 4, "unique": 2, "epic": 0, "legendary": 0 },
+      "depth_10": { "common": 75, "uncommon": 15, "rare": 6, "unique": 4, "epic": 0, "legendary": 0 },
+      "depth_15": { "common": 64, "uncommon": 17, "rare": 9, "unique": 6, "epic": 4, "legendary": 0 },
+      "depth_20": { "common": 55, "uncommon": 19, "rare": 11, "unique": 8, "epic": 5, "legendary": 2 },
+      "depth_30_plus": { "common": 37, "uncommon": 24, "rare": 16, "unique": 12, "epic": 8, "legendary": 3 }
+    }
+  },
+
+  "victory_chest": {
+    "description": "Сундук за победу над монстром: всегда одна вещь снаряжения. Это НЕ платный лутбокс (GDD §9.1.1) — не покупается и не связан с деньгами. Чем выше грейд монстра, тем выше шанс дорогой вещи: награда обязана отражать риск.",
+    "tiers": {
+      "how_built": "Всё снаряжение сортируется по цене и делится на три равные группы. Внутри группы — равновероятно.",
+      "cheap": ["soft_slippers", "acorn_charm", "tin_whistle"],
+      "mid": ["spring_boots", "river_stone", "brass_bell"],
+      "expensive": ["cloud_shoes", "heartwood_amulet", "thunder_pick"]
+    },
+    "odds_percent_by_monster_rarity": {
+      "common":    { "cheap": 70, "mid": 25, "expensive": 5 },
+      "uncommon":  { "cheap": 55, "mid": 33, "expensive": 12 },
+      "rare":      { "cheap": 40, "mid": 38, "expensive": 22 },
+      "unique":    { "cheap": 25, "mid": 42, "expensive": 33 },
+      "epic":      { "cheap": 15, "mid": 40, "expensive": 45 },
+      "legendary": { "cheap": 5,  "mid": 35, "expensive": 60 }
+    }
+  },
+
+  "wild_bush": {
+    "description": "Дикий куст (тип поляны, не встреча): вид фрукта выбирается равновероятно из всех видов игры. Единственный источник семян НОВЫХ культур.",
+    "yield": {
+      "fruits_plain_quality": 2,
+      "seed_of_same_fruit": 1,
+      "silver": "8 * (1 + 0.15 * depth), округление"
+    }
+  },
+
+  "campfire": {
+    "description": "Не дроп, но фиксируем: отдых восстанавливает здоровье, здесь же — единственная точка смены гуардиана в забеге.",
+    "health_restore": 25
+  },
+
+  "soft_death": {
+    "description": "Мягкая смерть (GDD §8.4): что теряется при обнулении здоровья.",
+    "lost_percent": { "run_fruits": 50, "run_silver": 50 },
+    "kept_full": ["приручённые гуардианы", "вся дружба", "найденное снаряжение", "семена новых культур"]
+  },
+
+  "cosmetic_crate": {
+    "description": "Пластинка — платный лутбокс, ТОЛЬКО косметика (SHOP.md). Шансы публикуются в интерфейсе покупки до оплаты.",
+    "price_gold": 120,
+    "odds_percent_by_rarity": {
+      "common": 60.0,
+      "uncommon": 27.0,
+      "rare": 10.0,
+      "epic": 2.5,
+      "legendary": 0.5,
+      "_warning": "Грейд «Уникальный» в таблице шансов отсутствует, при этом косметика этого грейда существует, а грейда «Редкий» — нет ни одной. Публикуемые шансы лгут. Есть отложенная задача на починку."
+    },
+    "pity": {
+      "guaranteed_after_opens": 30,
+      "min_rarity": "rare",
+      "counter_visible_to_player": true,
+      "resets_on_natural_rare": true
+    },
+    "duplicate_refund_gold": {
+      "common": 15,
+      "uncommon": 35,
+      "rare": 90,
+      "epic": 200,
+      "legendary": 450,
+      "_warning": "Для «Уникального» возврат не задан, код падает в 10 золота — меньше, чем за обычный дубль."
+    },
+    "banned_regions": ["BE", "NL"],
+    "banned_regions_rule": "Сундуки скрыты полностью, весь их состав доступен прямой покупкой."
+  }
+}

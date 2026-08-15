@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Проверки боевой логики.
 ##
@@ -6,13 +6,7 @@ extends Node
 ## стоят внимания, но не прогресса, пока он держится. Здоровье трогается
 ## только когда буфер выбит полностью — иначе игра станет злой к детям.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	_test_shield_absorbs_before_health()
 	_test_shield_note_restores_shield()
 	_test_missed_shield_hurts_more()
@@ -30,30 +24,16 @@ func _ready() -> void:
 	_test_rarity_scales_monster()
 	_test_experience_raises_damage()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
 
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
-
-
+## Бой между двумя экземплярами. Грейд противника — параметр: он и есть
+## главный множитель сложности встречи (GDD §6.3).
 func _make(monster_id := "synth_slime", guardian_id := "disco_sprout",
-		health := 100, depth := 0) -> BattleState:
+		health := 100, depth := 0, monster_grade := MonsterData.Rarity.COMMON) -> BattleState:
 	var s := BattleState.new()
-	s.setup(Registry.monster(monster_id), Registry.monster(guardian_id), health, depth)
+	s.setup(
+		MonsterInstance.create(monster_id, monster_grade),
+		GameState.tame(guardian_id, MonsterData.Rarity.COMMON),
+		health, depth)
 	return s
 
 
@@ -205,7 +185,7 @@ func _test_gear_raises_attack_damage() -> void:
 	var bare_damage := bare.register_attack(Judge.Grade.PERFECT)
 
 	GameState.add_gear("thunder_pick")
-	GameState.equip("disco_sprout", "thunder_pick")
+	GameState.equip(GameState.tame("disco_sprout", MonsterData.Rarity.COMMON).key(), "thunder_pick")
 	var geared := _make()
 	for i in BattleState.MIN_SERIES_LENGTH:
 		geared.register_hit(Judge.Grade.PERFECT)
@@ -325,8 +305,10 @@ func _test_snack() -> void:
 func _test_rarity_scales_monster() -> void:
 	print("Грейд делает монстра крепче и злее")
 	GameState.reset()
-	var common := _make("disco_sprout", "disco_sprout")
-	var epic := _make("beat_serpent", "disco_sprout")
+	# ОДИН И ТОТ ЖЕ вид в двух грейдах: грейд принадлежит экземпляру,
+	# и разница обязана появляться именно от него, а не от выбора вида
+	var common := _make("disco_sprout", "disco_sprout", 100, 0, MonsterData.Rarity.COMMON)
+	var epic := _make("disco_sprout", "disco_sprout", 100, 0, MonsterData.Rarity.EPIC)
 
 	check(epic.max_vibe > common.max_vibe,
 		"монстр выше грейдом крепче (%d против %d)" % [epic.max_vibe, common.max_vibe])
@@ -364,7 +346,7 @@ func _test_experience_raises_damage() -> void:
 	for i in 500:
 		GameState.add_battle_experience("synth_slime")
 	check(GameState.experience_multiplier("synth_slime")
-		<= 1.0 + GameState.XP_DAMAGE_CAP + 0.001, "прибавка упирается в потолок")
+		<= 1.0 + GameState.xp_damage_cap() + 0.001, "прибавка упирается в потолок")
 
 	# Опыт по одному виду не влияет на другой
 	check_eq(GameState.experience_multiplier("bass_bear"), 1.0,

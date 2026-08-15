@@ -206,11 +206,11 @@
     },
     {
       "beat": 41.0,
-      "type": "beat"
+      "type": "snack"
     },
     {
       "beat": 41.5,
-      "type": "snack"
+      "type": "beat"
     },
     {
       "beat": 43.0,
@@ -290,7 +290,7 @@
     },
     {
       "beat": 56.0,
-      "type": "skill"
+      "type": "beat"
     },
     {
       "beat": 56.5,
@@ -306,7 +306,7 @@
     },
     {
       "beat": 58.0,
-      "type": "beat"
+      "type": "skill"
     },
     {
       "beat": 60.0,

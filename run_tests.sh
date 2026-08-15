@@ -14,6 +14,18 @@ for scene in tests/test_*.tscn; do
   failed=$((failed + $(echo "$line" | grep -oE "[0-9]+ провалено" | grep -oE "^[0-9]+")))
 done
 
+# Тесты арт-пайплайна живут в Python: ворота меряют картинки, а не сцены,
+# и Godot для этого не нужен. Пропускаются, если не поставлен pytest, —
+# отсутствие инструмента не должно выглядеть как провал теста.
+if (cd tools/artgen && uv run --extra test python -c "import pytest" >/dev/null 2>&1); then
+  line=$(cd tools/artgen && uv run --extra test pytest tests -q 2>&1 | tail -1)
+  printf "%-20s %s\n" "artgen" "$line"
+  total=$((total + $(echo "$line" | grep -oE "[0-9]+ passed" | grep -oE "^[0-9]+" || echo 0)))
+  failed=$((failed + $(echo "$line" | grep -oE "[0-9]+ failed" | grep -oE "^[0-9]+" || echo 0)))
+else
+  printf "%-20s %s\n" "artgen" "пропущен: uv sync --extra test"
+fi
+
 echo
 echo "ИТОГО: $total пройдено, $failed провалено"
 [ "$failed" -eq 0 ]

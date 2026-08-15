@@ -9,7 +9,11 @@ extends Resource
 ## Внутренние имена остались музыкальными (ROCK, DISCO...), потому что за ними
 ## закреплены аранжировки треков. На экране их видеть не должны: музыкальный
 ## жаргон ничего не говорит семилетнему. Отображаемые имена — в ELEMENT_NAMES.
-enum Genre { ROCK, DISCO, FOLK, ELECTRO, HIPHOP }
+## Ветер — латина, а не хип-хоп: на синтезе, которым делаются треки,
+## хип-хоп звучал почти пустым (разреженный бит и длинный саб), а «почти
+## пустой» для ритм-игры означает «не по чему попадать». Обоснование
+## живёт в `tools/chartgen/beatroot_chartgen/arrange.py`.
+enum Genre { ROCK, DISCO, FOLK, ELECTRO, LATIN }
 
 const ELEMENT_NAMES := ["Камень", "Солнце", "Листва", "Искра", "Ветер"]
 
@@ -30,27 +34,20 @@ const RARITY_COLORS := [
 	Color("B8860B"),  # тёмно-золотой, переливается в интерфейсе
 ]
 
-## Насколько крепче и злее монстр каждого следующего грейда.
+## Насколько крепче и злее монстр каждого следующего грейда — берётся
+## из таблицы (`data/progression.json`), а не из константы в коде.
 ##
-## Растёт заметно, но не отвесно: легендарный обязан быть испытанием,
-## а не стеной, в которую упираются навсегда.
-const RARITY_VIBE_SCALE := [1.0, 1.1, 1.2, 1.35, 1.5, 1.7]
-const RARITY_POWER_SCALE := [1.0, 1.1, 1.2, 1.35, 1.5, 1.7]
+## Раньше числа жили здесь и разошлись с таблицей: 1.7 в коде против 2.0
+## в JSON, который объявлял себя источником истины. Держать их в двух местах
+## бессмысленно — расхождение обязательно вернётся.
 
 ## Силуэты соответствуют шаблонам ригов (GDD §11.2). Монстры одного силуэта
 ## делят библиотеку танцев — без этого сотня монстров недостижима.
 enum Silhouette { BIPED, QUADRUPED, FLYER, BLOB, SERPENT }
 
-## Порог дружбы по редкости. Редкость влияет на то, сколько встреч нужно,
-## но НЕ на шанс — приручение гарантировано (GDD §6.3).
-const FRIENDSHIP_THRESHOLD := {
-	Rarity.COMMON: 100,
-	Rarity.UNCOMMON: 150,
-	Rarity.RARE: 200,
-	Rarity.UNIQUE: 250,
-	Rarity.EPIC: 300,
-	Rarity.LEGENDARY: 400,
-}
+## Порог дружбы по грейду живёт в таблице (`Balance.friendship_threshold`).
+## Грейд влияет на то, сколько встреч нужно, но НЕ на шанс — приручение
+## гарантировано (GDD §6.3), и у каждого грейда своя шкала (GDD §6.1).
 
 ## Кто кого бьёт. Ветер нейтрален: без преимуществ и слабостей.
 const BEATS := {
@@ -73,6 +70,11 @@ const DISADVANTAGE_MULTIPLIER := 0.7
 ## игрок решает, стоит ли останавливаться (GDD §6.2).
 @export var favorite_fruit_id: String = ""
 
+## Мелодический мотив монстра. Вместе со стихией и грейдом задаёт трек боя:
+## `charts/<жанр>_<мотив>_<грейд>_<bpm>.json` (GDD §10.1.1). Один мотив звучит
+## в пяти аранжировках и шести темпах, поэтому монстру достаточно назвать его.
+@export var motif_id: String = ""
+
 @export var base_vibe: int = 100
 @export var base_health: int = 100
 ## Урон по Настрою за идеальное попадание.
@@ -83,8 +85,20 @@ const DISADVANTAGE_MULTIPLIER := 0.7
 var _sprite: Texture2D = null
 
 
+## Порог дружбы для конкретного грейда ЭТОЙ встречи.
+##
+## Грейд — свойство экземпляра, а не вида (GDD §6.3), поэтому порог
+## спрашивается по грейду, а не у ресурса вида.
+static func friendship_threshold_for(grade: int) -> int:
+	return Balance.friendship_threshold(grade)
+
+
+## Порог по грейду, записанному в самом ресурсе.
+##
+## Переходная обёртка: грейд переезжает на экземпляр, и после этого
+## у вида собственного порога не останется вовсе.
 func friendship_threshold() -> int:
-	return FRIENDSHIP_THRESHOLD.get(rarity, 100)
+	return friendship_threshold_for(rarity)
 
 
 ## Множитель урона против другого жанра.
@@ -102,6 +116,61 @@ func sprite() -> Texture2D:
 	return _sprite
 
 
+## Каталог спрайтов по грейдам: `art/monster/<вид>_<грейд>.png`.
+const SPRITE_DIR := "res://art/monster"
+
+## Разобранные пути, общие на все экземпляры вида: id -> {грейд -> путь}.
+## Скан по файловой системе на каждую отрисовку обошёлся бы в кадры.
+static var _grade_sprites: Dictionary = {}
+
+
+## Спрайт для конкретного грейда.
+##
+## Пока грейд не нарисован, показывается МАКСИМАЛЬНЫЙ доступный спрайт вида:
+## сначала ищем точное совпадение, потом ближайший меньший грейд, потом любой
+## имеющийся. Игра остаётся играбельной на неполном арте, а картинка сама
+## становится точнее по мере рисования — без единой правки кода.
+func sprite_for_grade(grade: int) -> Texture2D:
+	var available := _sprites_for_species(id)
+
+	if available.has(grade):
+		return load(available[grade]) as Texture2D
+
+	# Ближайший снизу: легендарный, которого ещё не нарисовали, выглядит
+	# как самый старший из готовых, а не как пустое место
+	for lower in range(grade - 1, -1, -1):
+		if available.has(lower):
+			return load(available[lower]) as Texture2D
+
+	var grades: Array = available.keys()
+	if not grades.is_empty():
+		grades.sort()
+		return load(available[grades[grades.size() - 1]]) as Texture2D
+
+	return sprite()
+
+
+static func _sprites_for_species(species_id: String) -> Dictionary:
+	if _grade_sprites.has(species_id):
+		return _grade_sprites[species_id]
+
+	var found: Dictionary = {}
+	for grade in RARITY_NAMES.size():
+		var key := Balance.grade_key(grade)
+		var path := "%s/%s_%s.png" % [SPRITE_DIR, species_id, key]
+		# ResourceLoader, а не FileAccess: в экспортированной сборке текстуры
+		# лежат как .import/.remap, и проверка по имени файла соврала бы
+		if ResourceLoader.exists(path):
+			found[grade] = path
+	_grade_sprites[species_id] = found
+	return found
+
+
+## Сбросить кеш путей. Нужен тестам и редактору: арт добавляется на ходу.
+static func forget_sprite_paths() -> void:
+	_grade_sprites.clear()
+
+
 static func genre_name(g: Genre) -> String:
 	return ELEMENT_NAMES[g]
 
@@ -114,14 +183,18 @@ static func rarity_color(r: Rarity) -> Color:
 	return RARITY_COLORS[r]
 
 
-## Множитель Настроя по грейду.
+## Множитель статов по грейду. Одинаков для Настроя дикого монстра
+## и для базовых статов приручённого — грейд принадлежит существу,
+## а не его роли в бою (GDD §6.3).
 static func rarity_vibe_scale(r: Rarity) -> float:
-	return RARITY_VIBE_SCALE[r]
+	return Balance.grade_stat_scale(r)
 
 
-## Множитель силы удара монстра по грейду.
+## Множитель силы удара монстра по грейду. Та же шкала, что и у Настроя:
+## разводить их значило бы держать две таблицы там, где дизайн говорит
+## об одной «крепости грейда».
 static func rarity_power_scale(r: Rarity) -> float:
-	return RARITY_POWER_SCALE[r]
+	return Balance.grade_stat_scale(r)
 
 
 ## Легендарный переливается: единственный грейд с особой подачей.

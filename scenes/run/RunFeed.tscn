@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://g2ttp4e56wli"]
 
-[ext_resource type="Script" path="res://scenes/run/run_feed.gd" id="1_tskye"]
+[ext_resource type="Script" uid="uid://ciam7crlxc2u6" path="res://scenes/run/run_feed.gd" id="1_tskye"]
 
 [node name="RunFeed" type="Node2D" unique_id=960895637]
 script = ExtResource("1_tskye")
@@ -9,6 +9,11 @@ script = ExtResource("1_tskye")
 offset_right = 1080.0
 offset_bottom = 1920.0
 color = Color(0.14117648, 0.22352941, 0.12156863, 1)
+
+[node name="Scenery" type="Sprite2D" parent="." unique_id=690072793]
+visible = false
+texture_filter = 1
+position = Vector2(540, 960)
 
 [node name="Card" type="Control" parent="." unique_id=1596759893]
 layout_mode = 3
@@ -25,11 +30,11 @@ scale = Vector2(4, 4)
 [node name="DepthLabel" type="Label" parent="Card" unique_id=1867792249]
 layout_mode = 0
 offset_left = 60.0
-offset_top = 140.0
+offset_top = 30.0
 offset_right = 1020.0
-offset_bottom = 360.0
-theme_override_font_sizes/font_size = 44
+offset_bottom = 120.0
 theme_override_colors/font_color = Color(0.6784314, 0.6627451, 0.62352943, 1)
+theme_override_font_sizes/font_size = 44
 horizontal_alignment = 1
 autowrap_mode = 3
 
@@ -39,8 +44,8 @@ offset_left = 60.0
 offset_top = 620.0
 offset_right = 1020.0
 offset_bottom = 840.0
-theme_override_font_sizes/font_size = 76
 theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
+theme_override_font_sizes/font_size = 76
 horizontal_alignment = 1
 autowrap_mode = 3
 
@@ -50,19 +55,68 @@ offset_left = 60.0
 offset_top = 800.0
 offset_right = 1020.0
 offset_bottom = 1020.0
-theme_override_font_sizes/font_size = 42
 theme_override_colors/font_color = Color(0.6784314, 0.6627451, 0.62352943, 1)
+theme_override_font_sizes/font_size = 42
+horizontal_alignment = 1
+autowrap_mode = 3
+[node name="TameBanner" type="Label" parent="Card" unique_id=1541280901]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 1010.0
+offset_right = 1020.0
+offset_bottom = 1110.0
+theme_override_colors/font_color = Color(1, 0.8235294, 0.3019608, 1)
+theme_override_font_sizes/font_size = 56
+horizontal_alignment = 1
+autowrap_mode = 3
+visible = false
+
+[node name="FriendshipTrack" type="ColorRect" parent="Card" unique_id=1541280902]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 1120.0
+offset_right = 840.0
+offset_bottom = 1158.0
+color = Color(0, 0, 0, 0.45)
+
+[node name="FriendshipFill" type="ColorRect" parent="Card" unique_id=1541280903]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 1120.0
+offset_right = 840.0
+offset_bottom = 1158.0
+color = Color(1, 0.34117648, 0.76862746, 1)
+
+[node name="FriendshipLabel" type="Label" parent="Card" unique_id=1541280904]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 1168.0
+offset_right = 1020.0
+offset_bottom = 1278.0
+theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
+theme_override_font_sizes/font_size = 34
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RewardLabel" type="Label" parent="Card" unique_id=1541280905]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 1284.0
+offset_right = 1020.0
+offset_bottom = 1364.0
+theme_override_colors/font_color = Color(0.6784314, 0.6627451, 0.62352943, 1)
+theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="Hint" type="Label" parent="Card" unique_id=1541280150]
 layout_mode = 0
 offset_left = 60.0
-offset_top = 1420.0
+offset_top = 1546.0
 offset_right = 1020.0
-offset_bottom = 1640.0
-theme_override_font_sizes/font_size = 38
+offset_bottom = 1666.0
 theme_override_colors/font_color = Color(0.11764706, 0.84705883, 1, 1)
+theme_override_font_sizes/font_size = 38
 horizontal_alignment = 1
 autowrap_mode = 3
 
@@ -112,23 +166,23 @@ text = "Домой"
 [node name="FinishButton" type="Button" parent="." unique_id=43014318]
 visible = false
 offset_left = 240.0
-offset_top = 1560.0
+offset_top = 1660.0
 offset_right = 840.0
-offset_bottom = 1690.0
+offset_bottom = 1790.0
 theme_override_font_sizes/font_size = 48
-text = "На ферму"
+text = "Домой"
 
 [node name="ActionButton" type="Button" parent="." unique_id=1727662730]
 offset_left = 90.0
-offset_top = 1180.0
+offset_top = 1394.0
 offset_right = 520.0
-offset_bottom = 1310.0
+offset_bottom = 1524.0
 theme_override_font_sizes/font_size = 44
 
 [node name="NextButton" type="Button" parent="." unique_id=949062452]
 offset_left = 560.0
-offset_top = 1180.0
+offset_top = 1394.0
 offset_right = 990.0
-offset_bottom = 1310.0
+offset_bottom = 1524.0
 theme_override_font_sizes/font_size = 44
 text = "Дальше ↑"

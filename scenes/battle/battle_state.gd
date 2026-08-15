@@ -19,8 +19,27 @@ const STRIKE_DAMAGE := 10
 ## Урон за обычный промах. Мал намеренно: щит гасит его несколько раз подряд,
 ## и ребёнок успевает поймать ритм прежде, чем это станет больно.
 const MISS_DAMAGE := 3
+
+## Промах по скиллу дороже обычного (GDD §4.2.4).
+##
+## Особая нота требует особого внимания: если бы она стоила столько же,
+## сколько бит, левая кнопка ничем не отличалась бы от правой.
+const SKILL_MISS_DAMAGE := 6
+
+## Эффекты спецдвижений по стихии гуардиана (GDD §4.2.4).
+## Маленькие и мгновенные: скилл — приправа к бою, а не вторая система.
+const SKILL_ATTACK_BONUS := 1.5
+const SKILL_SHIELD_GAIN := 6
+const SKILL_HEALTH_GAIN := 5
+const SKILL_COMBO_GAIN := 5
+const SKILL_WINDOW_BOOST := 1.25
+const SKILL_WINDOW_BARS := 4.0
 ## Сколько щита возвращает попадание по ноте-щиту.
-const SHIELD_RESTORE := 8
+##
+## Совсем немного намеренно. Щит — расходуемый буфер на весь забег, а не
+## возобновляемый ресурс: когда попадание возвращало восемь, забег переставал
+## быть испытанием на выносливость — буфер чинился быстрее, чем тратился.
+const SHIELD_RESTORE := 2
 
 ## Базовый запас щита.
 ##
@@ -43,10 +62,12 @@ const MIN_SERIES_LENGTH := 3
 ## примерно к его концу, а не на середине. Слишком крупный множитель
 ## обрывал бой раньше мелодии — это чинится здесь, а не в чарте.
 ## Охраняется тестом на длину боя.
-const ATTACK_MULTIPLIER := 1.8
+const ATTACK_MULTIPLIER := 2.2
 
-var monster: MonsterData = null
-var guardian: MonsterData = null
+## Кто танцует. Оба — ЭКЗЕМПЛЯРЫ: грейд и уровень принадлежат существу,
+## а не виду, и статы боя считаются от них (GDD §6.3, §6.5).
+var monster: MonsterInstance = null
+var guardian: MonsterInstance = null
 var depth: int = 0
 
 var max_vibe: int = 100
@@ -71,6 +92,14 @@ var max_combo: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
 
+## Спецдвижения: сколько сработало и что они оставили после себя.
+var skills_used: int = 0
+## Множитель следующей удавшейся атаки (Камень). Тратится при попадании.
+var next_attack_bonus: float = 1.0
+## До какой доли трека расширены окна (Ветер). Доля передаётся снаружи:
+## BattleState остаётся чистым классом и ничего не знает про Conductor.
+var window_boost_until_beat: float = -1.0
+
 ## Текущая серия. Атака в её конце сработает, только если серия чиста.
 var series_length: int = 0
 var series_clean: bool = true
@@ -88,37 +117,35 @@ var is_over: bool = false
 var did_win: bool = false
 
 
-func setup(new_monster: MonsterData, new_guardian: MonsterData,
+func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 		starting_health: int, run_depth: int = 0, starting_shield: int = -1) -> void:
 	monster = new_monster
 	guardian = new_guardian
 	depth = run_depth
 
 	# Крепость монстра складывается из трёх вещей: его собственного запаса,
-	# грейда и глубины забега. Грейд — главный множитель: легендарный обязан
-	# ощущаться как событие, а не как обычный бой с другой рамкой
-	max_vibe = int(round(
-		monster.base_vibe
-		* MonsterData.rarity_vibe_scale(monster.rarity)
-		* (1.0 + VIBE_DEPTH_SCALE * depth)
-	))
+	# грейда с уровнем (это уже внутри `vibe()`) и глубины забега. Грейд —
+	# главный множитель: легендарный обязан ощущаться как событие,
+	# а не как обычный бой с другой рамкой
+	max_vibe = int(round(monster.vibe() * (1.0 + VIBE_DEPTH_SCALE * depth)))
 	vibe = max_vibe
 
-	# Урон монстра тоже растёт с грейдом
-	strike_scale = MonsterData.rarity_power_scale(monster.rarity)
+	# Урон монстра растёт по СВОЕЙ шкале, круче, чем крепость: эпический
+	# обязан пугать, а не просто дольше держаться (GDD §6.3)
+	strike_scale = monster.strike_scale()
 
 	# Опыт боёв против ВИДА: каждая встреча учит повадкам и добавляет урона.
 	# Это то, что делает повторные встречи осмысленными, а не рутиной
-	experience_scale = GameState.experience_multiplier(monster.id)
+	experience_scale = GameState.experience_multiplier(monster.species_id)
 
-	var bonuses := GameState.gear_bonuses(guardian.id) if guardian != null else {}
+	var bonuses := GameState.gear_bonuses(guardian.key()) if guardian != null else {}
 	window_scale = bonuses.get("window_scale", 1.0)
 	power_bonus = bonuses.get("power_bonus", 0.0)
 	shield_reduction = bonuses.get("shield_reduction", 0.0)
 
 	# Здоровье сквозное: между полянами само не восстанавливается,
-	# только у костра и перекусами. В этом всё напряжение забега
-	max_health = (guardian.base_health if guardian != null else 100) \
+	# только у костра и зельями. В этом всё напряжение забега
+	max_health = (guardian.max_health() if guardian != null else 100) \
 		+ int(bonuses.get("health_bonus", 0))
 	health = clampi(starting_health, 0, max_health)
 
@@ -131,6 +158,9 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 	max_combo = 0
 	blocked = 0
 	strikes_taken = 0
+	skills_used = 0
+	next_attack_bonus = 1.0
+	window_boost_until_beat = -1.0
 	series_length = 0
 	series_clean = true
 	attacks_landed = 0
@@ -145,7 +175,7 @@ func setup(new_monster: MonsterData, new_guardian: MonsterData,
 func genre_multiplier() -> float:
 	if guardian == null or monster == null:
 		return 1.0
-	return MonsterData.genre_multiplier(guardian.genre, monster.genre)
+	return MonsterData.genre_multiplier(guardian.genre(), monster.genre())
 
 
 ## Учесть оценку обычной ноты.
@@ -204,15 +234,39 @@ func register_attack(grade: int) -> int:
 
 	# Урон растёт от снаряжения гуардиана: собирать предметы — это и есть
 	# способ бить сильнее (GDD §9.1)
-	var power := (guardian.base_power if guardian != null else 4.0) + power_bonus
+	# Сила удара экземпляра уже включает грейд и уровень
+	var power := (guardian.power() if guardian != null else 4.0) + power_bonus
 	var amount := int(round(
 		power * ATTACK_MULTIPLIER * Judge.effect(grade)
 			* Judge.combo_multiplier(combo) * genre_multiplier() * experience_scale
+			* next_attack_bonus
 	))
+	# Топот Камня усиливает ОДИН удар и тратится на нём: иначе спецдвижение
+	# в начале боя тихо усиливало бы весь бой целиком
+	next_attack_bonus = 1.0
 	attacks_landed += 1
 	_reset_series()
 	_reduce_vibe(amount)
 	return amount
+
+
+## Тап мимо всякой ноты.
+##
+## Не бьёт по здоровью — ребёнок, который просто пробует экран, не должен
+## терять забег. Но рвёт серию и сбрасывает комбо, и этого достаточно:
+## без чистой связки атака не проходит вовсе (§4.2.1), поэтому долбить
+## обе кнопки подряд становится строго хуже, чем ждать свою ноту.
+##
+## До этого лишний тап не стоил ничего, и найденный на живом прогоне приём
+## «спамить обе кнопки» давал попадание по каждой ноте бесплатно —
+## то есть отменял ритм-игру целиком.
+func register_stray_tap() -> void:
+	if is_over:
+		return
+	series_clean = false
+	if combo != 0:
+		combo = 0
+		combo_changed.emit(combo, 1.0)
 
 
 ## Пауза в музыке обрывает серию.
@@ -226,6 +280,65 @@ func break_series() -> void:
 func _reset_series() -> void:
 	series_length = 0
 	series_clean = true
+
+
+## Спецдвижение гуардиана: эффект определяется его СТИХИЕЙ (GDD §4.2.4).
+##
+## Текущая доля трека нужна Ветру, чей эффект длится четыре такта. Она
+## передаётся аргументом, а не берётся у Conductor: класс обязан оставаться
+## чистым, иначе его нельзя гонять headless.
+##
+## Без гуардиана (интро, §15.5) скилл ведёт себя как обычный бит: своей
+## стихии у героя нет, и выдумывать ей эффект значило бы учить игрока тому,
+## что перестанет быть правдой, как только у него появится защитник.
+func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) -> void:
+	if is_over:
+		return
+
+	grade_counts[grade] += 1
+
+	if grade == Judge.Grade.MISS:
+		combo = 0
+		combo_changed.emit(combo, 1.0)
+		series_clean = false
+		_take_damage(SKILL_MISS_DAMAGE)
+		return
+
+	combo += 1
+	max_combo = maxi(max_combo, combo)
+	series_length += 1
+	skills_used += 1
+
+	if guardian == null:
+		combo_changed.emit(combo, Judge.combo_multiplier(combo))
+		return
+
+	match guardian.genre():
+		MonsterData.Genre.ROCK:
+			# Камень: топот — следующая удавшаяся атака бьёт сильнее
+			next_attack_bonus = SKILL_ATTACK_BONUS
+		MonsterData.Genre.DISCO:
+			# Солнце: вспышка чинит буфер прощения
+			restore_shield(SKILL_SHIELD_GAIN)
+		MonsterData.Genre.FOLK:
+			# Листва: дыхание леса возвращает немного сил
+			restore_health(SKILL_HEALTH_GAIN)
+		MonsterData.Genre.ELECTRO:
+			# Искра: разряд подбрасывает комбо
+			combo += SKILL_COMBO_GAIN
+			max_combo = maxi(max_combo, combo)
+		MonsterData.Genre.LATIN:
+			# Ветер: порыв ненадолго расширяет окна попадания
+			window_boost_until_beat = current_beat + float(beats_per_bar) * SKILL_WINDOW_BARS
+
+	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+
+
+## Ширина окон с учётом снаряжения и действующего порыва Ветра.
+func effective_window_scale(current_beat: float = 0.0) -> float:
+	if current_beat <= window_boost_until_beat:
+		return window_scale * SKILL_WINDOW_BOOST
+	return window_scale
 
 
 ## Щит принят вовремя — атака погашена и щит немного восстановлен.

@@ -66,11 +66,45 @@ def cutout_background(arr: np.ndarray, tolerance: float = 0.10) -> np.ndarray:
     return ~filled
 
 
+def fit_subject(img: Image.Image, margin: float = 0.06) -> Image.Image:
+    """Обрезать по объекту и вписать его в квадратный кадр.
+
+    Без этого шага масштаб ассета определяется тем, как крупно модель решила
+    нарисовать предмет. Проверено на первом прогоне: жёлудь занял 5% кадра —
+    то есть от 64 пикселей ассета на сам жёлудь пришлось четырнадцать, а
+    остальное ушло в пустоту. Рядом яблоко заняло кадр целиком, и в интерфейсе
+    набор фруктов получился разнокалиберным.
+
+    Поля обязательны: объект, упирающийся в рамку, читается как обрезанный.
+    """
+    alpha = np.array(img.convert("RGBA"))[..., 3]
+    ys, xs = np.nonzero(alpha > 0)
+    if len(xs) == 0:
+        return img
+
+    side = int(max(xs.max() - xs.min(), ys.max() - ys.min()) + 1)
+    side = int(round(side * (1.0 + 2 * margin)))
+    cx = (int(xs.min()) + int(xs.max())) // 2
+    cy = (int(ys.min()) + int(ys.max())) // 2
+
+    fitted = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    fitted.paste(img, (side // 2 - cx, side // 2 - cy))
+    return fitted
+
+
 def pixelize(img: Image.Image, target: int = 96, palette: np.ndarray | None = None,
-             alpha_cutoff: int = 128, remove_background: bool = True) -> Image.Image:
+             alpha_cutoff: int = 128, remove_background: bool = True,
+             quantize: bool = True) -> Image.Image:
     """Привести картинку к пиксель-виду в палитре проекта.
 
     target — длинная сторона результата в пикселях.
+
+    `quantize=False` оставляет исходные цвета. Нужно бренду — логотипу
+    и заставке. Палитра мира приглушена намеренно, её потолок насыщенности
+    0.128, и логотип в ней получается землистым. Но правило зарезервированных
+    цветов защищает читаемость НОТЫ в бою, а на заставке нот нет: спорить
+    яркому логотипу не с чем. Для всего, что показывается вместе с нотами,
+    квантование обязательно.
     """
     img = img.convert("RGBA")
 
@@ -79,7 +113,9 @@ def pixelize(img: Image.Image, target: int = 96, palette: np.ndarray | None = No
     if remove_background:
         cut = remove_background_ml(img)
         if cut is not None:
-            img = cut
+            # Вписывать можно только когда фон снят: у поляны объект — весь кадр,
+            # и обрезать её по «содержимому» означает выкинуть композицию
+            img = fit_subject(cut)
 
     # BOX усредняет блоки — деталь превращается в цвет пикселя,
     # а не выбрасывается, как при NEAREST
@@ -98,12 +134,13 @@ def pixelize(img: Image.Image, target: int = 96, palette: np.ndarray | None = No
     if remove_background and solid.all():
         solid = cutout_background(arr)
 
-    pal = quantization_palette() if palette is None else palette
-    idx = nearest(rgb.reshape(-1, 3), pal)
-    quantized = pal[idx].reshape(rgb.shape).astype(np.uint8)
+    if quantize:
+        pal = quantization_palette() if palette is None else palette
+        idx = nearest(rgb.reshape(-1, 3), pal)
+        rgb = pal[idx].reshape(rgb.shape).astype(np.uint8)
 
     out = np.zeros_like(arr)
-    out[..., :3] = quantized
+    out[..., :3] = rgb
     out[..., 3] = np.where(solid, 255, 0)
     out[~solid] = 0
 

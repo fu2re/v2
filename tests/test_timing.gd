@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Headless-проверки ритм-ядра.
 ##
@@ -7,13 +7,7 @@ extends Node
 ##
 ## Выход ненулевым кодом при провале — чтобы падало в CI, а не молча.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	_test_judge_windows()
 	_test_combo()
 	_test_chart_loading()
@@ -22,29 +16,10 @@ func _ready() -> void:
 	_test_chart_playable()
 	await _test_no_leak_on_chart_switch()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
 
 func _frames(count: int) -> void:
 	for i in count:
 		await get_tree().process_frame
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _test_judge_windows() -> void:

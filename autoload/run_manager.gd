@@ -6,7 +6,7 @@ extends Node
 ## только при выходе. Так работает мягкая смерть (GDD §8.4): при обнулении
 ## здоровья теряется половина добычи забега, но не коллекция и не дружба.
 
-signal run_started(guardian_id: String)
+signal run_started(guardian_key: String)
 signal glade_entered(glade: Glade)
 signal run_ended(died: bool, kept_fruits: int, kept_seeds: int)
 signal health_changed(current: int, maximum: int)
@@ -19,24 +19,25 @@ const DEATH_LOSS := 0.5
 const REWARD_DEPTH_SCALE := 0.15
 const BASE_SEEDS := 8
 
-## Доли грейдов на поверхности: обычный, необычный, редкий, уникальный,
-## эпический, легендарный.
-const BASE_RARITY_WEIGHTS := [52.0, 26.0, 13.0, 6.0, 2.5, 0.5]
-const RARITY_SHIFT_PER_GLADES := 10.0
-const MAX_RARITY_SHIFT := 3.0
-
-## Обычные монстры никогда не исчезают полностью.
+## Доли грейдов, сдвиг с глубиной и пол обычных живут в таблице
+## `data/drop_tables.json` и читаются через `Balance.rarity_weights`.
 ##
-## Даже на самой большой глубине шанс редкого не достигает 100%: встреча
-## с легендарным обязана оставаться удачей, а не расписанием. Гарантированная
-## редкость обесценила бы и её саму, и радость от неё.
-const MIN_COMMON_WEIGHT := 12.0
+## Обычные монстры никогда не исчезают полностью: даже на самой большой
+## глубине шанс редкого не достигает 100%. Встреча с легендарным обязана
+## оставаться удачей, а не расписанием.
 
-const CAMPFIRE_RESTORE := 25
+## Сколько здоровья возвращает привал у костра.
+##
+## Мало намеренно: здоровье сквозное на весь забег, и костёр — передышка,
+## а не кнопка «начать сначала». Когда он возвращал двадцать пять, глубина
+## переставала накапливаться и решение «идти дальше или уйти» обесценивалось.
+const CAMPFIRE_RESTORE := 10
 
 var is_active: bool = false
 var depth: int = 0
-var guardian_id: String = ""
+## Ключ экземпляра, идущего в лес. Не вид: в забег берут конкретное
+## существо со своим грейдом, уровнем и снаряжением.
+var guardian_key: String = ""
 var health: int = 100
 var max_health: int = 100
 ## Щит тоже сквозной: забег на выносливость, и буфер не обновляется
@@ -64,15 +65,16 @@ func set_seed(value: int) -> void:
 	_rng.seed = value
 
 
-func start_run(new_guardian_id: String) -> bool:
-	var guardian := Registry.monster(new_guardian_id)
+func start_run(new_guardian_key: String) -> bool:
+	var guardian := GameState.instance(new_guardian_key)
 	if guardian == null:
-		push_error("Гуардиан не найден: %s" % new_guardian_id)
+		push_error("Гуардиан не найден: %s" % new_guardian_key)
 		return false
 
-	guardian_id = new_guardian_id
-	max_health = guardian.base_health \
-		+ int(GameState.gear_bonuses(new_guardian_id).get("health_bonus", 0))
+	guardian_key = new_guardian_key
+	# Запас здоровья считает сам экземпляр: в нём уже учтены грейд и уровень
+	max_health = guardian.max_health() \
+		+ int(GameState.gear_bonuses(new_guardian_key).get("health_bonus", 0))
 	health = max_health
 	max_shield = BattleState.BASE_SHIELD
 	shield = max_shield
@@ -83,7 +85,7 @@ func start_run(new_guardian_id: String) -> bool:
 	current_glade = null
 	is_active = true
 
-	run_started.emit(guardian_id)
+	run_started.emit(guardian_key)
 	health_changed.emit(health, max_health)
 	return true
 
@@ -108,63 +110,89 @@ func _generate(for_depth: int) -> Glade:
 
 	match glade.type:
 		Glade.Type.BATTLE:
-			glade.monster_id = _pick_monster(for_depth)
+			# Вид и грейд роллятся НЕЗАВИСИМО (GDD §6.3): раньше грейд
+			# выбирался только чтобы найти вид с таким полем, и легендарным
+			# мог быть лишь тот, кого таким нарисовали. Теперь любой вид
+			# может встретиться в любом грейде
+			glade.monster_id = _pick_species()
+			glade.grade = _pick_grade(for_depth)
 		Glade.Type.WILD_BUSH:
 			var fruits := Registry.all_fruits()
 			if not fruits.is_empty():
 				glade.fruit_id = fruits[_rng.randi_range(0, fruits.size() - 1)].id
+		Glade.Type.ENCOUNTER:
+			glade.encounter = _pick_encounter()
 	return glade
 
 
 func _pick_type() -> Glade.Type:
-	var total := 0.0
-	for weight: int in Glade.WEIGHTS.values():
-		total += weight
-	var roll := _rng.randf() * total
-	for type: Glade.Type in Glade.WEIGHTS:
-		roll -= Glade.WEIGHTS[type]
-		if roll <= 0.0:
+	var weights := Balance.glade_weights()
+	var picked := _pick_key(weights)
+	for type: Glade.Type in Glade.TYPE_KEYS:
+		if Glade.TYPE_KEYS[type] == picked:
 			return type
 	return Glade.Type.BATTLE
+
+
+## Кто попался на поляне-встрече. Доли — в таблице; загадка пока весит ноль,
+## и её доля уходит торговцу сама собой.
+func _pick_encounter() -> Glade.Encounter:
+	var weights := Balance.encounter_weights()
+	var picked := _pick_key(weights)
+	for kind: Glade.Encounter in Glade.ENCOUNTER_KEYS:
+		if Glade.ENCOUNTER_KEYS[kind] == picked:
+			return kind
+	return Glade.Encounter.MERCHANT
+
+
+## Розыгрыш по словарю «ключ -> вес». Возвращает ключ.
+func _pick_key(weights: Dictionary) -> String:
+	var total := 0.0
+	for weight: float in weights.values():
+		total += weight
+	if total <= 0.0:
+		return ""
+
+	var roll := _rng.randf() * total
+	for key: String in weights:
+		roll -= float(weights[key])
+		if roll <= 0.0:
+			return key
+	return ""
 
 
 ## Чем глубже, тем выше доля редких монстров. Сдвиг ограничен, иначе
 ## на 40-й поляне встречались бы одни легендарные и редкость обесценилась бы.
 func rarity_weights(for_depth: int) -> Array:
-	var shift := minf(for_depth / RARITY_SHIFT_PER_GLADES, MAX_RARITY_SHIFT)
-	return [
-		maxf(BASE_RARITY_WEIGHTS[0] - 11.0 * shift, MIN_COMMON_WEIGHT),
-		BASE_RARITY_WEIGHTS[1],
-		BASE_RARITY_WEIGHTS[2] + 3.5 * shift,
-		BASE_RARITY_WEIGHTS[3] + 3.0 * shift,
-		BASE_RARITY_WEIGHTS[4] + 2.0 * shift,
-		BASE_RARITY_WEIGHTS[5] + 0.8 * shift,
-	]
+	var weights := Balance.rarity_weights(for_depth)
+	var out: Array = []
+	for w: float in weights:
+		out.append(w)
+	return out
 
 
-func _pick_monster(for_depth: int) -> String:
-	var weights := rarity_weights(for_depth)
+## Какой вид встретился. Все виды равновероятны: редкость — свойство
+## экземпляра, а не вида, и «редких видов» больше не существует.
+func _pick_species() -> String:
+	var pool := Registry.all_monsters()
+	if pool.is_empty():
+		return ""
+	return pool[_rng.randi_range(0, pool.size() - 1)].id
+
+
+## В каком грейде встретился. Чем глубже, тем выше доля редких.
+func _pick_grade(for_depth: int) -> int:
+	var weights := Balance.rarity_weights(for_depth)
 	var total := 0.0
 	for w: float in weights:
 		total += w
 
 	var roll := _rng.randf() * total
-	var chosen := 0
 	for i in weights.size():
 		roll -= weights[i]
 		if roll <= 0.0:
-			chosen = i
-			break
-
-	# Если монстров выбранной редкости нет, спускаемся вниз, а не падаем:
-	# контент добавляется постепенно, и дыра в пуле не должна ломать забег
-	for rarity in range(chosen, -1, -1):
-		var pool := Registry.monsters_of_rarity(rarity)
-		if not pool.is_empty():
-			return pool[_rng.randi_range(0, pool.size() - 1)].id
-
-	var all := Registry.all_monsters()
-	return all[0].id if not all.is_empty() else ""
+			return i
+	return MonsterData.Rarity.COMMON
 
 
 # --- здоровье --------------------------------------------------------------------
@@ -190,16 +218,17 @@ func rest_at_campfire() -> void:
 ##
 ## Здоровье переносится ДОЛЕЙ, а не числом: иначе смена на существо с большим
 ## запасом лечила бы бесплатно, и костёр превратился бы в кнопку хила.
-func swap_guardian(monster_id: String) -> bool:
-	if not is_active or not GameState.is_tamed(monster_id):
+func swap_guardian(instance_key: String) -> bool:
+	if not is_active:
 		return false
-	var monster := Registry.monster(monster_id)
-	if monster == null:
+	var guardian := GameState.instance(instance_key)
+	if guardian == null:
 		return false
 
 	var ratio := float(health) / maxf(max_health, 1.0)
-	guardian_id = monster_id
-	max_health = monster.base_health + int(GameState.gear_bonuses(monster_id).get("health_bonus", 0))
+	guardian_key = instance_key
+	max_health = guardian.max_health() \
+		+ int(GameState.gear_bonuses(instance_key).get("health_bonus", 0))
 	set_health(int(round(max_health * ratio)))
 	return true
 
@@ -271,29 +300,122 @@ func _end(died: bool) -> void:
 	run_ended.emit(died, kept_fruits, kept_seeds)
 
 
-## Шансы выпадения снаряжения за победу, по грейду монстра.
+## Шансы выпадения снаряжения за победу живут в `data/drop_tables.json`
+## (секция `victory_chest`).
 ##
 ## Это НЕ платный лутбокс: он не покупается и не связан с деньгами, поэтому
-## регуляторные правила §12.3 к нему не относятся. Но принцип «открытие
+## регуляторные правила лутбоксов к нему не относятся. Но принцип «открытие
 ## не пропадает впустую» действует и здесь — сундук всегда что-то даёт.
-const VICTORY_DROP_ODDS := {
-	MonsterData.Rarity.COMMON: [70.0, 25.0, 5.0],
-	MonsterData.Rarity.UNCOMMON: [55.0, 33.0, 12.0],
-	MonsterData.Rarity.RARE: [40.0, 38.0, 22.0],
-	MonsterData.Rarity.UNIQUE: [25.0, 42.0, 33.0],
-	MonsterData.Rarity.EPIC: [15.0, 40.0, 45.0],
-	MonsterData.Rarity.LEGENDARY: [5.0, 35.0, 60.0],
-}
+
+
+## Начислить гуардиану опыт за бой. Возвращает, сколько уровней взято.
+##
+## Опыт получает ТОТ, КТО ДРАЛСЯ, и растёт он от грейда противника: победа
+## над легендарным обязана значить больше, чем над обычным, иначе выгоднее
+## фармить самых безопасных (GDD §6.5).
+##
+## За убежавшего монстра опыт тоже идёт, только меньше. Без этого новичок
+## запирается: бой с незнакомым видом обязателен, добить его пока нечем,
+## а гуардиан от этих боёв не растёт — то есть не станет сильнее никогда.
+## Танцевал — значит учился.
+func reward_guardian_xp(enemy_grade: int, perfect: bool, won: bool = true) -> int:
+	var guardian := GameState.instance(guardian_key)
+	if guardian == null:
+		return 0
+	var amount := Balance.xp_for_victory(enemy_grade, perfect) if won \
+		else Balance.xp_for_defeat(enemy_grade)
+	var gained := guardian.add_xp(amount)
+	if gained > 0:
+		SaveManager.mark_dirty()
+	return gained
+
+
+# --- встречи -----------------------------------------------------------------
+
+## Потрясти куст с гостинцами. Возвращает текст о добыче.
+##
+## Куст никогда не бывает пустым: «потряс и ничего» — это обещание,
+## которое игра не сдержала, а для ребёнка такое обиднее, чем скромный приз.
+func shake_bush(for_depth: int) -> String:
+	var weights := Balance.loot_bush_weights()
+	var picked := _pick_key(weights) if not weights.is_empty() else "silver_handful"
+
+	match picked:
+		"potion":
+			var potions := Registry.all_potions()
+			if not potions.is_empty():
+				var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
+				GameState.add_potion(potion.id)
+				return "%s — в сумку!" % potion.display_name
+		"seed_random_known":
+			var fruits := Registry.all_fruits()
+			if not fruits.is_empty():
+				var fruit: FruitData = fruits[_rng.randi_range(0, fruits.size() - 1)]
+				add_loot_seed(fruit.id, 1)
+				return "Семя: %s" % fruit.display_name
+		"gear_chest_like_victory":
+			var prize := roll_victory_gear(MonsterData.Rarity.COMMON)
+			var item := Registry.gear(prize)
+			if item != null:
+				return "Сундук в ветвях: %s!" % item.display_name
+
+	# Горсть серебра — и запасной вариант, если чего-то из пула не оказалось
+	var silver := int(round(5.0 * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
+	add_loot_silver(silver)
+	return "Горсть серебра: +%d" % silver
+
+
+## Сколько просит бабушка. НИКОГДА не больше, чем есть у игрока.
+func granny_request() -> int:
+	if run_silver <= 0:
+		return 0
+	var fraction := Balance.granny_ask_fraction()
+	var share := _rng.randf_range(fraction.x, fraction.y)
+	return clampi(int(ceil(run_silver * share)), 1, run_silver)
+
+
+## Отдать бабушке серебро и получить подарок. Возвращает текст о подарке.
+func pay_granny(amount: int) -> String:
+	var given := clampi(amount, 0, run_silver)
+	add_loot_silver(-given)
+
+	var weights := Balance.granny_gift_weights()
+	var picked := _pick_key(weights) if not weights.is_empty() else "potion"
+
+	match picked:
+		"seed_tier_up":
+			var fruits := Registry.all_fruits()
+			if not fruits.is_empty():
+				# Семя повыше тиром: подарок должен быть чем-то, чего игрок
+				# сам пока не вырастил
+				var best: FruitData = fruits[0]
+				for fruit in fruits:
+					if fruit.tier > best.tier:
+						best = fruit
+				add_loot_seed(best.id, 1)
+				return "Семя: %s" % best.display_name
+		"gear_mid_tier":
+			var prize := roll_victory_gear(MonsterData.Rarity.RARE)
+			var item := Registry.gear(prize)
+			if item != null:
+				return "Свёрток: %s" % item.display_name
+
+	var potions := Registry.all_potions()
+	if not potions.is_empty():
+		var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
+		GameState.add_potion(potion.id)
+		return "Гостинец: %s" % potion.display_name
+	return "Тёплое слово и добрый взгляд"
 
 
 ## Выдать снаряжение за побеждённого монстра. Возвращает id или пустую строку.
 ##
 ## Чем выше грейд монстра, тем выше шанс дорогой вещи. Награда обязана
 ## отражать риск: иначе редкие монстры не стоят того, чтобы за ними идти.
-func roll_victory_gear(monster: MonsterData) -> String:
-	if monster == null:
-		return ""
-	var odds: Array = VICTORY_DROP_ODDS.get(monster.rarity, [70.0, 25.0, 5.0])
+## Принимает ГРЕЙД, а не монстра: сундук зависит от того, насколько опасен был
+## конкретный экземпляр, и вызывающему не нужно тащить сюда весь объект.
+func roll_victory_gear(grade: int) -> String:
+	var odds := Balance.victory_chest_odds(grade)
 
 	var total := 0.0
 	for w: float in odds:

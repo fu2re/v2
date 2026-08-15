@@ -18,6 +18,8 @@ const DIM_COLOR := Color("ADA99F")
 
 func _ready() -> void:
 	$BackButton.pressed.connect(_go_back)
+	Jukebox.play_screen("inventory")
+	UIUtil.set_screen_background($Scenery, "res://art/screen/screen_inventory.png")
 
 	GameState.fruits_changed.connect(_refresh)
 	GameState.silver_changed.connect(func(_v): _refresh())
@@ -67,6 +69,18 @@ func _refresh() -> void:
 		_add_row("%s (%s)" % [item.display_name, GearData.slot_name(item.slot)],
 			"x%d · %s" % [GameState.gear_count(gear_id), item.effect_text()])
 
+	# Зелья пьются в бою по ноте-зелью, а не отсюда: сумка их только считает
+	_add_section("Зелья", "Пьются в бою — по ноте-фляжке, особой кнопкой")
+	var any_potion := false
+	for potion in Registry.all_potions():
+		var count := GameState.potion_count(potion.id)
+		if count <= 0:
+			continue
+		any_potion = true
+		_add_row(potion.display_name, "x%d · %s" % [count, potion.effect_text()])
+	if not any_potion:
+		_add_row("Пусто — купи у торговца в лесу", "", DIM_COLOR)
+
 
 func _format_time(seconds: float) -> String:
 	var total := int(ceil(seconds))
@@ -101,6 +115,4 @@ func _add_row(name: String, detail: String, colour := TEXT_COLOR) -> void:
 
 
 func _go_back() -> void:
-	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
-
-
+	get_tree().change_scene_to_file(OnboardingState.LOBBY)

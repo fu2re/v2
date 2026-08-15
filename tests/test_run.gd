@@ -1,17 +1,11 @@
-extends Node
+extends TestHarness
 
 ## Проверки петли забега.
 ##
 ## Главное здесь — мягкая смерть (GDD §8.4). Коллекция и дружба обязаны
 ## пережить любое поражение: терять можно только добычу текущего забега.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
 	RunManager.set_seed(20260814)
 
@@ -27,34 +21,27 @@ func _ready() -> void:
 	_test_seeds_survive_death()
 	_test_rare_chance_never_reaches_certainty()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
+
+## Гуардиан для забега: в лес идёт ЭКЗЕМПЛЯР, а не вид, поэтому его
+## сначала надо завести в коллекции.
+func _guardian() -> String:
+	return GameState.tame("disco_sprout", MonsterData.Rarity.COMMON).key()
 
 
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
+## Пол доли обычных из таблицы — то же число, что читает RunManager.
+func _common_floor() -> float:
+	var deepest := Balance.rarity_weights(100000)
+	return deepest[MonsterData.Rarity.COMMON]
 
 
 func _test_start_run() -> void:
 	print("Старт забега")
-	check(RunManager.start_run("disco_sprout"), "забег стартовал")
+	check(RunManager.start_run(_guardian()), "забег стартовал")
 	check(RunManager.is_active, "забег активен")
 	check_eq(RunManager.depth, 0, "глубина ноль до первого свайпа")
 	check_eq(RunManager.health, RunManager.max_health, "Здоровье полное")
 
-	check(not RunManager.start_run("no_such_monster"), "несуществующий гуардиан отклонён")
+	check(not RunManager.start_run("no_such_monster:0"), "несуществующий гуардиан отклонён")
 
 	var first := RunManager.advance()
 	check(first != null, "первая поляна выдана")
@@ -64,7 +51,7 @@ func _test_start_run() -> void:
 
 func _test_glade_distribution() -> void:
 	print("Доли типов полян")
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	var counts := {}
 	const SAMPLES := 4000
 	for i in SAMPLES:
@@ -77,12 +64,14 @@ func _test_glade_distribution() -> void:
 	check(absf(battle_share - 0.65) < 0.04,
 		"боёв около 65%% (получено %.1f%%)" % (battle_share * 100.0))
 
-	for type: Glade.Type in Glade.WEIGHTS:
+	# Каждый тип, объявленный в таблице, обязан реально попадаться:
+	# доля, записанная, но не выпадающая, — это мёртвый контент
+	for type: Glade.Type in Glade.TYPE_KEYS:
 		check(counts.get(type, 0) > 0, "тип поляны '%s' вообще встречается"
 			% Glade.TYPE_NAMES[type])
 
 	# Каждая боевая поляна обязана нести живого монстра
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	for i in 200:
 		var g := RunManager.advance()
 		if g.type == Glade.Type.BATTLE:
@@ -109,7 +98,7 @@ func _test_rarity_shifts_with_depth() -> void:
 
 func _test_rewards_grow_with_depth() -> void:
 	print("Награды растут с глубиной")
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	var first := RunManager.advance()
 	var shallow_reward := first.silver_reward
 	for i in 14:
@@ -124,7 +113,7 @@ func _test_rewards_grow_with_depth() -> void:
 func _test_go_home_keeps_everything() -> void:
 	print("Выход домой сохраняет всю добычу")
 	GameState.reset()
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	RunManager.add_loot_fruit("drum_berry", FruitData.Quality.PLAIN, 8)
 	RunManager.add_loot_silver(100)
@@ -139,16 +128,16 @@ func _test_go_home_keeps_everything() -> void:
 func _test_death_keeps_collection() -> void:
 	print("Смерть не трогает коллекцию и дружбу")
 	GameState.reset()
-	GameState.add_friendship("bass_bear", 60)
-	GameState.add_friendship("disco_sprout", 100)  # приручён
-	var friendship_before := GameState.get_friendship("bass_bear")
+	GameState.add_friendship("bass_bear", MonsterData.Rarity.COMMON, 60)
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	var friendship_before := GameState.get_friendship("bass_bear", MonsterData.Rarity.COMMON)
 
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	RunManager.add_loot_silver(50)
 	RunManager.die()
 
-	check_eq(GameState.get_friendship("bass_bear"), friendship_before,
+	check_eq(GameState.get_friendship("bass_bear", MonsterData.Rarity.COMMON), friendship_before,
 		"дружба пережила смерть — это ядро защиты от фрустрации")
 	check(GameState.is_tamed("disco_sprout"), "приручённый монстр остался в коллекции")
 
@@ -156,7 +145,7 @@ func _test_death_keeps_collection() -> void:
 func _test_death_halves_loot() -> void:
 	print("Смерть забирает половину добычи")
 	GameState.reset()
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	RunManager.add_loot_fruit("drum_berry", FruitData.Quality.PLAIN, 10)
 	RunManager.add_loot_silver(80)
@@ -169,7 +158,7 @@ func _test_death_halves_loot() -> void:
 	# Даже с одним фруктом игрок не должен уходить с пустыми руками навсегда:
 	# проверяем, что округление не уводит в минус
 	GameState.reset()
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	RunManager.add_loot_fruit("echo_pear", FruitData.Quality.PLAIN, 1)
 	RunManager.die()
@@ -179,7 +168,7 @@ func _test_death_halves_loot() -> void:
 
 func _test_groove_is_shared_across_glades() -> void:
 	print("Здоровье сквозное между полянами")
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	var full := RunManager.health
 
 	RunManager.advance()
@@ -205,7 +194,7 @@ func _test_loop_is_closed() -> void:
 	FarmState.reset()
 
 	# 1. В лесу нашли дикий куст с неизвестной культурой
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	check(not FarmState.known_seeds.has("loop_fig"), "культура ещё не открыта")
 	RunManager.add_loot_seed("loop_fig", 1)
@@ -236,8 +225,8 @@ func _test_loop_is_closed() -> void:
 	check(bonus > plain_bonus, "танец на грядке окупился прибавкой к дружбе")
 
 	GameState.consume_fruit("loop_fig", FruitData.Quality.PERFECT)
-	GameState.add_friendship("banjo_moth", bonus)
-	check(GameState.get_friendship("banjo_moth") > 0, "дружба выросла — контур замкнулся")
+	GameState.add_friendship("banjo_moth", MonsterData.Rarity.COMMON, bonus)
+	check(GameState.get_friendship("banjo_moth", MonsterData.Rarity.COMMON) > 0, "дружба выросла — контур замкнулся")
 
 
 ## Семена новых культур не теряются при смерти: это открытый прогресс,
@@ -247,7 +236,7 @@ func _test_seeds_survive_death() -> void:
 	print("Новые культуры переживают смерть")
 	GameState.reset()
 	FarmState.reset()
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_guardian())
 	RunManager.advance()
 	RunManager.add_loot_seed("chord_apple", 2)
 	RunManager.add_loot_silver(100)
@@ -277,7 +266,9 @@ func _test_rare_chance_never_reaches_certainty() -> void:
 		check(common_share > 0.05,
 			"глубина %d: обычные остаются заметной долей (%.1f%%)"
 				% [depth, common_share * 100.0])
-		check(weights[0] >= RunManager.MIN_COMMON_WEIGHT,
+		# Пол обычных задан таблицей: приручение обычного обязано оставаться
+		# доступным на любой глубине (GDD §6.3)
+		check(weights[0] >= _common_floor(),
 			"глубина %d: вес обычных не ниже дна" % depth)
 
 	# Вглубь редкие действительно становятся чаще

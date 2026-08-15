@@ -1,17 +1,11 @@
-extends Node
+extends TestHarness
 
 ## Проверки фермы.
 ##
 ## Два обещания под охраной: урожай не портится никогда (GDD §2), и перевод
 ## системных часов не ломает экономику (открытый вопрос GDD §15.4).
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
 	FarmState.reset()
 
@@ -26,25 +20,6 @@ func _ready() -> void:
 	_test_plot_purchase()
 	_test_save_roundtrip()
 	_test_dance_grade_has_no_failure()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _fresh() -> void:

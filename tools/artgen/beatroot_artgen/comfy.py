@@ -51,20 +51,102 @@ STYLE_POSITIVE_DISTILLED = (
 )
 
 
-def positive_prompt(subject: str, checkpoint: str) -> str:
-    template = STYLE_POSITIVE_DISTILLED if is_distilled(checkpoint) else STYLE_POSITIVE
+# Шаблоны для фонов. Отдельные, потому что шаблон спрайта на фоне работает
+# ровно наоборот: он требует «белый фон, изолированный объект, центрированный
+# персонаж во весь рост». Проверено на первом прогоне полян — модель послушалась
+# буквально: небо вышло белым (после квантования — кремовым, в палитре мира нет
+# неба), а «персонаж» появился на всех пятнадцати кадрах. Для фона, за которым
+# бежит настоящий герой, запечённый человек смертелен.
+STYLE_SCENE = (
+    "detailed painterly game background, {subject}, "
+    "warm earthy color palette, ochre and olive and terracotta tones, "
+    "simplified silhouetted shapes, low detail, soft hazy depth, "
+    "illustration fills the entire frame, empty place with no people and no creatures"
+)
+
+STYLE_SCENE_NEGATIVE = (
+    "person, people, character, figure, silhouette of a person, animal, creature, "
+    "pixel art, 8-bit, text, watermark, signature, photorealistic, "
+    "cluttered, busy detail, white background, isolated object, neon colors"
+)
+
+# У дистиллятов негативный промпт инертен, поэтому запрет на людей и на открытое
+# небо вынесен в НАЧАЛО позитивного — там вес максимален.
+STYLE_SCENE_DISTILLED = (
+    "completely empty place, no people, no characters, no animals, "
+    "background scenery filling the whole frame, {subject}, "
+    "painterly game background, warm earthy palette, ochre olive terracotta, "
+    "simplified silhouetted shapes, low detail, soft hazy depth"
+)
+
+
+def positive_prompt(subject: str, checkpoint: str, scene: bool = False) -> str:
+    """Позитивный промпт. `scene` — фон или тайл, а не объект на прозрачном.
+
+    Разделение обязательно: у фона и у спрайта требования прямо противоположные.
+    """
+    distilled = is_distilled(checkpoint)
+    if scene:
+        template = STYLE_SCENE_DISTILLED if distilled else STYLE_SCENE
+    else:
+        template = STYLE_POSITIVE_DISTILLED if distilled else STYLE_POSITIVE
     return template.format(subject=subject)
 
 
-# Модели-дистилляты (Turbo, Lightning, LCM, Hyper) рассчитаны на 1-4 шага
-# при cfg около 1.0. Обычные 28 шагов с cfg 6.5 дают на них пересвеченную кашу,
-# поэтому параметры подбираются по имени чекпойнта, а не задаются вслепую.
-_TURBO_MARKERS = ("turbo", "lightning", "lcm", "hyper")
+def negative_prompt(scene: bool = False) -> str:
+    return STYLE_SCENE_NEGATIVE if scene else STYLE_NEGATIVE
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Параметры сэмплера под конкретное семейство моделей.
+
+    Задаются профилем, а не флагами вызова: перепутать cfg 6.5 с cfg 1.0 —
+    значит получить либо пересвеченную кашу, либо мыло, и понять это только
+    посмотрев на сотню картинок.
+    """
+
+    name: str
+    steps: int
+    cfg: float
+    sampler: str
+    scheduler: str
+    max_side: int
+    distilled: bool
+
+
+# SDXL и обычные модели: полноценный cfg, негативный промпт работает.
+SDXL = Profile("sdxl", steps=28, cfg=6.5, sampler="dpmpp_2m",
+               scheduler="karras", max_side=1024, distilled=False)
+
+# FLUX schnell — дистиллят на 4 шага. Cfg 1.0 не опечатка: guidance вшит
+# в модель, и поднимать его нельзя. Держит нестандартные пропорции лучше SDXL,
+# поэтому потолок стороны выше.
+FLUX = Profile("flux", steps=4, cfg=1.0, sampler="euler",
+               scheduler="simple", max_side=1216, distilled=True)
+
+# Turbo/Lightning/LCM/Hyper: тоже дистилляты, но со своей связкой сэмплера
+# и заметной деградацией выше 768.
+TURBO = Profile("turbo", steps=4, cfg=1.0, sampler="euler_ancestral",
+                scheduler="sgm_uniform", max_side=768, distilled=True)
+
+_MARKERS: tuple[tuple[tuple[str, ...], Profile], ...] = (
+    (("flux", "schnell"), FLUX),
+    (("turbo", "lightning", "lcm", "hyper"), TURBO),
+)
+
+
+def profile_for(checkpoint: str) -> Profile:
+    name = checkpoint.lower()
+    for markers, profile in _MARKERS:
+        if any(m in name for m in markers):
+            return profile
+    return SDXL
 
 
 def is_distilled(checkpoint: str) -> bool:
-    name = checkpoint.lower()
-    return any(marker in name for marker in _TURBO_MARKERS)
+    """Дистиллят работает на cfg ≈ 1.0, где негативный промпт почти инертен."""
+    return profile_for(checkpoint).distilled
 
 
 @dataclass
@@ -72,25 +154,47 @@ class GenerationRequest:
     subject: str
     checkpoint: str
     seed: int = 0
-    steps: int = 28
-    cfg: float = 6.5
+    steps: int = 0  # 0 — взять из профиля модели
+    cfg: float = 0.0
     width: int = 1024
     height: int = 1024
-    sampler: str = "dpmpp_2m"
-    scheduler: str = "karras"
+    sampler: str = ""
+    scheduler: str = ""
+    ## Фон или тайл. Меняет шаблон промпта на противоположный по смыслу.
+    scene: bool = False
+    ## Исходник для img2img: имя файла, уже загруженного в ComfyUI.
+    ## Пусто — рисуем с чистого листа.
+    init_image: str = ""
+    ## Насколько далеко разрешено уйти от исходника. 1.0 равносильно рисованию
+    ## с нуля, 0.0 — точной копии.
+    denoise: float = 1.0
 
     def tuned(self) -> "GenerationRequest":
-        """Копия с параметрами под тип модели."""
-        if not is_distilled(self.checkpoint):
-            return self
+        """Копия с параметрами под тип модели. Явно заданное не перебивается."""
+        import math
+
+        p = profile_for(self.checkpoint)
+        scale = min(1.0, p.max_side / max(self.width, self.height))
+
+        # При img2img сэмплер проходит только долю denoise от заданных шагов.
+        # У дистиллята их четыре, и на denoise 0.6 остаётся два — этого не хватает
+        # даже чтобы навесить шнурок с оберегом: первый прогон грейдов вышел
+        # неотличимым от исходника. Компенсируем, чтобы модель получала свой
+        # полный бюджет РЕАЛЬНОЙ работы, сколько бы её ни съел denoise.
+        steps = self.steps or p.steps
+        if self.init_image and 0.0 < self.denoise < 1.0:
+            steps = math.ceil(steps / self.denoise)
+
         return replace(
             self,
-            steps=min(self.steps, 6) if self.steps <= 6 else 4,
-            cfg=1.0,
-            sampler="euler_ancestral",
-            scheduler="sgm_uniform",
-            width=min(self.width, 768),
-            height=min(self.height, 768),
+            steps=steps,
+            cfg=self.cfg or p.cfg,
+            sampler=self.sampler or p.sampler,
+            scheduler=self.scheduler or p.scheduler,
+            # Кратность 64 обязательна: латент считается блоками, произвольный
+            # размер молча округляется движком и ломает заданные пропорции
+            width=int(self.width * scale) // 64 * 64,
+            height=int(self.height * scale) // 64 * 64,
         )
 
 
@@ -109,17 +213,22 @@ def build_workflow(raw: GenerationRequest) -> dict:
         "2": {
             "class_type": "CLIPTextEncode",
             "inputs": {
-                "text": positive_prompt(req.subject, req.checkpoint),
+                "text": positive_prompt(req.subject, req.checkpoint, req.scene),
                 "clip": ["1", 1],
             },
         },
         "3": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": STYLE_NEGATIVE, "clip": ["1", 1]},
+            "inputs": {"text": negative_prompt(req.scene), "clip": ["1", 1]},
         },
+        # Пустой латент или закодированный исходник — узел один и тот же номер,
+        # чтобы KSampler не пришлось перепроводить в зависимости от режима
         "4": {
             "class_type": "EmptyLatentImage",
             "inputs": {"width": req.width, "height": req.height, "batch_size": 1},
+        } if not req.init_image else {
+            "class_type": "VAEEncode",
+            "inputs": {"pixels": ["8", 0], "vae": ["1", 2]},
         },
         "5": {
             "class_type": "KSampler",
@@ -129,7 +238,7 @@ def build_workflow(raw: GenerationRequest) -> dict:
                 "cfg": req.cfg,
                 "sampler_name": req.sampler,
                 "scheduler": req.scheduler,
-                "denoise": 1.0,
+                "denoise": req.denoise if req.init_image else 1.0,
                 "model": ["1", 0],
                 "positive": ["2", 0],
                 "negative": ["3", 0],
@@ -144,7 +253,12 @@ def build_workflow(raw: GenerationRequest) -> dict:
             "class_type": "SaveImage",
             "inputs": {"filename_prefix": "beatroot", "images": ["6", 0]},
         },
-    }
+    } | ({
+        "8": {
+            "class_type": "LoadImage",
+            "inputs": {"image": req.init_image},
+        },
+    } if req.init_image else {})
 
 
 class ComfyClient:
@@ -173,6 +287,25 @@ class ComfyClient:
         r.raise_for_status()
         info = r.json()["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"]
         return list(info[0])
+
+    def upload(self, path: Path) -> str:
+        """Положить исходник в input ComfyUI и вернуть имя для LoadImage.
+
+        LoadImage читает только из своего каталога input, произвольный путь
+        с диска он не берёт — поэтому файл сначала надо отдать по HTTP.
+        """
+        with path.open("rb") as f:
+            r = self._requests.post(
+                f"{self.host}/upload/image",
+                files={"image": (path.name, f, "image/png")},
+                data={"overwrite": "true"},
+                timeout=60,
+            )
+        r.raise_for_status()
+        info = r.json()
+        name = info["name"]
+        subfolder = info.get("subfolder", "")
+        return f"{subfolder}/{name}" if subfolder else name
 
     def submit(self, workflow: dict) -> str:
         r = self._requests.post(

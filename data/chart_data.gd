@@ -22,6 +22,13 @@ const TYPE_NAMES := {
 	"attack": NoteType.ATTACK,
 }
 
+## Сложность боевого трека — это грейд монстра, и порядок здесь совпадает
+## с MonsterData.Rarity. Чем реже монстр, тем быстрее и плотнее его трек.
+##
+## Строки, а не enum: то же значение лежит в JSON-чарте и в имени файла,
+## и лишнее преобразование туда-обратно только добавляло бы места для ошибки.
+const GRADE_ORDER := ["common", "uncommon", "rare", "unique", "epic", "legendary"]
+
 @export var id: String = ""
 @export var genre: String = ""
 @export var difficulty: String = "normal"

@@ -54,11 +54,11 @@
     },
     {
       "beat": 18.0,
-      "type": "attack"
+      "type": "skill"
     },
     {
       "beat": 20.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 21.0,
@@ -70,11 +70,11 @@
     },
     {
       "beat": 23.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 24.0,
-      "type": "skill"
+      "type": "attack"
     },
     {
       "beat": 26.0,
@@ -86,11 +86,11 @@
     },
     {
       "beat": 29.0,
-      "type": "attack"
+      "type": "snack"
     },
     {
       "beat": 30.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 32.0,

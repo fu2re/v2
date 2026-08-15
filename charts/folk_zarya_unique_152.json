@@ -1,0 +1,282 @@
+{
+  "id": "folk_zarya",
+  "genre": "folk",
+  "bpm": 152.0,
+  "difficulty": "unique",
+  "duration": 26.842105263157894,
+  "audio": "res://music/folk_zarya_unique_152.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 5.0,
+      "type": "beat"
+    },
+    {
+      "beat": 6.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.0,
+      "type": "attack"
+    },
+    {
+      "beat": 8.5,
+      "type": "beat"
+    },
+    {
+      "beat": 9.0,
+      "type": "beat"
+    },
+    {
+      "beat": 10.0,
+      "type": "beat"
+    },
+    {
+      "beat": 11.0,
+      "type": "beat"
+    },
+    {
+      "beat": 11.5,
+      "type": "attack"
+    },
+    {
+      "beat": 13.0,
+      "type": "beat"
+    },
+    {
+      "beat": 14.0,
+      "type": "beat"
+    },
+    {
+      "beat": 15.0,
+      "type": "beat"
+    },
+    {
+      "beat": 15.5,
+      "type": "beat"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "attack"
+    },
+    {
+      "beat": 19.0,
+      "type": "beat"
+    },
+    {
+      "beat": 20.0,
+      "type": "beat"
+    },
+    {
+      "beat": 21.0,
+      "type": "beat"
+    },
+    {
+      "beat": 21.5,
+      "type": "beat"
+    },
+    {
+      "beat": 22.0,
+      "type": "attack"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "skill"
+    },
+    {
+      "beat": 24.5,
+      "type": "beat"
+    },
+    {
+      "beat": 26.0,
+      "type": "beat"
+    },
+    {
+      "beat": 27.0,
+      "type": "attack"
+    },
+    {
+      "beat": 28.0,
+      "type": "beat"
+    },
+    {
+      "beat": 29.0,
+      "type": "beat"
+    },
+    {
+      "beat": 30.0,
+      "type": "beat"
+    },
+    {
+      "beat": 31.0,
+      "type": "beat"
+    },
+    {
+      "beat": 31.5,
+      "type": "attack"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 33.0,
+      "type": "beat"
+    },
+    {
+      "beat": 34.0,
+      "type": "beat"
+    },
+    {
+      "beat": 35.0,
+      "type": "beat"
+    },
+    {
+      "beat": 36.0,
+      "type": "attack"
+    },
+    {
+      "beat": 37.0,
+      "type": "beat"
+    },
+    {
+      "beat": 37.5,
+      "type": "beat"
+    },
+    {
+      "beat": 38.0,
+      "type": "beat"
+    },
+    {
+      "beat": 39.0,
+      "type": "beat"
+    },
+    {
+      "beat": 40.0,
+      "type": "attack"
+    },
+    {
+      "beat": 41.0,
+      "type": "snack"
+    },
+    {
+      "beat": 42.0,
+      "type": "beat"
+    },
+    {
+      "beat": 43.0,
+      "type": "beat"
+    },
+    {
+      "beat": 43.5,
+      "type": "beat"
+    },
+    {
+      "beat": 44.0,
+      "type": "attack"
+    },
+    {
+      "beat": 45.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "beat"
+    },
+    {
+      "beat": 47.0,
+      "type": "beat"
+    },
+    {
+      "beat": 48.0,
+      "type": "shield"
+    },
+    {
+      "beat": 50.0,
+      "type": "attack"
+    },
+    {
+      "beat": 51.0,
+      "type": "beat"
+    },
+    {
+      "beat": 52.0,
+      "type": "beat"
+    },
+    {
+      "beat": 53.0,
+      "type": "beat"
+    },
+    {
+      "beat": 54.0,
+      "type": "attack"
+    },
+    {
+      "beat": 58.0,
+      "type": "skill"
+    },
+    {
+      "beat": 60.0,
+      "type": "beat"
+    },
+    {
+      "beat": 61.0,
+      "type": "beat"
+    },
+    {
+      "beat": 62.0,
+      "type": "beat"
+    },
+    {
+      "beat": 63.0,
+      "type": "attack"
+    },
+    {
+      "beat": 64.0,
+      "type": "beat"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    },
+    {
+      "beat": 46.0,
+      "action": "windup"
+    },
+    {
+      "beat": 48.0,
+      "action": "strike"
+    }
+  ]
+}

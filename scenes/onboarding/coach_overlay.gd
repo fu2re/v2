@@ -11,6 +11,14 @@ const DEMO_NOTES := 6
 
 var judge_y: float = 1480.0
 var lane_x: float = 540.0
+## Насколько дорожки разведены от центра. Ставится боем, чтобы тренер
+## показывал те же две цели, что и настоящая игра.
+var lane_offset: float = 150.0
+
+## Какую кнопку показывать пальцем. Тренер ведёт ту дорожку, по которой
+## идёт ближайшая нота: учить сразу двум рукам бессмысленно, ребёнок
+## смотрит в одну точку.
+var demo_lane: int = NoteRules.Lane.NORMAL
 
 var _canvas: Control = null
 var _pulse: float = 0.0
@@ -49,22 +57,33 @@ func _draw_coach() -> void:
 	var phase := fmod(Conductor.song_beat, 1.0)
 	var radius := 150.0 - 100.0 * phase
 	var alpha := 0.25 + 0.5 * phase
-	_canvas.draw_arc(Vector2(lane_x, judge_y), radius, 0.0, TAU, 48,
+
+	# Кольцо сжимается над ТОЙ кнопкой, которую сейчас надо нажать:
+	# «когда» и «какой рукой» показываются одним движением
+	var target_x := _lane_x_of(demo_lane)
+	_canvas.draw_arc(Vector2(target_x, judge_y), radius, 0.0, TAU, 48,
 		Color(0.12, 0.85, 1.0, alpha), 7.0, true)
 
-	# Постоянная цель на линии — куда именно возвращается кольцо
-	_canvas.draw_arc(Vector2(lane_x, judge_y), 50.0, 0.0, TAU, 48,
-		Color(0.12, 0.85, 1.0, 0.85), 5.0, true)
+	# Постоянные цели на линии — обе половины видно всегда, чтобы вторая
+	# кнопка не оказалась сюрпризом, когда до неё дойдёт очередь
+	for lane in [NoteRules.Lane.NORMAL, NoteRules.Lane.SPECIAL]:
+		var dim := 0.85 if lane == demo_lane else 0.3
+		_canvas.draw_arc(Vector2(_lane_x_of(lane), judge_y), 50.0, 0.0, TAU, 48,
+			Color(0.12, 0.85, 1.0, dim), 5.0, true)
 
 	if _notes_hit < DEMO_NOTES:
 		_draw_hand(phase)
+
+
+func _lane_x_of(lane: int) -> float:
+	return lane_x + (lane_offset if lane == NoteRules.Lane.NORMAL else -lane_offset)
 
 
 ## Призрачный палец опускается к линии в такт. Показывает «как»,
 ## пока игрок не попал несколько раз сам.
 func _draw_hand(phase: float) -> void:
 	var press := 1.0 - phase
-	var centre := Vector2(lane_x, judge_y + 130.0 + 90.0 * phase)
+	var centre := Vector2(_lane_x_of(demo_lane), judge_y + 130.0 + 90.0 * phase)
 	var col := Color(1, 1, 1, _hand_alpha * (0.4 + 0.6 * press))
 
 	_canvas.draw_circle(centre, 34.0 * _hand_scale, col)

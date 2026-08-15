@@ -17,10 +17,8 @@ var writes_disabled := false
 
 ## Стартовый набор новой игры.
 ##
-## Без гуардиана в лес не выйти, а приручить первого можно только сходив
-## в лес — курица и яйцо. Без семян ферма пустой экран. Выдаётся здесь,
-## а не на экране фермы: иначе вход с любого другого экрана видит пустоту.
-const STARTER_GUARDIAN := "disco_sprout"
+## Только семена: без них ферма — пустой экран. Гуардиана здесь нет
+## намеренно, первого игрок добывает сам в интро (GDD §15.5).
 const STARTER_SEEDS := {"drum_berry": 3, "echo_pear": 2}
 
 
@@ -32,11 +30,6 @@ func _ready() -> void:
 func _grant_new_game() -> void:
 	for fruit_id: String in STARTER_SEEDS:
 		FarmState.add_seed(fruit_id, STARTER_SEEDS[fruit_id])
-
-	var starter := Registry.monster(STARTER_GUARDIAN)
-	if starter != null:
-		GameState.add_friendship(STARTER_GUARDIAN, starter.friendship_threshold())
-		GameState.set_guardian(STARTER_GUARDIAN)
 
 
 ## Перевести подсистему в тестовый режим: ничего не читать и не писать.
@@ -103,6 +96,23 @@ func _load_from(path: String) -> bool:
 		push_warning("Сейв повреждён: %s" % path)
 		return false
 	var data: Dictionary = parsed
+
+	# Версия сверяется ДО применения: несовместимый сейв не должен доехать
+	# до подсистем даже частично, иначе половина состояния окажется новой,
+	# а половина — старой, и разобраться в этом будет уже нельзя.
+	#
+	# Миграция не пишется намеренно: игра в разработке, живых игроков нет,
+	# а поддержка мостов между схемами стоит дороже, чем новый старт.
+	var version := int(data.get("version", 0))
+	if version != GameState.SAVE_VERSION:
+		# Файл не удаляем: `_ready` автозагрузчика отрабатывает раньше, чем
+		# тест успевает включить запрет записи, и удаление здесь стирало бы
+		# сейв разработчика при каждом прогоне тестов. Старый файл просто
+		# не читается и будет перезаписан первым же сохранением.
+		push_warning("Сейв версии %d несовместим с текущей %d — начинаем заново"
+			% [version, GameState.SAVE_VERSION])
+		return false
+
 	GameState.from_dict(data)
 	if data.has("farm"):
 		FarmState.from_dict(data["farm"])

@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Каждая кнопка должна быть кликабельной.
 ##
@@ -10,17 +10,14 @@ extends Node
 ## Тест повторяет логику выбора Godot: среди контролов, накрывающих точку,
 ## побеждает последний в порядке обхода дерева.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 
 	_prepare_state()
 
 	for path in [
+		"res://scenes/lobby/Lobby.tscn",
 		"res://scenes/farm/Farm.tscn",
+		"res://scenes/merchant/Merchant.tscn",
 		"res://scenes/collection/Collection.tscn",
 		"res://scenes/shop/Shop.tscn",
 		"res://scenes/inventory/Inventory.tscn",
@@ -34,14 +31,13 @@ func _ready() -> void:
 	await _check_panel("res://scenes/farm/Farm.tscn", "выбор семян",
 		func(root): root._open_seed_picker(0))
 	await _check_panel("res://scenes/collection/Collection.tscn", "снаряжение",
-		func(root): root._open_gear("disco_sprout"))
+		func(root): root._open_gear("disco_sprout:0"))
+	await _check_panel("res://scenes/collection/Collection.tscn", "угощение",
+		func(root): root._open_feed("disco_sprout:0"))
 	await _check_panel("res://scenes/run/RunFeed.tscn", "костёр",
 		func(root): root._open_campfire())
 	await _check_panel("res://scenes/run/RunFeed.tscn", "торговец",
 		func(root): root._open_merchant(RunManager.current_glade))
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
 
 
 ## Состояние, при котором панели вообще есть что показать.
@@ -52,10 +48,9 @@ func _prepare_state() -> void:
 	FarmState.add_seed("drum_berry", 3)
 	FarmState.add_seed("echo_pear", 2)
 
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.add_friendship("bass_bear", Registry.monster("bass_bear").friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.tame("bass_bear", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	GameState.add_gear("spring_boots")
 	GameState.add_silver(500)
 	ShopState.add_gold(500)
@@ -64,14 +59,6 @@ func _prepare_state() -> void:
 	# и набор кнопок: прогон к прогону число проверок гуляло, и падение
 	# ниже прежнего было бы неотличимо от невезения
 	RunManager.set_seed(7)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
 
 
 func _check_scene(path: String) -> void:

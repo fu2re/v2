@@ -24,6 +24,7 @@ var _pending_since: float = 0.0
 func _ready() -> void:
 	$BackButton.pressed.connect(_go_back)
 	_crate_button.pressed.connect(_on_crate_pressed)
+	Jukebox.play_screen("shop")
 
 	ShopState.gold_changed.connect(func(_v): _refresh())
 	ShopState.purchase_blocked.connect(_on_blocked)
@@ -139,6 +140,6 @@ func _on_blocked(reason: String) -> void:
 
 
 func _go_back() -> void:
-	get_tree().change_scene_to_file("res://scenes/farm/Farm.tscn")
+	get_tree().change_scene_to_file("res://scenes/merchant/Merchant.tscn")
 
 

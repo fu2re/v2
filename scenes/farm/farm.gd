@@ -26,10 +26,14 @@ var _pending_plot := -1
 
 
 func _ready() -> void:
-	$NavFriends.pressed.connect(_go_to_collection)
-	$NavBag.pressed.connect(_go_to_inventory)
-	$NavShop.pressed.connect(_go_to_shop)
-	$NavForest.pressed.connect(_go_to_forest)
+	# Навигация теперь во дворе усадьбы: отсюда есть только путь обратно.
+	# Раньше каждый экран знал про все остальные, и «назад» означало разное
+	# в зависимости от того, откуда пришёл
+	$BackButton.pressed.connect(_go_to_lobby)
+
+	Jukebox.play_screen("farm")
+	UIUtil.set_screen_background($Scenery, "res://art/screen/screen_farm.png")
+
 	# Подложка гаснет вместе с панелью: без неё панель висит поверх
 	# живого экрана, кнопки под ней видно, но нажать нельзя
 	_seed_picker.visibility_changed.connect(
@@ -56,9 +60,15 @@ func _refresh() -> void:
 		GameState.silver, ShopState.gold, _total_seeds(),
 	]
 
-	var guardian := Registry.monster(GameState.guardian_id())
-	_guardian_label.text = "В лес пойдёт: %s" % guardian.display_name if guardian != null \
-		else "Гуардиан не выбран"
+	var guardian := GameState.guardian()
+	if guardian == null:
+		_guardian_label.text = "Гуардиан не выбран"
+	else:
+		var grade_mark := "" if guardian.grade == MonsterData.Rarity.COMMON \
+			else " · %s" % guardian.grade_name()
+		_guardian_label.text = "В лес пойдёт: %s%s (ур.%d)" % [
+			guardian.display_name(), grade_mark, guardian.level,
+		]
 
 
 func _total_seeds() -> int:
@@ -218,21 +228,6 @@ func _on_dance_finished(level: DanceGrade.Level) -> void:
 	_refresh()
 
 
-func _go_to_forest() -> void:
-	if GameState.guardian_id().is_empty():
-		_status.text = "Некого взять в лес. Сначала подружись с кем-нибудь."
-		return
-	get_tree().change_scene_to_file("res://scenes/run/RunFeed.tscn")
-
-
-func _go_to_collection() -> void:
-	get_tree().change_scene_to_file("res://scenes/collection/Collection.tscn")
-
-
-func _go_to_shop() -> void:
-	get_tree().change_scene_to_file("res://scenes/shop/Shop.tscn")
-
-
-func _go_to_inventory() -> void:
-	get_tree().change_scene_to_file("res://scenes/inventory/Inventory.tscn")
+func _go_to_lobby() -> void:
+	get_tree().change_scene_to_file(OnboardingState.LOBBY)
 

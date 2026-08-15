@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Проверки живого взаимодействия: жмём НАСТОЯЩИЕ кнопки настоящих сцен.
 ##
@@ -6,8 +6,6 @@ extends Node
 ## на вопрос «что произойдёт, если нажать её несколько раз подряд».
 ## Оба бага, о которых сообщил игрок, живут именно здесь.
 
-var _failed := 0
-var _passed := 0
 ## Печатать, кто перехватывает клик. Включай при разборе поломок:
 ## именно этот вывод показал, что клик доходит до кнопки, а `pressed`
 ## не срабатывает, потому что кнопку пересоздают между нажатием и отпусканием.
@@ -35,8 +33,7 @@ func _all_controls(node: Node, out: Array[Control]) -> void:
 		_all_controls(child, out)
 
 
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 
 	await _test_planting_several_plots()
 	await _test_home_button_does_not_start_battle()
@@ -47,25 +44,6 @@ func _ready() -> void:
 	_test_swipe_thresholds_are_relative()
 	_test_series_visuals_contrast_with_background()
 	await _test_wheel_and_keys_move_forward()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _frames(count: int) -> void:
@@ -163,9 +141,8 @@ func _test_home_button_does_not_start_battle() -> void:
 	print("Кнопка «Домой» уводит домой, а не в бой")
 	GameState.reset()
 	FarmState.reset()
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 
 	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
 	add_child(feed)
@@ -187,27 +164,30 @@ func _test_home_button_does_not_start_battle() -> void:
 	await _frames(2)
 
 
-## Поляну с монстром пропустить нельзя: встретил — танцуй.
+## Поляну с НЕпревзойдённым монстром пропустить нельзя: встретил — танцуй.
 ##
 ## Без этого главное решение забега подменялось бы бесплатным листанием
-## мимо всего опасного, и лента переставала быть выбором.
+## мимо всего опасного, и лента переставала быть выбором. Превзойдённых
+## пропускать можно — за это отвечает test_skipping.
 func _test_monster_glade_blocks_swipe() -> void:
-	print("Поляну с монстром нельзя пропустить")
+	print("Поляну с новым монстром нельзя пропустить")
 	GameState.reset()
 	FarmState.reset()
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	RunManager.set_seed(7)
 
 	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
 	add_child(feed)
 	await _frames(3)
 
-	# Доходим до боевой поляны
+	# Доходим до боевой поляны с НЕпревзойдённым монстром: превзойдённого
+	# лента отпускает по правилу §8.1, и на нём проверять блокировку нечего.
+	# У поверхности почти все монстры обычные, а обычный Ростик уже приручён —
+	# поэтому ищем именно ту поляну, которая держит
 	var guard := 0
-	while RunManager.current_glade != null \
-			and RunManager.current_glade.type != Glade.Type.BATTLE and guard < 60:
+	while RunManager.current_glade != null and guard < 60 \
+			and not feed._blocks_swipe():
 		guard += 1
 		feed._next_glade()
 		await _frames(1)
@@ -255,9 +235,8 @@ func _test_defeat_does_not_freeze() -> void:
 	print("Поражение не подвешивает ленту")
 	GameState.reset()
 	FarmState.reset()
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	RunManager.set_seed(11)
 
 	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
@@ -275,8 +254,11 @@ func _test_defeat_does_not_freeze() -> void:
 		and RunManager.current_glade.type == Glade.Type.BATTLE, "боевая поляна найдена")
 
 	var state := BattleState.new()
-	state.setup(Registry.monster(RunManager.current_glade.monster_id),
-		Registry.monster("disco_sprout"), 1, RunManager.current_glade.depth, 0)
+	var glade := RunManager.current_glade
+	state.setup(
+		MonsterInstance.create(glade.monster_id, glade.grade),
+		GameState.tame("disco_sprout", MonsterData.Rarity.COMMON),
+		1, glade.depth, 0)
 	state.take_strike()
 	check(state.health <= 0, "здоровье обнулено — поражение")
 
@@ -301,10 +283,10 @@ func _test_defeat_does_not_freeze() -> void:
 	await _frames(2)
 
 
-## Игрок сообщил: вторая половина мелодии в туториале без нот.
+## Игрок сообщил: вторая половина мелодии в уроке была без нот.
 func _test_tutorial_notes_cover_whole_track() -> void:
 	print("Урок покрывает нотами весь трек")
-	var lesson := preload("res://scenes/onboarding/Onboarding.tscn").instantiate()
+	var lesson := preload("res://scenes/intro/Intro.tscn").instantiate()
 	add_child(lesson)
 	await _frames(3)
 
@@ -464,9 +446,8 @@ func _test_wheel_and_keys_move_forward() -> void:
 	print("Колесо и клавиши ведут вперёд, а не перезапускают поляну")
 	GameState.reset()
 	FarmState.reset()
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	RunManager.set_seed(5)
 
 	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()

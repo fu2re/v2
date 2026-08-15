@@ -25,6 +25,11 @@ var is_judged: bool = false
 ## Испорчена ли серия перед этой атакой. Серая звезда сразу говорит,
 ## что удар уже не сработает — гадать не придётся.
 var is_dulled: bool = false
+## Дорожка: обычные ноты падают правее центра, особые левее, и каждая
+## съезжает к своей кнопке. Подсказка «куда жать» встроена в траекторию,
+## а не написана словами (GDD §4.1).
+var lane: int = NoteRules.Lane.NORMAL
+
 
 var _color: Color = COLORS[ChartData.NoteType.BEAT]
 
@@ -32,6 +37,7 @@ var _color: Color = COLORS[ChartData.NoteType.BEAT]
 func setup(note_beat: float, note_type: int) -> void:
 	beat = note_beat
 	type = note_type
+	lane = NoteRules.primary_lane(note_type)
 	is_judged = false
 	is_dulled = false
 	_color = COLORS.get(note_type, COLORS[ChartData.NoteType.BEAT])

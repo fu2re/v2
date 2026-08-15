@@ -7,9 +7,8 @@ func _ready() -> void:
 	SaveManager.enter_test_mode()
 	GameState.reset()
 	FarmState.reset()
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	RunManager.set_seed(11)
 
 	var feed := preload("res://scenes/run/RunFeed.tscn").instantiate()
@@ -23,12 +22,13 @@ func _ready() -> void:
 		feed._next_glade()
 		await _frames(1)
 
-	var monster := Registry.monster(RunManager.current_glade.monster_id)
+	var glade := RunManager.current_glade
+	var monster := MonsterInstance.create(glade.monster_id, glade.grade)
 	var state := BattleState.new()
 	# Значения берём у забега, а не выдумываем: подставленное здоровье
 	# рисует пустую шкалу и выглядит как баг движка
-	state.setup(monster, Registry.monster("disco_sprout"), RunManager.health,
-		RunManager.current_glade.depth, RunManager.shield)
+	state.setup(monster, GameState.instance(RunManager.guardian_key), RunManager.health,
+		glade.depth, RunManager.shield)
 	# Монстр не побеждён — он убегает, и это худший из двух итогов
 	feed._on_battle_finished(false, state)
 	await _frames(30)

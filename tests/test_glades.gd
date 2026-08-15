@@ -1,16 +1,11 @@
-extends Node
+extends TestHarness
 
 ## Проверки торговца и костра.
 ##
 ## Костёр — единственная точка смены гуардиана в забеге (GDD §15.1), и он
 ## не должен превращаться в бесплатный хил: смена переносит ДОЛЮ Ритма.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
 	RunManager.set_seed(4242)
 
@@ -21,36 +16,22 @@ func _ready() -> void:
 	_test_merchant_stock_is_stable()
 	_test_victory_gives_gear()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
 
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
-
-
+## Завести экземпляры обычного грейда — минимальная подготовка коллекции.
 func _tame(ids: Array) -> void:
 	for id: String in ids:
-		GameState.add_friendship(id, Registry.monster(id).friendship_threshold())
+		GameState.tame(id, MonsterData.Rarity.COMMON)
+
+
+func _key(species_id: String) -> String:
+	return MonsterInstance.key_for(species_id, MonsterData.Rarity.COMMON)
 
 
 func _test_campfire_restores() -> void:
 	print("Костёр восстанавливает Ритм")
 	GameState.reset()
 	_tame(["disco_sprout"])
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_key("disco_sprout"))
 	RunManager.set_health(30)
 	RunManager.rest_at_campfire()
 	check_eq(RunManager.health, 30 + RunManager.CAMPFIRE_RESTORE, "Ритм поднялся")
@@ -62,12 +43,12 @@ func _test_swap_carries_ratio_not_amount() -> void:
 	GameState.reset()
 	_tame(["disco_sprout", "beat_serpent"])
 
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_key("disco_sprout"))
 	var small_max := RunManager.max_health
 	RunManager.set_health(int(small_max * 0.5))
 
-	check(RunManager.swap_guardian("beat_serpent"), "смена прошла")
-	check_eq(RunManager.guardian_id, "beat_serpent", "гуардиан сменился")
+	check(RunManager.swap_guardian(_key("beat_serpent")), "смена прошла")
+	check_eq(RunManager.guardian_key, _key("beat_serpent"), "гуардиан сменился")
 
 	var big_max := RunManager.max_health
 	check(big_max > small_max, "у змея запас больше")
@@ -85,25 +66,25 @@ func _test_swap_requires_tamed() -> void:
 	print("Позвать можно только друга")
 	GameState.reset()
 	_tame(["disco_sprout"])
-	RunManager.start_run("disco_sprout")
-	check(not RunManager.swap_guardian("beat_serpent"), "неприручённого позвать нельзя")
-	check_eq(RunManager.guardian_id, "disco_sprout", "гуардиан не сменился")
+	RunManager.start_run(_key("disco_sprout"))
+	check(not RunManager.swap_guardian(_key("beat_serpent")), "неприручённого позвать нельзя")
+	check_eq(RunManager.guardian_key, _key("disco_sprout"), "гуардиан не сменился")
 	RunManager.go_home()
 
-	check(not RunManager.swap_guardian("disco_sprout"), "вне забега смена не работает")
+	check(not RunManager.swap_guardian(_key("disco_sprout")), "вне забега смена не работает")
 
 
 func _test_gear_raises_run_health() -> void:
 	print("Амулет поднимает Ритм в забеге")
 	GameState.reset()
 	_tame(["disco_sprout"])
-	RunManager.start_run("disco_sprout")
+	RunManager.start_run(_key("disco_sprout"))
 	var bare := RunManager.max_health
 	RunManager.go_home()
 
 	GameState.add_gear("heartwood_amulet")
-	GameState.equip("disco_sprout", "heartwood_amulet")
-	RunManager.start_run("disco_sprout")
+	GameState.equip(_key("disco_sprout"), "heartwood_amulet")
+	RunManager.start_run(_key("disco_sprout"))
 	check(RunManager.max_health > bare,
 		"амулет поднял запас забега (%d против %d)" % [RunManager.max_health, bare])
 	RunManager.go_home()
@@ -141,22 +122,23 @@ func _test_victory_gives_gear() -> void:
 	GameState.reset()
 	RunManager.set_seed(555)
 
-	for id in ["disco_sprout", "beat_serpent"]:
-		var monster := Registry.monster(id)
+	for grade in [MonsterData.Rarity.COMMON, MonsterData.Rarity.LEGENDARY]:
+		var name := MonsterData.rarity_name(grade)
 		var before := GameState.owned_gear_ids().size()
-		var prize := RunManager.roll_victory_gear(monster)
-		check(not prize.is_empty(), "%s: сундук что-то дал" % id)
-		check(Registry.gear(prize) != null, "%s: выпавший предмет существует" % id)
+		var prize := RunManager.roll_victory_gear(grade)
+		check(not prize.is_empty(), "%s: сундук что-то дал" % name)
+		check(Registry.gear(prize) != null, "%s: выпавший предмет существует" % name)
 		check(GameState.owned_gear_ids().size() >= before,
-			"%s: предмет попал в сундук игрока" % id)
+			"%s: предмет попал в сундук игрока" % name)
 
-	# Чем выше грейд, тем дороже средняя добыча
+	# Чем выше грейд ЭКЗЕМПЛЯРА, тем дороже средняя добыча: награда обязана
+	# отражать риск, иначе за редкими незачем идти
 	var cheap_total := 0
 	var rich_total := 0
 	for i in 60:
 		GameState.reset()
-		var a := Registry.gear(RunManager.roll_victory_gear(Registry.monster("disco_sprout")))
-		var b := Registry.gear(RunManager.roll_victory_gear(Registry.monster("beat_serpent")))
+		var a := Registry.gear(RunManager.roll_victory_gear(MonsterData.Rarity.COMMON))
+		var b := Registry.gear(RunManager.roll_victory_gear(MonsterData.Rarity.LEGENDARY))
 		if a != null:
 			cheap_total += a.price
 		if b != null:

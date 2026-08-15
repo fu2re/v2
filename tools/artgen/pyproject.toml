@@ -20,6 +20,10 @@ cutout = [
 	"rembg>=2.0",
 	"onnxruntime>=1.17",
 ]
+# Тесты пайплайна. Ставится отдельно: uv sync --extra test
+test = [
+	"pytest>=8.0",
+]
 
 [project.scripts]
 artgen = "beatroot_artgen.cli:main"
