@@ -153,11 +153,21 @@ func _test_save_roundtrip() -> void:
 	GameState.add_friendship("banjo_moth", common, 75)
 	GameState.add_fruit("loop_fig", FruitData.Quality.JUICY, 4)
 	GameState.add_silver(120)
-	GameState.add_friendship("disco_sprout", common, GameState.friendship_threshold(common))
 	# Второй экземпляр того же вида, но другого грейда — именно это отличает
-	# новую схему от старой, и именно это должно пережить сейв
-	GameState.add_friendship("disco_sprout", rare, GameState.friendship_threshold(rare))
-	GameState.instance(MonsterInstance.key_for("disco_sprout", rare)).add_xp(150)
+	# новую схему от старой, и именно это должно пережить сейв.
+	#
+	# Ступени идут по порядку: редкого не приручить, пока не подружился
+	# с необычным (GDD §6.1). Раньше тест прыгал сразу к редкому, шкала молча
+	# не заполнялась, и `instance()` возвращал null — весь остаток проверки
+	# обрывался ошибкой скрипта, а набор при этом рапортовал «0 провалено»
+	for grade in [common, MonsterData.Rarity.UNCOMMON, rare]:
+		GameState.add_friendship("disco_sprout", grade,
+			GameState.friendship_threshold(grade))
+	var rare_instance := GameState.instance(MonsterInstance.key_for("disco_sprout", rare))
+	check(rare_instance != null, "редкий экземпляр приручился по лестнице")
+	if rare_instance == null:
+		return
+	rare_instance.add_xp(150)
 
 	var snapshot := GameState.to_dict()
 	GameState.reset()

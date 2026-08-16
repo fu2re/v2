@@ -63,7 +63,7 @@ const SCREEN_HEIGHT := 1920.0
 
 @onready var _buildings: Control = $Buildings
 @onready var _title: Label = $Title
-@onready var _purse: Label = $Purse
+@onready var _purse: RichTextLabel = $Purse
 @onready var _guardian_label: Label = $GuardianLabel
 @onready var _status: Label = $Status
 
@@ -191,7 +191,7 @@ func _enter(entry: Dictionary) -> void:
 
 
 func _refresh() -> void:
-	_purse.text = "Серебро %d    Золото %d" % [GameState.silver, ShopState.gold]
+	_purse.text = UIUtil.purse_bbcode(GameState.silver, ShopState.gold)
 
 	var guardian := GameState.guardian()
 	if guardian == null:

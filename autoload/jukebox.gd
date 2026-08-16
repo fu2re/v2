@@ -40,6 +40,10 @@ var _current: String = ""
 
 var _rng := RandomNumberGenerator.new()
 
+## Мешки мелодий по типу поляны и последняя сыгранная в каждом.
+var _bags: Dictionary = {}
+var _last_glade: Dictionary = {}
+
 
 func _ready() -> void:
 	_rng.randomize()
@@ -119,17 +123,49 @@ func play_screen(screen: String) -> bool:
 	return _play_loop(screen, _screens.get(screen, ""))
 
 
-## Мелодия поляны. Тип задаёт пул, а вариант выбирается случайно из пяти:
-## лента длинная, и одна и та же подсказка на каждой поляне приедается
-## быстрее любой другой музыки в игре.
+## Мелодия поляны. Тип задаёт пул, а порядок — МЕШОК: все мелодии звучат
+## по разу в перемешанном порядке, и лишь потом набираются заново.
+##
+## Не бросок кубика: случайный выбор из десяти выдаёт повтор подряд примерно
+## каждый десятый раз, а повтор подряд игрок читает не как совпадение,
+## а как «музыка не сменилась» — ровно та же причина, по которой мешком
+## вращаются и фоны леса (§11.1.0).
 func play_glade(kind: String) -> bool:
 	if not _glades.has(kind):
 		return false
 	var pool: PackedStringArray = _glades[kind]
 	if pool.is_empty():
 		return false
-	var path := pool[_rng.randi_range(0, pool.size() - 1)]
+	var path := _draw_from_bag(kind, pool)
 	return _play_loop(path, path)
+
+
+## Достать следующую мелодию из мешка этого типа, набрав его при нужде.
+func _draw_from_bag(kind: String, pool: PackedStringArray) -> String:
+	if pool.size() == 1:
+		return pool[0]
+
+	var bag: PackedStringArray = _bags.get(kind, PackedStringArray())
+	if bag.is_empty():
+		bag = pool.duplicate()
+		# Тасование Фишера — Йетса: PackedStringArray не умеет shuffle()
+		for i in range(bag.size() - 1, 0, -1):
+			var j := _rng.randi_range(0, i)
+			var tmp := bag[i]
+			bag[i] = bag[j]
+			bag[j] = tmp
+		# На стыке мешков повтор подряд запрещён отдельно
+		var last: String = _last_glade.get(kind, "")
+		if bag.size() > 1 and bag[bag.size() - 1] == last:
+			var swap := bag[0]
+			bag[0] = bag[bag.size() - 1]
+			bag[bag.size() - 1] = swap
+
+	var path := bag[bag.size() - 1]
+	bag.resize(bag.size() - 1)
+	_bags[kind] = bag
+	_last_glade[kind] = path
+	return path
 
 
 func _play_loop(key: String, path: String) -> bool:

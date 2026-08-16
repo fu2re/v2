@@ -31,16 +31,18 @@ theme_override_constants/outline_size = 12
 text = "Твоя усадьба"
 horizontal_alignment = 1
 
-[node name="Purse" type="Label" parent="."]
+[node name="Purse" type="RichTextLabel" parent="."]
 offset_left = 60.0
 offset_top = 200.0
 offset_right = 1020.0
 offset_bottom = 260.0
-theme_override_font_sizes/font_size = 38
-theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
+theme_override_font_sizes/normal_font_size = 38
+theme_override_colors/default_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.12, 0.07, 1)
 theme_override_constants/outline_size = 10
-horizontal_alignment = 1
+bbcode_enabled = true
+fit_content = false
+scroll_active = false
 
 [node name="Buildings" type="Control" parent="."]
 layout_mode = 3

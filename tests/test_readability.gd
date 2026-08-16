@@ -61,7 +61,11 @@ func _rich_state() -> void:
 	FarmState.add_seed("chord_apple", 2)
 	FarmState.plant(0, "chord_apple")
 	GameState.add_gear("acorn_charm")
-	GameState.add_potion("health_potion", 2)
+	# Фрукты в сумке — то, что игрок теперь носит вместо зелий: ими лечатся
+	# у костра и угощают монстров. Без них инвентарь и костёр показывались
+	# пустыми, и самое длинное название в игре тест не мерил вовсе
+	for fruit: String in ["chord_apple", "drum_berry", "loop_fig"]:
+		GameState.add_fruit(fruit, FruitData.Quality.JUICY, 3)
 
 
 func _open(path: String) -> Node:
@@ -75,7 +79,7 @@ func _open(path: String) -> Node:
 ## тексту НУЖНО (`get_minimum_size`); если это больше отведённого — на экране
 ## обрезок или перенос посреди слова.
 func _walk(node: Node, out: Array) -> void:
-	if node is Label or node is Button:
+	if node is Label or node is Button or node is RichTextLabel:
 		out.append(node)
 	for child in node.get_children():
 		_walk(child, out)
@@ -85,7 +89,35 @@ func _walk(node: Node, out: Array) -> void:
 ## у кнопки с переносом строк тот возвращает размер до переноса и молча
 ## отчитывается, что всё помещается, — первая версия этой проверки прошла
 ## мимо ровно той поломки, ради которой писалась.
+## Текст без разметки — для сообщения о провале.
+##
+## В `RichTextLabel` лежит BBCode, и первые 28 символов кошелька целиком
+## уходили на «[center][img=44]res://art/c»: по такому сообщению не понять,
+## какая подпись сломалась.
+func _plain(text: String) -> String:
+	var out := ""
+	var depth := 0
+	for i in text.length():
+		var ch := text[i]
+		if ch == "[":
+			depth += 1
+		elif ch == "]":
+			depth = maxi(depth - 1, 0)
+		elif depth == 0:
+			out += ch
+	return out.strip_edges()
+
+
 func _overflow_of(control: Control) -> Vector2:
+	# `RichTextLabel` считает раскладку сам и знает про теги и картинки —
+	# мерить его шрифтом бессмысленно: в тексте лежит BBCode, и `[img]` со
+	# ссылкой на файл был бы посчитан как сотня символов. Кошелёк с монетами
+	# перестал быть `Label`, и без этой ветки пять подписей молча выпали
+	# из обхода: набор отчитался «0 провалено», проверив на 15 штук меньше
+	if control is RichTextLabel:
+		var rich := control as RichTextLabel
+		return Vector2(0.0, rich.get_content_height() - rich.size.y)
+
 	var font := control.get_theme_font("font")
 	var font_size := control.get_theme_font_size("font_size")
 	if font == null:
@@ -138,8 +170,9 @@ func _test_text_fits_its_box() -> void:
 
 			var overflow := _overflow_of(control)
 			check(overflow.y <= 1.0,
-				"%s: «%s» не помещается по высоте (лишних %.0f px)" % [
-					path.get_file(), text.substr(0, 28), overflow.y])
+				"%s: %s «%s» не помещается по высоте (лишних %.0f px)" % [
+					path.get_file(), control.name, _plain(text).substr(0, 28),
+					overflow.y])
 
 		place.queue_free()
 		await _frames(1)

@@ -7,6 +7,9 @@ extends TestHarness
 ## только когда буфер выбит полностью — иначе игра станет злой к детям.
 
 func run_tests() -> void:
+	_test_crit_hits_four_times_harder()
+	_test_one_blow_never_ends_the_run()
+	_test_miss_reports_damage()
 	_test_shield_absorbs_before_health()
 	_test_shield_note_restores_shield()
 	_test_missed_shield_hurts_more()
@@ -23,6 +26,34 @@ func run_tests() -> void:
 	_test_snack()
 	_test_rarity_scales_monster()
 	_test_experience_raises_damage()
+
+
+## С полного здоровья ни один удар не заканчивает забег.
+##
+## Множители перемножаются: ×4 за крит и ×5 за легендарный грейд давали удар
+## на 300 при 172 здоровья — полностью прокачанный гуардиан умирал с ПЕРВОГО
+## пропуска, не успев понять, что случилось. Проверяется наблюдаемый результат
+## (жив и бой не кончен), а не сама доля: порог можно двигать, обещание — нет.
+func _test_one_blow_never_ends_the_run() -> void:
+	print("Один удар не кончает забег с полного здоровья")
+	# Именно С ПОЛНОГО: 9999 обрезается setup'ом до max_health. Со 100 тест
+	# мерил бы уже раненого гуардиана — обещание касается не его
+	for grade in range(MonsterData.Rarity.size()):
+		var s := _make("beat_serpent", "disco_sprout", 9999, 12, grade)
+		check_eq(s.health, s.max_health, "%s: старт с полного здоровья"
+			% MonsterData.rarity_name(grade))
+		s.take_strike(true)
+		check(s.health > 0, "%s: после крита с полного здоровья гуардиан жив"
+			% MonsterData.rarity_name(grade))
+		check(not s.is_over, "%s: бой продолжается" % MonsterData.rarity_name(grade))
+
+	# Но не бессмертие: криты подряд добивают. Иначе порог сделал бы пропуск
+	# крита бесплатным, и особая нота перестала бы что-то значить
+	var top := _make("beat_serpent", "disco_sprout", 9999, 12,
+		MonsterData.Rarity.LEGENDARY)
+	for i in 4:
+		top.take_strike(true)
+	check(top.health <= 0, "криты подряд на легендарном всё же добивают")
 
 
 ## Бой между двумя экземплярами. Грейд противника — параметр: он и есть
@@ -69,7 +100,10 @@ func _test_shield_absorbs_before_health() -> void:
 	var health_at_zero_shield := s.health
 	s.register_hit(Judge.Grade.MISS)
 	check(s.health < health_at_zero_shield, "без щита промахи бьют прямо по здоровью")
-	check_eq(health_at_zero_shield - s.health, BattleState.MISS_DAMAGE,
+	# Урон масштабируется злостью грейда (strike_scale), поэтому сверяем
+	# с ценой ПОСЛЕ множителя, а не с голой константой
+	var expected := maxi(int(round(BattleState.MISS_DAMAGE * s.strike_scale)), 1)
+	check_eq(health_at_zero_shield - s.health, expected,
 		"без щита промах стоит ровно свою цену")
 
 
@@ -352,3 +386,43 @@ func _test_experience_raises_damage() -> void:
 	check_eq(GameState.experience_multiplier("bass_bear"), 1.0,
 		"опыт не протекает на другие виды")
 	GameState.reset()
+
+
+## Крит монстра бьёт вчетверо больнее обычного удара (GDD §4.2.3).
+##
+## Раньше на этом месте стояла нота-зелье, и после упразднения зелий она
+## осталась нарисованной бутылочкой: игрок ждал лечения и получал по лбу.
+func _test_crit_hits_four_times_harder() -> void:
+	print("Крит бьёт вчетверо")
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("synth_slime", MonsterData.Rarity.COMMON),
+		null, 500, 0)
+	state.shield = 0
+
+	var normal := state.take_strike(false)
+	var crit := state.take_strike(true)
+	# Сравниваем ОТНОШЕНИЕ с допуском: множитель применяется до округления,
+	# и 23×4 не обязано в точности совпасть с round(60×1.5)
+	var ratio := float(crit) / maxf(normal, 1.0)
+	check(absf(ratio - BattleState.CRIT_MULTIPLIER) < 0.15,
+		"крит (%d) примерно вчетверо больше обычного (%d), отношение %.2f" % [
+			crit, normal, ratio])
+	check(crit > 0, "и он вообще что-то снимает")
+
+
+## Промах по герою обязан ВОЗВРАЩАТЬ урон: по этому числу рисуется цифра
+## над героем, и без него удары по себе не видно вовсе.
+func _test_miss_reports_damage() -> void:
+	print("Промах сообщает, сколько стоил")
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("synth_slime", MonsterData.Rarity.COMMON),
+		null, 500, 0)
+	state.shield = 0
+
+	# Минус означает «получил сам», плюс — «снял с монстра»
+	check(state.register_hit(Judge.Grade.MISS) < 0,
+		"обычный промах вернул урон по герою")
+	check(state.use_skill(Judge.Grade.MISS) < 0,
+		"промах по скиллу вернул урон по герою")
+	check(state.use_skill(Judge.Grade.PERFECT) == 0,
+		"удачный скилл героя не бьёт")

@@ -10,7 +10,7 @@ const CONFIRM_RESET_SEC := 4.0
 
 ## Раскладка живёт в Shop.tscn и правится в инспекторе (GDD §13.2.1).
 @onready var _list: VBoxContainer = $ListScroll/List
-@onready var _balance: Label = $Balance
+@onready var _balance: RichTextLabel = $Balance
 @onready var _status: Label = $Status
 @onready var _crate_button: Button = $CrateButton
 @onready var _odds_label: Label = $OddsLabel
@@ -43,9 +43,10 @@ func _process(_delta: float) -> void:
 
 
 func _refresh() -> void:
-	_balance.text = "Золото: %d      Сегодня можно потратить: %d" % [
-		ShopState.gold, ShopState.remaining_today(),
-	]
+	# Серебро скрыто: наряды за него не продаются, и показывать его здесь
+	# значило бы намекать, что контуры валют пересекаются (GDD §12)
+	_balance.text = UIUtil.purse_bbcode(-1, ShopState.gold,
+		"Сегодня можно потратить: %d" % ShopState.remaining_today())
 
 	var allowed := ShopState.lootboxes_allowed()
 	_crate_button.visible = allowed

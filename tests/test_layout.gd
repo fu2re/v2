@@ -249,6 +249,26 @@ func _test_victory_screen_comes_before_taming() -> void:
 		"на экране победы показано, что досталось")
 	check(shown.contains("серебра"), "названа добыча: [%s]" % shown.strip_edges())
 
+	# У КАЖДОГО приза обязана быть картинка (GDD §8.1.3). Проверяется
+	# наблюдаемое: в строке приза есть `TextureRect` с непустой текстурой.
+	# Пустой слот вместо монеты сдвигает подпись и делает строку непохожей
+	# на остальные, а поймать это можно только здесь — компиляция молчит,
+	# и на скриншоте посреди анимации проявления монету от фона не отличить
+	var icons := 0
+	var blank := 0
+	for row in feed._panel_box.get_children():
+		if not row is HBoxContainer:
+			continue
+		for cell in row.get_children():
+			if not cell is TextureRect:
+				continue
+			if (cell as TextureRect).texture != null:
+				icons += 1
+			else:
+				blank += 1
+	check(icons > 0, "у приза есть картинка")
+	check_eq(blank, 0, "ни одного приза без картинки")
+
 	# И только по нажатию открывается угощение
 	feed._open_taming()
 	await _frames(2)

@@ -109,7 +109,11 @@ func _build_lane_hints() -> void:
 			NoteRules.lane_name(lane), colour)
 		caption.add_theme_font_size_override("font_size", 34)
 		caption.size.x = half - 80.0
-		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# Подписи разведены к КРАЯМ экрана, а не по центрам половин: ровно
+		# в этих центрах стоят герой и гуардиан, и надпись ложилась им
+		# поперёк туловища. Середина низа принадлежит танцорам
+		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT \
+			if lane == NoteRules.Lane.SPECIAL else HORIZONTAL_ALIGNMENT_RIGHT
 
 	# Разделитель посередине: граница половин должна быть видна глазом,
 	# иначе игрок узнаёт о ней только по незасчитанному попаданию

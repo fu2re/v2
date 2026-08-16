@@ -13,7 +13,7 @@ const DIM_COLOR := Color("ADA99F")
 
 ## Раскладка живёт в Inventory.tscn и правится в инспекторе (GDD §13.2.1).
 @onready var _list: VBoxContainer = $ListScroll/List
-@onready var _wallet: Label = $Wallet
+@onready var _wallet: RichTextLabel = $Wallet
 
 
 func _ready() -> void:
@@ -28,7 +28,7 @@ func _ready() -> void:
 
 
 func _refresh() -> void:
-	_wallet.text = "Серебро: %d        Золото: %d" % [GameState.silver, ShopState.gold]
+	_wallet.text = UIUtil.purse_bbcode(GameState.silver, ShopState.gold)
 	UIUtil.clear_children(_list)
 
 	_add_hero_stats()

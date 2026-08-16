@@ -12,7 +12,7 @@ extends Node2D
 ## семена продаются всегда, ничего не пропадает, и опоздать невозможно.
 
 @onready var _list: VBoxContainer = $ListScroll/List
-@onready var _purse: Label = $Purse
+@onready var _purse: RichTextLabel = $Purse
 @onready var _rotation: Label = $Rotation
 @onready var _status: Label = $Status
 
@@ -95,7 +95,7 @@ func _buy(item: Resource) -> void:
 ## Что по карману, а что нет. Меняются только `disabled` и подпись кошелька:
 ## кнопки остаются теми же узлами, и нажатие не теряется.
 func _refresh_prices() -> void:
-	_purse.text = "Серебро: %d" % GameState.silver
+	_purse.text = UIUtil.purse_bbcode(GameState.silver)
 	for child in _list.get_children():
 		if child is Button and child.has_meta("price"):
 			var price: int = child.get_meta("price")

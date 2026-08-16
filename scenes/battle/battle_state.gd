@@ -15,10 +15,18 @@ signal victory()
 signal defeat()
 
 ## Урон за пропущенный щит — атака монстра дошла до цели.
-const STRIKE_DAMAGE := 10
-## Тяжёлая атака монстра — бывшая нота-зелье. Втрое больнее обычной:
-## особая нота должна ЧУВСТВОВАТЬСЯ особой, а не отличаться силуэтом.
-const HEAVY_STRIKE_DAMAGE := 30
+## Урон монстра за пропущенную атаку.
+##
+## Поднят с 10: на низких грейдах монстры почти не кусались, и бой
+## с обычным превращался в формальность — попадать в такт было незачем.
+const STRIKE_DAMAGE := 15
+## Крит монстра — бывшая нота-зелье. ВЧЕТВЕРО больнее обычного удара.
+##
+## Особая нота обязана чувствоваться особой, а не отличаться силуэтом.
+## Вчетверо — это уже событие: пропустил крит, и щит снесло целиком,
+## а цифра на экране красная и вдвое крупнее обычной.
+const CRIT_MULTIPLIER := 4
+const HEAVY_STRIKE_DAMAGE := STRIKE_DAMAGE * CRIT_MULTIPLIER
 ## Урон за обычный промах. Мал намеренно: щит гасит его несколько раз подряд,
 ## и ребёнок успевает поймать ритм прежде, чем это станет больно.
 const MISS_DAMAGE := 3
@@ -43,6 +51,20 @@ const SKILL_WINDOW_BARS := 4.0
 ## возобновляемый ресурс: когда попадание возвращало восемь, забег переставал
 ## быть испытанием на выносливость — буфер чинился быстрее, чем тратился.
 const SHIELD_RESTORE := 2
+
+## Какую долю здоровья способен снять ОДИН удар после щита.
+##
+## Множители перемножаются: крит вчетверо больнее обычного удара, а грейд
+## добавляет своё сверху — на вершине это давало удар, убивающий полностью
+## прокачанного гуардиана с одного пропуска. Игра для детей 7+ не имеет права
+## заканчивать забег до того, как игрок понял, что произошло: пропустил крит —
+## осталась полоска, а не экран поражения. Второй пропуск уже убивает.
+##
+## Доля намеренно велика. Порог обязан быть милостью на самом верху, а не
+## тихой правкой баланса: на 0.6 он обрезал крит и на ОБЫЧНОМ монстре, где
+## тот и так не убивал, — вчетверо больнее превращалось в 2.6 раза, и особая
+## нота теряла смысл ровно там, где ребёнок встречает её впервые.
+const MAX_BLOW_SHARE := 0.9
 
 ## Базовый запас щита.
 ##
@@ -197,8 +219,10 @@ func register_hit(grade: int) -> int:
 		combo_changed.emit(combo, 1.0)
 		# Промах пачкает серию: атака в её конце уже не сработает
 		series_clean = false
-		_take_damage(MISS_DAMAGE)
-		return 0
+		# Возвращаем урон СО ЗНАКОМ МИНУС: вызывающему надо отличить
+		# «попал и снял столько-то с монстра» от «промазал и получил сам»,
+		# а иначе цифра над героем и цифра над монстром неразличимы
+		return -_take_damage(MISS_DAMAGE)
 
 	combo += 1
 	max_combo = maxi(max_combo, combo)
@@ -294,9 +318,9 @@ func _reset_series() -> void:
 ## Без гуардиана (интро, §15.5) скилл ведёт себя как обычный бит: своей
 ## стихии у героя нет, и выдумывать ей эффект значило бы учить игрока тому,
 ## что перестанет быть правдой, как только у него появится защитник.
-func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) -> void:
+func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) -> int:
 	if is_over:
-		return
+		return 0
 
 	grade_counts[grade] += 1
 
@@ -304,8 +328,7 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 		combo = 0
 		combo_changed.emit(combo, 1.0)
 		series_clean = false
-		_take_damage(SKILL_MISS_DAMAGE)
-		return
+		return -_take_damage(SKILL_MISS_DAMAGE)
 
 	combo += 1
 	max_combo = maxi(max_combo, combo)
@@ -314,7 +337,7 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 
 	if guardian == null:
 		combo_changed.emit(combo, Judge.combo_multiplier(combo))
-		return
+		return 0
 
 	match guardian.genre():
 		MonsterData.Genre.ROCK:
@@ -335,6 +358,8 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 			window_boost_until_beat = current_beat + float(beats_per_bar) * SKILL_WINDOW_BARS
 
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
+	# Удачный скилл урона по герою не наносит — цифре взяться неоткуда
+	return 0
 
 
 ## Ширина окон с учётом снаряжения и действующего порыва Ветра.
@@ -398,6 +423,14 @@ func _take_damage(amount: int) -> int:
 
 	if damage <= 0:
 		return total
+
+	# Ни один удар не отнимает больше доли запаса — с полного здоровья
+	# забег не может кончиться одним пропуском (см. MAX_BLOW_SHARE).
+	# На низких грейдах порог не достаётся вовсе: там крит и так меньше
+	var cap := maxi(int(round(max_health * MAX_BLOW_SHARE)), 1)
+	if damage > cap:
+		total -= damage - cap
+		damage = cap
 
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)

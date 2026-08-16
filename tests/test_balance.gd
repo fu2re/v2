@@ -199,6 +199,10 @@ func _test_deep_monsters_need_progression() -> void:
 		GameState.add_battle_experience("beat_serpent")
 
 	var ready := _play_sloppy(chart, "beat_serpent", 12, top, 0.85)
+	note("здоровье %d/%d, щит %d, принято ударов %d, крит бьёт %d, обычный %d"
+		% [ready.health, ready.max_health, ready.shield, ready.strikes_taken,
+			int(BattleState.HEAVY_STRIKE_DAMAGE * ready.strike_scale),
+			int(BattleState.STRIKE_DAMAGE * ready.strike_scale)])
 	check(ready.did_win,
 		"с плащом и опытом та же игра побеждает (Настрой %d из %d)"
 			% [ready.vibe, ready.max_vibe])
@@ -230,7 +234,15 @@ func _play_sloppy(chart: ChartData, monster_id: String, depth: int,
 				if hit:
 					state.block_strike()
 				else:
-					state.take_strike()
+					state.take_strike(false)
+			ChartData.NoteType.HEAVY:
+				# Крит монстра: блокируется как щит, пропущенный бьёт вчетверо.
+				# Раньше помощник считал его обычным битом и мерил игру,
+				# которой нет
+				if hit:
+					state.block_strike()
+				else:
+					state.take_strike(true)
 			ChartData.NoteType.SKILL:
 				state.use_skill(grade)
 			_:
@@ -254,7 +266,9 @@ func _play_clean(chart: ChartData, monster_id: String, guardian_id: String,
 		match chart.note_types[i]:
 			ChartData.NoteType.ATTACK:
 				state.register_attack(Judge.Grade.PERFECT)
-			ChartData.NoteType.SHIELD:
+			ChartData.NoteType.SHIELD, ChartData.NoteType.HEAVY:
+				# И обычная атака монстра, и крит берутся одной кнопкой:
+				# при идеальной игре обе блокируются
 				state.block_strike()
 			_:
 				state.register_hit(Judge.Grade.PERFECT)

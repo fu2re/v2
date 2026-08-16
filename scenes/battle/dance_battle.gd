@@ -78,6 +78,10 @@ var _last_tap_time: float = 0.0
 ## показывать, а это известно только здесь — по ближайшей ноте.
 var _coach: Node = null
 
+## Слой для вылетающих цифр урона: выше HUD, иначе удары по герою
+## рисуются под шкалами и не видны вовсе.
+var _damage_layer: CanvasLayer = null
+
 
 func _ready() -> void:
 	# Рисование остаётся в коде: узел в сцене задаёт ГДЕ, а _draw — ЧТО.
@@ -247,17 +251,22 @@ func _miss(note: Note) -> void:
 			_popup_damage(state.take_strike(false), _hero.position, false)
 			_shake_screen()
 		ChartData.NoteType.HEAVY:
-			# Тяжёлая атака бьёт втрое больнее обычной
-			_popup_damage(state.take_strike(true), _hero.position, false)
+			# Крит: вчетверо больнее обычного удара
+			_popup_damage(state.take_strike(true), _hero.position, false, true)
+			_shake_screen()
 			_shake_screen()
 		ChartData.NoteType.ATTACK:
 			state.register_attack(Judge.Grade.MISS)
 		ChartData.NoteType.SKILL:
 			# Промах по скиллу бьёт вдвое больнее обычного: особая нота
 			# требует особого внимания
-			state.use_skill(Judge.Grade.MISS)
+			_popup_damage(absi(state.use_skill(Judge.Grade.MISS)),
+				_hero.position, false)
 		_:
-			state.register_hit(Judge.Grade.MISS)
+			# Обычный промах тоже стоит здоровья, и цифра над героем
+			# показывает сколько именно
+			_popup_damage(absi(state.register_hit(Judge.Grade.MISS)),
+				_hero.position, false)
 	note_judged.emit(Judge.Grade.MISS, Judge.LATE_WINDOW)
 
 
@@ -559,25 +568,48 @@ func enable_coach() -> Node:
 ##
 ## Цвета разные и не случайные: свой урон читается в цвете попадания,
 ## чужой — в цвете тревоги, том же, которым мигает замах (§11.1.1).
-func _popup_damage(amount: int, at: Vector2, to_monster: bool) -> void:
+## Вылетающая цифра урона.
+##
+## Живёт на СВОЁМ слое поверх HUD. Пока цифры были обычными узлами сцены,
+## удары по герою рисовались под шкалами и подсказками дорожек — то есть
+## не рисовались вовсе: HUD лежит на слое выше и накрывал их целиком.
+##
+## Размеры крупные намеренно: прошлые 56 пунктов терялись на пёстром лесу,
+## и цифру приходилось искать. Крит вдвое больше обычного и красный —
+## вчетверо больший урон обязан и выглядеть вчетверо страшнее.
+func _popup_damage(amount: int, at: Vector2, to_monster: bool, crit := false) -> void:
 	if amount <= 0:
 		return
+	if _damage_layer == null:
+		_damage_layer = CanvasLayer.new()
+		# Выше HUD (10), ниже угощения (50)
+		_damage_layer.layer = 20
+		add_child(_damage_layer)
 
 	var label := Label.new()
 	label.text = "-%d" % amount
-	label.add_theme_font_size_override("font_size", 64 if to_monster else 56)
+	var size := 150 if crit else (100 if to_monster else 88)
+	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color",
-		Color("FFD24D") if to_monster else Color("FF5C7A"))
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	label.add_theme_constant_override("outline_size", 10)
+		Color("FF3B5C") if crit else (Color("FFD24D") if to_monster else Color("FF8A9E")))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	label.add_theme_constant_override("outline_size", 16)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.size = Vector2(300, 80)
+	label.size = Vector2(500, 180)
 	# Слегка вразброс: два числа подряд в одной точке слипаются в кашу
-	label.position = at + Vector2(-150.0 + randf_range(-40.0, 40.0), -60.0)
+	label.position = at + Vector2(-250.0 + randf_range(-50.0, 50.0), -120.0)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(label)
+	_damage_layer.add_child(label)
+
+	# Крит ещё и вспыхивает: рывок вверх заметнее плавного всплытия
+	if crit:
+		label.scale = Vector2(0.6, 0.6)
+		label.pivot_offset = label.size * 0.5
+		var pop := create_tween()
+		pop.tween_property(label, "scale", Vector2(1.25, 1.25), 0.12)
+		pop.tween_property(label, "scale", Vector2.ONE, 0.1)
 
 	var tween := create_tween()
-	tween.tween_property(label, "position:y", label.position.y - 140.0, 0.7)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.7)
+	tween.tween_property(label, "position:y", label.position.y - 190.0, 0.85)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.85)
 	tween.tween_callback(label.queue_free)

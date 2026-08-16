@@ -63,7 +63,12 @@ const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 ## зависит от состояния и порогов, а кнопка — нет.
 @onready var _action_button: Button = $ActionButton
 @onready var _next_button: Button = $NextButton
+## Кнопка «дальше» ПОСЛЕ боя. Отдельная от обычной и на слое поверх боя:
+## та стоит на 1394 — ровно по линии удара и танцорам, — и поверх живой
+## сцены боя читалась как приклеенная к герою.
+@onready var _result_button: Button = $PanelLayer/ResultButton
 @onready var _panel_bg: ColorRect = $PanelLayer/PanelBackdrop
+@onready var _panel_frame: Panel = $PanelLayer/PanelFrame
 @onready var _panel_box: VBoxContainer = $PanelLayer/PanelScroll/PanelBox
 
 var _battle: Node2D = null
@@ -101,6 +106,7 @@ func _ready() -> void:
 	_finish_button.pressed.connect(_return_to_farm)
 	_action_button.pressed.connect(_confirm)
 	_next_button.pressed.connect(_advance)
+	_result_button.pressed.connect(_advance)
 	# Прокрутка живёт и гаснет вместе с панелью: пустой ScrollContainer
 	# во весь экран молча съедал бы клики по тому, что под ним
 	var scroll: ScrollContainer = $PanelLayer/PanelScroll
@@ -627,6 +633,7 @@ func _open_panel(title: String) -> void:
 	_busy = true
 	_panel_box.visible = true
 	_panel_bg.visible = true
+	_panel_frame.visible = true
 
 	# Кнопки поляны лежат в дереве ПОСЛЕ подложки, поэтому рисуются поверх
 	# неё: на живом прогоне «Отдохнуть» и «Дальше ↑» торчали сквозь панель
@@ -643,6 +650,7 @@ func _open_panel(title: String) -> void:
 func _close_panel() -> void:
 	_panel_box.visible = false
 	_panel_bg.visible = false
+	_panel_frame.visible = false
 	_hint.text = HINT_NEXT
 	_busy = false
 	# Кнопки поляны возвращаются в том состоянии, которое положено ЭТОЙ поляне,
@@ -655,6 +663,9 @@ func _add_panel_label(text: String, size: int = 34) -> void:
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# По центру: `Label` по умолчанию прижимает текст влево, и панель победы
+	# читалась как список у левого края вместо карточки итога
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", Color("DCC7A4"))
 	_panel_box.add_child(label)
@@ -815,6 +826,7 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 func _close_victory() -> void:
 	_panel_box.visible = false
 	_panel_bg.visible = false
+	_panel_frame.visible = false
 	_awaiting_result_swipe = true
 	_busy = false
 	_refresh_buttons()
@@ -829,6 +841,7 @@ func _close_victory() -> void:
 func _open_taming() -> void:
 	_panel_box.visible = false
 	_panel_bg.visible = false
+	_panel_frame.visible = false
 
 	if _pending_taming == null:
 		return
@@ -859,10 +872,17 @@ func _dismiss_battle() -> void:
 		_pending_result = ""
 
 
+## Угощение закрылось — поляна пройдена, идём дальше САМИ.
+##
+## Раньше игрок возвращался на карточку той же встречи: монстр уже приручён,
+## делать здесь нечего, а экран звал танцевать с ним заново. Приручение —
+## финал поляны, и после него ждать свайпа не за чем.
 func _on_taming_finished() -> void:
 	_pending_result = ""
 	_dismiss_battle()
 	_busy = false
+	_awaiting_result_swipe = false
+	_next_glade()
 
 
 func _on_health_changed(current: int, maximum: int) -> void:
@@ -944,10 +964,13 @@ func _refresh_buttons() -> void:
 		return
 
 	if _awaiting_result_swipe:
-		_action_button.text = "Дальше"
-		_action_button.visible = true
+		# Итог показывается ПОВЕРХ сцены боя, поэтому и кнопка своя —
+		# на верхнем слое и выше танцоров
+		_action_button.visible = false
 		_next_button.visible = false
+		_result_button.visible = true
 		return
+	_result_button.visible = false
 
 	# Подпись говорит, ЧТО именно произойдёт: одна на все случаи так же
 	# непонятна, как голый жест (GDD §8.1.1)
@@ -1143,6 +1166,9 @@ func _show_prize(prize: Dictionary) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 20)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Строка приза centered целиком: иконка и подпись держатся вместе
+	# посреди панели, а не разъезжаются по её краям
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var item: Resource = prize.get("item")
 	var icon := TextureRect.new()
@@ -1164,8 +1190,12 @@ func _show_prize(prize: Dictionary) -> void:
 	text.text = String(prize.get("text", ""))
 	text.add_theme_font_size_override("font_size", 38)
 	text.add_theme_color_override("font_color", Color("F0DEC0"))
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Ширина колонки задана явно. В центрированном `HBoxContainer` подпись
+	# получает свой МИНИМАЛЬНЫЙ размер, а у автопереноса он равен ширине
+	# одного символа — «+12 серебра» вставало столбиком по букве в строке
+	text.custom_minimum_size = Vector2(560, 96)
 	row.add_child(text)
 
 	_panel_box.add_child(row)

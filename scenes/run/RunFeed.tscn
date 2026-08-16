@@ -139,18 +139,34 @@ color = Color(0.5921569, 0.76862746, 0.4156863, 1)
 [node name="PanelLayer" type="CanvasLayer" parent="."]
 layer = 40
 
+[node name="ResultButton" type="Button" parent="PanelLayer"]
+visible = false
+offset_left = 280.0
+offset_top = 1180.0
+offset_right = 800.0
+offset_bottom = 1320.0
+theme_override_font_sizes/font_size = 44
+text = "Дальше ↑"
+
 [node name="PanelBackdrop" type="ColorRect" parent="PanelLayer" unique_id=370203205]
 visible = false
 offset_right = 1080.0
 offset_bottom = 1920.0
 color = Color(0.07, 0.11, 0.08, 0.96)
 
+[node name="PanelFrame" type="Panel" parent="PanelLayer" unique_id=118820411]
+visible = false
+offset_left = 60.0
+offset_top = 180.0
+offset_right = 1020.0
+offset_bottom = 1360.0
+
 [node name="PanelScroll" type="ScrollContainer" parent="PanelLayer" unique_id=873230592]
 visible = false
-offset_left = 70.0
-offset_top = 200.0
-offset_right = 1010.0
-offset_bottom = 1700.0
+offset_left = 100.0
+offset_top = 230.0
+offset_right = 980.0
+offset_bottom = 1150.0
 
 [node name="PanelBox" type="VBoxContainer" parent="PanelLayer/PanelScroll" unique_id=1619577428]
 visible = false

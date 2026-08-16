@@ -21,7 +21,7 @@ const GRID_LEFT := 58.0
 ## Раскладка живёт в Farm.tscn и правится в инспекторе (GDD §13.2.1).
 ## Скрипт только связывает узлы с логикой.
 @onready var _status: Label = $Status
-@onready var _seeds_label: Label = $SeedsLabel
+@onready var _seeds_label: RichTextLabel = $SeedsLabel
 @onready var _grid: Control = $PlotGrid
 @onready var _seed_picker: VBoxContainer = $SeedPicker
 @onready var _picker_bg: ColorRect = $PickerBackdrop
@@ -58,9 +58,8 @@ func _process(_delta: float) -> void:
 
 func _refresh() -> void:
 	_sync_grid()
-	_seeds_label.text = "Серебро %d    Золото %d    Семян %d" % [
-		GameState.silver, ShopState.gold, _total_seeds(),
-	]
+	_seeds_label.text = UIUtil.purse_bbcode(GameState.silver, ShopState.gold,
+		"Семян %d" % _total_seeds())
 
 	var guardian := GameState.guardian()
 	if guardian == null:

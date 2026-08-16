@@ -25,14 +25,16 @@ theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
 text = "Инвентарь"
 horizontal_alignment = 1
 
-[node name="Wallet" type="Label" parent="." unique_id=877512172]
+[node name="Wallet" type="RichTextLabel" parent="." unique_id=877512172]
 offset_left = 60.0
 offset_top = 150.0
 offset_right = 1020.0
-offset_bottom = 200.0
-theme_override_font_sizes/font_size = 34
-theme_override_colors/font_color = Color(1, 0.8235294, 0.3019608, 1)
-horizontal_alignment = 1
+offset_bottom = 214.0
+theme_override_font_sizes/normal_font_size = 34
+theme_override_colors/default_color = Color(1, 0.8235294, 0.3019608, 1)
+bbcode_enabled = true
+fit_content = false
+scroll_active = false
 
 [node name="ListScroll" type="ScrollContainer" parent="." unique_id=240589297]
 offset_left = 60.0

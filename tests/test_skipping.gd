@@ -152,7 +152,6 @@ func _test_card_shows_stakes() -> void:
 	feed._show_glade(RunManager.current_glade)
 	await _frames(2)
 
-	check(feed._grade_frame.visible, "рамка грейда показана")
 	check(feed._tame_banner.visible, "пометка «можно подружиться» показана")
 	check(feed._friendship_label.text.contains("%d" % threshold),
 		"на карточке виден порог дружбы: [%s]" % feed._friendship_label.text)
@@ -180,8 +179,8 @@ func _test_card_shows_stakes() -> void:
 	RunManager.current_glade = bush
 	feed._show_glade(bush)
 	await _frames(2)
-	check(not feed._grade_frame.visible, "на кусте рамки грейда нет")
-	check(not feed._friendship_track.visible, "и полоски дружбы тоже")
+	check(not feed._friendship_track.visible, "на кусте полоски дружбы нет")
+	check(not feed._tame_banner.visible, "и пометки о дружбе тоже")
 
 	feed.queue_free()
 	await _frames(2)

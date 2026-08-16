@@ -140,20 +140,32 @@ func _test_shield_never_free() -> void:
 	print("Щит нельзя обнулить снаряжением")
 	GameState.reset()
 	_sprout()
+
+	# Сначала тот же удар БЕЗ амулета. Сравнивать надо с ним, а не с голой
+	# константой: урон умножается ещё и на шкалу грейда, и стоило поднять её
+	# обычному монстру, как исправный амулет «перестал» смягчать — тест мерил
+	# не снаряжение, а лестницу грейдов
+	#
+	# Урон меряем суммарно: он гасится щитом раньше здоровья, и смотреть
+	# только на здоровье значит не увидеть удар вовсе
+	var bare := BattleState.new()
+	bare.setup(_slime(), _sprout(), 100)
+	var bare_before := bare.shield + bare.health
+	bare.take_strike()
+	var bare_damage := bare_before - (bare.shield + bare.health)
+
 	GameState.add_gear("heartwood_amulet")
 	GameState.equip(SPROUT, "heartwood_amulet")
 
 	var s := BattleState.new()
 	s.setup(_slime(), _sprout(), 100)
-
-	# Урон меряем суммарно: он гасится щитом раньше здоровья, и смотреть
-	# только на здоровье значит не увидеть удар вовсе
 	var before := s.shield + s.health
 	s.take_strike()
 	var damage := before - (s.shield + s.health)
 
 	check(damage > 0, "пропущенный щит всё равно бьёт — механика обязана остаться")
-	check(damage < BattleState.STRIKE_DAMAGE, "но амулет смягчил удар")
+	check(damage < bare_damage,
+		"но амулет смягчил удар (%d против %d без него)" % [damage, bare_damage])
 
 	# Даже при абсурдном снижении урон не уходит в ноль
 	s.shield_reduction = 5.0

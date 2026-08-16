@@ -13,7 +13,7 @@ const COLORS := {
 	ChartData.NoteType.BEAT: Color("00E5FF"),
 	ChartData.NoteType.SKILL: Color("FF6BDE"),
 	ChartData.NoteType.SHIELD: Color("2E9BFF"),
-	ChartData.NoteType.HEAVY: Color("B87AFF"),
+	ChartData.NoteType.HEAVY: Color("FF3B5C"),
 	# Атака — единственная нота, наносящая урон. Она обязана отличаться
 	# и цветом, и формой: игрок должен узнавать её краем глаза
 	ChartData.NoteType.ATTACK: Color("FFD24D"),
@@ -59,7 +59,7 @@ func _draw() -> void:
 		ChartData.NoteType.ATTACK:
 			_draw_star()
 		ChartData.NoteType.HEAVY:
-			_draw_flask()
+			_draw_crit()
 		_:
 			draw_circle(Vector2.ZERO, RADIUS, _color)
 			draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, _color.lightened(0.4), 5.0, true)
@@ -98,34 +98,26 @@ func _draw_shield() -> void:
 	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 5.0, true)
 
 
-## Бутылочка — форма зелья.
+## Крит монстра — шипастый щит с восклицательным знаком.
 ##
-## Раньше зелье рисовалось тем же кругом, что и обычный бит, и отличалось
-## только цветом. В темпе боя цвет не читается: игрок видит круг и жмёт
-## обычную кнопку, теряя глоток. Форма считывается боковым зрением,
-## цвет — нет, поэтому у зелья теперь свой силуэт.
-func _draw_flask() -> void:
-	var r := RADIUS
-	var light := _color.lightened(0.4)
+## Форма нарочно похожа на обычный щит (это тоже атака, и берётся той же
+## особой кнопкой), но с шипами и красная: пропущенный крит бьёт вчетверо,
+## и его нельзя спутать с обычным ударом. Пока здесь стояла бутылочка,
+## оставшаяся от упразднённых зелий, игрок ждал лечения и получал по лбу.
+func _draw_crit() -> void:
+	var r := RADIUS * 1.15
+	var light := _color.lightened(0.45)
 
-	# Пузатое тело
-	var body := PackedVector2Array([
-		Vector2(-r * 0.42, -r * 0.3), Vector2(r * 0.42, -r * 0.3),
-		Vector2(r * 0.95, r * 0.45), Vector2(r * 0.7, r * 1.25),
-		Vector2(-r * 0.7, r * 1.25), Vector2(-r * 0.95, r * 0.45),
-	])
-	draw_colored_polygon(body, _color)
-	draw_polyline(body + PackedVector2Array([body[0]]), light, 5.0, true)
+	# Шипы: восемь лучей наружу — силуэт «опасно» без единого слова
+	var spikes := PackedVector2Array()
+	for i in 16:
+		var angle := -PI * 0.5 + i * PI / 8.0
+		var radius := r * 1.35 if i % 2 == 0 else r * 0.95
+		spikes.append(Vector2(cos(angle), sin(angle)) * radius)
+	draw_colored_polygon(spikes, _color)
+	draw_polyline(spikes + PackedVector2Array([spikes[0]]), light, 4.0, true)
 
-	# Горлышко и пробка: без них силуэт читается как мешок, а не как склянка
-	var neck := PackedVector2Array([
-		Vector2(-r * 0.36, -r * 1.0), Vector2(r * 0.36, -r * 1.0),
-		Vector2(r * 0.36, -r * 0.24), Vector2(-r * 0.36, -r * 0.24),
-	])
-	draw_colored_polygon(neck, _color)
-	draw_polyline(neck + PackedVector2Array([neck[0]]), light, 4.0, true)
-	draw_rect(Rect2(Vector2(-r * 0.46, -r * 1.35), Vector2(r * 0.92, r * 0.38)), light, true)
-
-	# Блик — он же подсказка «внутри жидкость»
-	draw_line(Vector2(-r * 0.45, r * 0.15), Vector2(-r * 0.28, r * 0.85),
-		Color(1, 1, 1, 0.55), 4.0, true)
+	# Восклицательный знак внутри
+	draw_rect(Rect2(Vector2(-r * 0.12, -r * 0.55),
+		Vector2(r * 0.24, r * 0.72)), Color.WHITE, true)
+	draw_circle(Vector2(0, r * 0.45), r * 0.15, Color.WHITE)
