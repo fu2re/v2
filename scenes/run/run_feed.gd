@@ -466,14 +466,25 @@ func _resolve_glade() -> void:
 			# Куст даёт и фрукты, и СЕМЕНА нового вида. Семена — единственный
 			# способ завести новую культуру, и он замыкает контур лес→ферма
 			_glade_used = true
-			RunManager.add_loot_fruit(glade.fruit_id, FruitData.Quality.PLAIN, 2)
-			RunManager.add_loot_seed(glade.fruit_id, 1)
-			RunManager.add_loot_silver(glade.silver_reward)
 			var fruit := Registry.fruit(glade.fruit_id)
 			var name := fruit.display_name if fruit != null else glade.fruit_id
 			var known := FarmState.known_seeds.has(glade.fruit_id)
-			_hint.text = "%s: 2 плода и семя!\n%s" % [name, HINT_NEXT] if known \
-				else "Новый вид: %s!\nСемя пойдёт на грядку.\n%s" % [name, HINT_NEXT]
+			# Сколько выпало, решает таблица, а не эта строка. Плод с куста —
+			# редкая удача: фрукты растят на грядке, и если их можно набрать
+			# в лесу, ферма становится необязательной
+			var picked := RunManager.harvest_wild_bush(
+				glade.fruit_id, glade.silver_reward)
+			if not known:
+				_hint.text = "Новый вид: %s!\nСемя пойдёт на грядку.\n%s" \
+					% [name, HINT_NEXT]
+			elif picked > 0:
+				# Текст строится по НАЙДЕННОМУ, а не по замыслу: фиксированная
+				# строка «2 плода и семя» пережила смену таблицы и врала
+				_hint.text = "%s: семя и %d %s — повезло!\n%s" % [
+					name, picked, _fruit_word(picked), HINT_NEXT,
+				]
+			else:
+				_hint.text = "%s: семя для грядки\n%s" % [name, HINT_NEXT]
 			_busy = false
 			_refresh_buttons()
 		Glade.Type.ENCOUNTER:
@@ -562,11 +573,11 @@ func _open_merchant(glade: Glade) -> void:
 	if stock.is_empty():
 		_add_panel_label("Сегодня всё раскуплено.")
 	for item: Resource in stock:
-		# Типы указаны явно: у Resource поля читаются как Variant,
-		# и вывод типа через := уронил бы весь скрипт (CLAUDE.md)
-		var price: int = item.price
+		# Цена и описание — через MerchantStock: у семени нет поля price,
+		# его цена задана тиром в merchant.json
+		var price := MerchantStock.price_of(item)
 		var title: String = item.display_name
-		var effect: String = item.effect_text()
+		var effect := MerchantStock.describe(item)
 		var button := _add_panel_button("%s — %d серебра\n%s" % [title, price, effect],
 			_buy_item.bind(item))
 		button.disabled = RunManager.run_silver < price
@@ -586,12 +597,17 @@ func _merchant_stock(depth: int) -> Array:
 
 
 func _buy_item(item: Resource) -> void:
-	var price: int = item.price
+	var price := MerchantStock.price_of(item)
 	var id: String = item.id
 	if RunManager.run_silver < price:
 		return
 	RunManager.add_loot_silver(-price)
-	GameState.add_gear(id)
+	# Семя ложится в мешок забега: семена новых культур переживают
+	# даже смерть, а купленное — тем более
+	if item is FruitData:
+		RunManager.add_loot_seed(id, 1)
+	else:
+		GameState.add_gear(id)
 	_open_merchant(RunManager.current_glade)
 
 
@@ -1090,6 +1106,20 @@ func _sync_hint() -> void:
 		return
 	if _hint.text.contains(_action_button.text):
 		_hint.text = HINT_NEXT
+
+
+## Склонение «плод» по числу. Русский счёт нельзя собрать одним «%d плода»:
+## один плод, два плода, пять плодов — и на пяти строка ломается.
+func _fruit_word(count: int) -> String:
+	var last := count % 10
+	var tens := count % 100
+	if tens >= 11 and tens <= 14:
+		return "плодов"
+	if last == 1:
+		return "плод"
+	if last >= 2 and last <= 4:
+		return "плода"
+	return "плодов"
 
 
 ## Съесть фрукт у костра: здоровье и баф до конца забега.

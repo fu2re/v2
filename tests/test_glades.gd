@@ -15,6 +15,7 @@ func run_tests() -> void:
 	_test_gear_raises_run_health()
 	_test_merchant_stock_is_stable()
 	_test_victory_gives_gear()
+	_test_wild_bush_follows_the_table()
 
 
 ## Завести экземпляры обычного грейда — минимальная подготовка коллекции.
@@ -167,3 +168,53 @@ func _test_victory_gives_gear() -> void:
 	check(rich_total > cheap_total,
 		"с редкого монстра добыча ценнее (%d против %d)" % [rich_total, cheap_total])
 	GameState.reset()
+
+
+## Куст выдаёт по ТАБЛИЦЕ, а не по числу в коде.
+##
+## Живой отчёт: «почему такой большой лут? ожидался очень мелкий шанс
+## на дроп плода». В коде стояло жёсткое «два плода и семя», а таблица,
+## где записаны пятнадцать процентов на ОДИН плод, не читалась вовсе:
+## куст исправно выдавал два золотых яблока подряд — восемь часов роста
+## каждое, — и грядка становилась необязательной.
+##
+## Доля сверяется С ТАБЛИЦЕЙ, а не с зашитым здесь числом: иначе тест
+## пришлось бы править при каждой подкрутке баланса, и он перестал бы
+## что-либо охранять.
+func _test_wild_bush_follows_the_table() -> void:
+	print("Дикий куст выдаёт по таблице")
+	var chance := Balance.wild_bush_fruit_chance()
+	check(chance > 0.0 and chance < 0.5,
+		"плод с куста — редкая удача, а не норма (%.0f%%)" % (chance * 100.0))
+
+	var runs := 600
+	var with_fruit := 0
+	var fruits_total := 0
+	var seeds_total := 0
+	RunManager.set_seed(31337)
+	for i in runs:
+		RunManager.run_fruits.clear()
+		RunManager.run_seed_bag.clear()
+		var picked := RunManager.harvest_wild_bush("chord_apple", 8)
+		if picked > 0:
+			with_fruit += 1
+			fruits_total += picked
+		for count: int in RunManager.run_seed_bag.values():
+			seeds_total += count
+
+	# Семена — то, ради чего к кусту подходят: они падают ВСЕГДА
+	check_eq(seeds_total, runs * Balance.wild_bush_seeds(),
+		"семя даёт каждый куст")
+
+	var observed := float(with_fruit) / float(runs)
+	check(absf(observed - chance) < 0.06,
+		"доля плодоносных кустов близка к таблице: %.0f%% против %.0f%%"
+			% [observed * 100.0, chance * 100.0])
+
+	# И удачный куст даёт РОВНО столько, сколько сказано, — не больше
+	if with_fruit > 0:
+		check_eq(fruits_total, with_fruit * Balance.wild_bush_lucky_fruits(),
+			"удачный куст даёт ровно %d плод(а)" % Balance.wild_bush_lucky_fruits())
+
+	RunManager.run_fruits.clear()
+	RunManager.run_seed_bag.clear()

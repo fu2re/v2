@@ -36,7 +36,7 @@ static func seconds_until_rotation(now_seconds: int = -1) -> int:
 	return ROTATION_SECONDS - (stamp % ROTATION_SECONDS)
 
 
-## Витрина усадьбы: семена всегда плюс несколько зелий и вещей по ротации.
+## Витрина усадьбы: базовые семена всегда плюс несколько вещей по ротации.
 ##
 ## Возвращает массив ресурсов (FruitData — это семя, GearData).
 static func farm_stock(rotation: int = -1) -> Array:
@@ -44,26 +44,54 @@ static func farm_stock(rotation: int = -1) -> Array:
 	var out: Array = []
 
 	# Базовые семена в продаже ВСЕГДА: без них новая ферма — пустой экран,
-	# и «опоздал к витрине» превратилось бы в «не могу играть»
-	for fruit in Registry.all_fruits():
-		out.append(fruit)
+	# и «опоздал к витрине» превратилось бы в «не могу играть».
+	# Только БАЗОВЫЕ (merchant.json): дикие виды добываются с кустов в лесу
+	# и нигде больше (GDD §7.3) — пока лавка продавала все семена подряд,
+	# весь контур «лес → семя → ферма» можно было пройти не выходя со двора
+	out.append_array(_base_seeds())
 
-	out.append_array(_rotate(Registry.all_gear(), index + 7, FARM_GEAR_SLOTS))
+	out.append_array(_rotate(_affordable_gear(), index + 7, FARM_GEAR_SLOTS))
 	return out
 
 
 ## Товар лесного торговца. Зависит от глубины, а не от времени: витрина
 ## обязана быть одной и той же, пока игрок на этой поляне.
+##
+## Пул — снаряжение и базовые семена (merchant.json → forest_merchant):
+## семя в лесу — страховка забывшему посадить, а не источник диких видов.
 static func forest_stock(depth: int) -> Array:
 	var pool: Array = []
 	for item in Registry.all_gear():
 		pool.append(item)
+	pool.append_array(_base_seeds())
 	if pool.is_empty():
 		return []
+	pool.sort_custom(func(a, b): return price_of(a) < price_of(b))
 
 	var out: Array = []
 	for i in FOREST_SLOTS:
 		out.append(pool[(depth * 7 + i * 3) % pool.size()])
+	return out
+
+
+## Семена базовых культур — постоянная часть любого прилавка.
+static func _base_seeds() -> Array:
+	var out: Array = []
+	var base_ids := Balance.base_seed_ids()
+	for fruit in Registry.all_fruits():
+		if base_ids.has(fruit.id):
+			out.append(fruit)
+	return out
+
+
+## Дешёвая и средняя трети снаряжения (merchant.json). Дорогая треть
+## в витрину не попадает: вершина добывается в сундуках за победу,
+## иначе лавка продаёт финал игры за пару забегов.
+static func _affordable_gear() -> Array:
+	var pool := Registry.all_gear()
+	var out: Array = []
+	for i in pool.size() * 2 / 3:
+		out.append(pool[i])
 	return out
 
 

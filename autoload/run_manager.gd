@@ -260,6 +260,27 @@ func add_loot_seed(fruit_id: String, count: int = 1) -> void:
 	run_seed_bag[fruit_id] = run_seed_bag.get(fruit_id, 0) + count
 
 
+## Обобрать дикий куст. Возвращает, сколько плодов выпало (0 или больше).
+##
+## Числа берутся из `drop_tables.json`, а не из кода. Раньше здесь стояло
+## жёсткое «два плода и семя», и таблица, где записаны пятнадцать процентов
+## на ОДИН плод, не читалась вовсе: куст исправно выдавал два золотых яблока
+## подряд — восемь часов роста каждое, — и грядка становилась необязательной.
+## Это ровно то расхождение кода и таблицы, из-за которого таблица и заведена.
+##
+## Бросок идёт по сеяному генератору забега: так куст воспроизводится
+## вместе с остальной лентой, и тест может проверить долю, а не угадывать.
+func harvest_wild_bush(fruit_id: String, silver: int) -> int:
+	add_loot_seed(fruit_id, Balance.wild_bush_seeds())
+	add_loot_silver(silver)
+
+	if _rng.randf() >= Balance.wild_bush_fruit_chance():
+		return 0
+	var fruits := Balance.wild_bush_lucky_fruits()
+	add_loot_fruit(fruit_id, FruitData.Quality.PLAIN, fruits)
+	return fruits
+
+
 func add_loot_silver(amount: int) -> void:
 	run_silver += amount
 
@@ -311,6 +332,10 @@ func _end(died: bool) -> void:
 	run_fruits.clear()
 	run_seed_bag.clear()
 	run_silver = 0
+	# Бафы живут ДО КОНЦА забега — значит, здесь они кончаются. Без очистки
+	# съеденное в прошлом забеге тихо усиливало бы бой интро и первый бой
+	# следующего забега до start_run
+	run_buffs.clear()
 
 	SaveManager.save_game()
 	run_ended.emit(died, kept_fruits, kept_seeds)
@@ -363,8 +388,21 @@ func shake_bush(for_depth: int) -> String:
 				var fruit: FruitData = fruits[_rng.randi_range(0, fruits.size() - 1)]
 				add_loot_seed(fruit.id, 1)
 				return "Семя: %s" % fruit.display_name
+		"fruit_single":
+			# Готовый плод — редкость (6% в таблице): фрукты растят,
+			# а не подбирают. Дикий всегда обычного качества — выращенное
+			# на грядке лучше найденного под кустом
+			var fruits := Registry.all_fruits()
+			if not fruits.is_empty():
+				var fruit: FruitData = fruits[_rng.randi_range(0, fruits.size() - 1)]
+				add_loot_fruit(fruit.id, FruitData.Quality.PLAIN)
+				return "Спелый плод: %s" % fruit.display_name
 		"gear_chest_like_victory":
-			var prize := roll_victory_gear(MonsterData.Rarity.COMMON)
+			# БЕЗ второго броска «выпадет ли»: таблица уже решила, что сундук
+			# есть. Пока здесь стоял roll_victory_gear, обещанные 2% куста
+			# превращались в 0.2% — внутренний бросок молча забирал сундук
+			# в девяти случаях из десяти
+			var prize := grant_victory_gear(MonsterData.Rarity.COMMON)
 			var item := Registry.gear(prize)
 			if item != null:
 				return "Сундук в ветвях: %s!" % item.display_name
@@ -394,28 +432,56 @@ func pay_granny(amount: int) -> String:
 
 	match picked:
 		"seed_tier_up":
-			var fruits := Registry.all_fruits()
-			if not fruits.is_empty():
-				# Семя повыше тиром: подарок должен быть чем-то, чего игрок
-				# сам пока не вырастил
-				var best: FruitData = fruits[0]
-				for fruit in fruits:
-					if fruit.tier > best.tier:
-						best = fruit
-				add_loot_seed(best.id, 1)
-				return "Семя: %s" % best.display_name
+			var gift := _seed_above_known()
+			if gift != null:
+				add_loot_seed(gift.id, 1)
+				return "Семя: %s" % gift.display_name
 		"gear_mid_tier":
-			var prize := roll_victory_gear(MonsterData.Rarity.RARE)
+			# Свёрток обещан таблицей — второй бросок «а выпадет ли» здесь
+			# не нужен: с ним подарок в трёх случаях из четырёх молча
+			# превращался в горсть монет
+			var prize := grant_victory_gear(MonsterData.Rarity.RARE)
 			var item := Registry.gear(prize)
 			if item != null:
 				return "Свёрток: %s" % item.display_name
 
-	# Зелье не влезло — бабушка даёт серебро. Подарок обязан быть
-	# материальным: «тёплое слово» после того, как игрок отдал ей деньги,
+	# Запасной вариант — серебро. Подарок обязан быть материальным:
+	# «тёплое слово» после того, как игрок отдал ей деньги,
 	# читается как обман, а не как трогательность
 	var coins := 12
 	add_loot_silver(coins)
 	return "Горсть монеток на дорожку: +%d" % coins
+
+
+## Семя на тир выше лучшего ИЗВЕСТНОГО игроку, потолок — максимальный тир
+## (drop_tables.json → granny). Раньше бралось лучшее семя всего реестра:
+## подарок бабки одним разом обгонял весь огородный прогресс, и оптимальной
+## игрой было прийти к ней с одной монетой в кармане.
+func _seed_above_known() -> FruitData:
+	var fruits := Registry.all_fruits()
+	if fruits.is_empty():
+		return null
+
+	var best_known := -1
+	var top_tier := 0
+	for fruit in fruits:
+		top_tier = maxi(top_tier, fruit.tier)
+		if FarmState.known_seeds.has(fruit.id) or run_seed_bag.has(fruit.id):
+			best_known = maxi(best_known, fruit.tier)
+
+	var target := mini(best_known + 1, top_tier)
+	var candidates: Array[FruitData] = []
+	for fruit in fruits:
+		if fruit.tier == target:
+			candidates.append(fruit)
+	# В лестнице тиров может не оказаться точной ступени — берём ближайшую сверху
+	if candidates.is_empty():
+		for fruit in fruits:
+			if fruit.tier > best_known:
+				candidates.append(fruit)
+	if candidates.is_empty():
+		candidates.assign(fruits)
+	return candidates[_rng.randi_range(0, candidates.size() - 1)]
 
 
 ## Выдать снаряжение за побеждённого монстра. Возвращает id или пустую строку.
@@ -430,7 +496,14 @@ func roll_victory_gear(grade: int) -> String:
 	# чем игрок успевал надеть, а торговец стал не нужен
 	if _rng.randf() >= Balance.victory_chest_chance(grade):
 		return ""
+	return grant_victory_gear(grade)
 
+
+## Содержимое сундука БЕЗ броска «выпадет ли»: для мест, где сундук уже
+## обещан своей таблицей — куст с гостинцами, свёрток бабки. Их шанс
+## разыгрывается снаружи, и второй бросок здесь умножал бы вероятности:
+## обещанные таблицей 2% превращались в 0.2%.
+func grant_victory_gear(grade: int) -> String:
 	var odds := Balance.victory_chest_odds(grade)
 
 	var total := 0.0

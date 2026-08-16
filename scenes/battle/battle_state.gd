@@ -94,9 +94,6 @@ const STRAY_TAP_DAMAGE := 2
 ## что щит чинится в бою нотами-щитами, а здоровье — только у костра.
 const BASE_SHIELD := 40
 
-## Рост Настроя монстра с глубиной забега (GDD §8.3).
-const VIBE_DEPTH_SCALE := 0.05
-
 ## Сколько нот подряд обязана содержать серия, чтобы атака в её конце
 ## считалась заслуженной. Ниже — атака проходит, но слабее не бывает:
 ## короткие связки не должны давать тот же результат, что длинные.
@@ -175,7 +172,7 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 	# грейда с уровнем (это уже внутри `vibe()`) и глубины забега. Грейд —
 	# главный множитель: легендарный обязан ощущаться как событие,
 	# а не как обычный бой с другой рамкой
-	max_vibe = int(round(monster.vibe() * (1.0 + VIBE_DEPTH_SCALE * depth)))
+	max_vibe = int(round(monster.vibe() * (1.0 + Balance.vibe_depth_scale() * depth)))
 	vibe = max_vibe
 
 	# Урон монстра растёт по СВОЕЙ шкале, круче, чем крепость: эпический
@@ -190,6 +187,15 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 	window_scale = bonuses.get("window_scale", 1.0)
 	power_bonus = bonuses.get("power_bonus", 0.0)
 	shield_reduction = bonuses.get("shield_reduction", 0.0)
+
+	# Бафы съеденных за забег фруктов (GDD §8.2.3) — поверх снаряжения.
+	# Семантика у них разная, и это надо привести к одной: окно у фрукта
+	# записано ДОЛЕЙ (0.15 = «+15%»), у снаряжения — множителем (1.15).
+	# Потолки самих бафов уже применены при накоплении (Balance.fruit_buff_cap),
+	# общий предел смягчения — тот же, что у снаряжения: урон не обнуляется
+	window_scale *= 1.0 + RunManager.buff("window_scale")
+	power_bonus += RunManager.buff("power_bonus")
+	shield_reduction = minf(shield_reduction + RunManager.buff("shield_reduction"), 0.75)
 
 	# Здоровье сквозное: между полянами само не восстанавливается,
 	# только у костра и зельями. В этом всё напряжение забега

@@ -26,7 +26,7 @@ const GRADE_KEYS := ["common", "uncommon", "rare", "unique", "epic", "legendary"
 ## Игра не имеет права упасть из-за данных: битый JSON — это плохая картинка
 ## баланса, а не конец сессии. Тот же принцип, что в ChartLoader.
 const FALLBACK_STAT_SCALE := [1.0, 1.15, 1.3, 1.5, 1.7, 2.0]
-const FALLBACK_STRIKE_SCALE := [1.0, 1.4, 2.0, 2.8, 3.8, 5.0]
+const FALLBACK_STRIKE_SCALE := [1.5, 1.9, 2.4, 3.1, 4.0, 5.0]
 const FALLBACK_THRESHOLDS := [100, 150, 200, 250, 300, 400]
 const FALLBACK_XP_CURVE := [0, 100, 220, 370, 550, 770, 1030, 1340, 1700, 2120]
 const FALLBACK_GLADE_WEIGHTS := {"battle": 65.0, "wild_bush": 12.0, "campfire": 8.0, "encounter": 15.0}
@@ -108,6 +108,14 @@ static func grade_strike_scale(grade: int) -> float:
 	if value == null:
 		return FALLBACK_STRIKE_SCALE[clampi(grade, 0, FALLBACK_STRIKE_SCALE.size() - 1)]
 	return float(value)
+
+
+## Рост Настроя монстра с глубиной забега: +доля за каждую поляну (GDD §8.3).
+## Поверх грейда, который остаётся главным множителем сложности.
+static func vibe_depth_scale() -> float:
+	ensure_loaded()
+	var battle := _section(_progression, "battle")
+	return float(battle.get("vibe_depth_scale", 0.05))
 
 
 # --- дружба ------------------------------------------------------------------
@@ -252,7 +260,7 @@ static func rarity_weights(depth: int) -> PackedFloat32Array:
 	var max_shift := float(shift_section.get("max_shift", 3.0))
 
 	var shift := minf(float(depth) / divisor, max_shift)
-	var floor_common := float(shift_section.get("common_floor", 12.0))
+	var floor_common := float(shift_section.get("common_floor", 15.0))
 	var unlocks := _section(table, "unlock_depth")
 
 	var out := PackedFloat32Array()
@@ -313,6 +321,20 @@ static func wild_bush_fruit_chance() -> float:
 	return float(yield_row.get("fruit_chance_percent", 15.0)) / 100.0
 
 
+## Сколько семян даёт куст. Всегда: семена — то, ради чего к нему подходят.
+static func wild_bush_seeds() -> int:
+	ensure_loaded()
+	var yield_row := _section(_section(_drops, "wild_bush"), "yield")
+	return int(yield_row.get("seed_of_same_fruit", 1))
+
+
+## Сколько плодов даёт удачный куст — тех самых пятнадцати процентов.
+static func wild_bush_lucky_fruits() -> int:
+	ensure_loaded()
+	var yield_row := _section(_section(_drops, "wild_bush"), "yield")
+	return int(yield_row.get("fruits_when_lucky", 1))
+
+
 # --- торговец ----------------------------------------------------------------
 
 ## Цена семени по тиру. У семян нет своего ресурса, поэтому цена живёт
@@ -326,6 +348,17 @@ static func seed_price(tier: int) -> int:
 		# Запасная лестница: каждый следующий тир заметно дороже предыдущего
 		return [15, 40, 100, 250][clampi(tier, 0, 3)]
 	return int(value)
+
+
+## Семена каких культур продаются в лавках. Базовые — те же, что в стартовом
+## наборе; дикие виды добываются только с кустов в лесу (GDD §7.3): продавать
+## их значило бы обесценить весь контур «лес → семена → ферма».
+static func base_seed_ids() -> Array:
+	ensure_loaded()
+	var farm := _section(_merchant, "farm_merchant")
+	var value: Variant = farm.get("base_seed_ids", [])
+	var ids: Array = value if typeof(value) == TYPE_ARRAY else []
+	return ids if not ids.is_empty() else ["drum_berry", "echo_pear"]
 
 
 # --- бабка -------------------------------------------------------------------

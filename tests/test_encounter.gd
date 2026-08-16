@@ -16,6 +16,8 @@ func run_tests() -> void:
 	_test_granny_never_asks_more_than_you_have()
 	_test_granny_with_empty_pockets_asks_nothing()
 	_test_granny_gives_something_back()
+	_test_granny_seed_is_one_tier_up()
+	_test_promised_chest_always_grants()
 	_test_refusing_granny_costs_nothing()
 
 
@@ -70,13 +72,15 @@ func _test_bush_is_never_empty() -> void:
 		var before_silver := RunManager.run_silver
 		var before_seeds := _total_seeds()
 		var before_gear := _total_gear()
+		var before_fruits := _total_fruits()
 
 		var text := RunManager.shake_bush(5)
 		check(not text.is_empty(), "куст сказал, что дал")
 
 		var got := RunManager.run_silver > before_silver \
 			or _total_seeds() > before_seeds \
-			or _total_gear() > before_gear
+			or _total_gear() > before_gear \
+			or _total_fruits() > before_fruits
 		check(got, "куст действительно что-то дал (%s)" % text)
 
 	RunManager.go_home()
@@ -131,6 +135,54 @@ func _test_granny_gives_something_back() -> void:
 	RunManager.go_home()
 
 
+## Подарочное семя не перепрыгивает огородный прогресс: не выше чем
+## на тир над лучшим известным. Раньше бабка дарила лучшее семя всего
+## реестра, и оптимальной игрой было прийти к ней с одной монетой.
+func _test_granny_seed_is_one_tier_up() -> void:
+	print("Семя бабушки — на тир выше известного")
+	_fresh_run()
+	FarmState.add_seed("drum_berry", 1)  # известен только тир 0
+
+	for i in 40:
+		RunManager.run_silver = 100
+		var before := RunManager.run_seed_bag.duplicate()
+		# Разрешённый потолок фиксируется ДО подарка: полученное семя само
+		# становится известным и поднимает планку для следующего
+		var allowed := _best_known_tier() + 1
+		RunManager.pay_granny(10)
+		for fruit_id: String in RunManager.run_seed_bag:
+			var gained: int = RunManager.run_seed_bag[fruit_id] \
+				- int(before.get(fruit_id, 0))
+			if gained <= 0:
+				continue
+			var fruit := Registry.fruit(fruit_id)
+			check(fruit != null and fruit.tier <= allowed,
+				"семя «%s» (тир %d) не выше разрешённого тира %d"
+					% [fruit_id, fruit.tier if fruit != null else -1, allowed])
+
+	RunManager.go_home()
+
+
+func _best_known_tier() -> int:
+	var best := -1
+	for fruit in Registry.all_fruits():
+		if FarmState.known_seeds.has(fruit.id) or RunManager.run_seed_bag.has(fruit.id):
+			best = maxi(best, fruit.tier)
+	return best
+
+
+## Сундук, уже обещанный своей таблицей (куст, свёрток бабки), не имеет
+## права на второй бросок «а выпадет ли»: с ним обещанные 2% превращались
+## в 0.2%, и игрок почти никогда не видел обещанного.
+func _test_promised_chest_always_grants() -> void:
+	print("Обещанный сундук не бывает пустым")
+	_fresh_run()
+	for i in 20:
+		check(not RunManager.grant_victory_gear(COMMON).is_empty(),
+			"grant выдаёт вещь без второго броска (№%d)" % i)
+	RunManager.go_home()
+
+
 ## Отказ — законный выбор, а не проступок: он ничего не отнимает.
 func _test_refusing_granny_costs_nothing() -> void:
 	print("Отказ ничем не наказывается")
@@ -153,6 +205,16 @@ func _test_refusing_granny_costs_nothing() -> void:
 	check(RunManager.run_silver >= 0, "серебро не уходит в минус")
 
 	RunManager.go_home()
+
+
+## Сколько плодов в добыче забега. Куст может дать и готовый плод
+## (fruit_single, 6%) — без этого счётчика удачная встряска выглядела бы
+## как «куст оказался пустым».
+func _total_fruits() -> int:
+	var total := 0
+	for count: int in RunManager.run_fruits.values():
+		total += count
+	return total
 
 
 ## Сколько ЕДИНИЦ снаряжения на руках.

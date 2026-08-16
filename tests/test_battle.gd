@@ -18,6 +18,7 @@ func run_tests() -> void:
 	_test_series_resets_after_attack()
 	_test_pause_breaks_series()
 	_test_gear_raises_attack_damage()
+	_test_fruit_buffs_raise_attack_damage()
 	_test_attack_quality_matters()
 	_test_genre_advantage()
 	_test_depth_scaling()
@@ -230,6 +231,39 @@ func _test_gear_raises_attack_damage() -> void:
 	GameState.reset()
 
 
+## Съеденный у костра фрукт — вложение: его баф обязан доехать до боя.
+## Проверяется НАБЛЮДАЕМЫЙ результат (урон атаки), а не поле run_buffs:
+## бафы уже копились и показывались в сумке, но бой их не читал вовсе.
+func _test_fruit_buffs_raise_attack_damage() -> void:
+	print("Бафы съеденных фруктов действуют в бою")
+	GameState.reset()
+	RunManager.run_buffs.clear()
+
+	var plain := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		plain.register_hit(Judge.Grade.PERFECT)
+	var plain_damage := plain.register_attack(Judge.Grade.PERFECT)
+
+	# Инжир (тир 2): удар +1.2 — ровно то, что обещает сумка
+	RunManager.add_buff({"power_bonus": 1.2})
+	var fed := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		fed.register_hit(Judge.Grade.PERFECT)
+	var fed_damage := fed.register_attack(Judge.Grade.PERFECT)
+
+	check(fed_damage > plain_damage,
+		"съеденный фрукт бьёт сильнее (%d против %d)" % [fed_damage, plain_damage])
+
+	# Окно: доля фрукта конвертируется в множитель снаряжения
+	RunManager.add_buff({"window_scale": 0.15})
+	var widened := _make()
+	check_close(widened.effective_window_scale(), 1.15,
+		"окно шире на долю из таблицы фруктов")
+
+	RunManager.run_buffs.clear()
+	GameState.reset()
+
+
 func _test_attack_quality_matters() -> void:
 	print("Точность атаки влияет на урон")
 	var damages := {}
@@ -273,8 +307,8 @@ func _test_depth_scaling() -> void:
 	var deep := _make("synth_slime", "disco_sprout", 100, 10)
 	check(deep.max_vibe > shallow.max_vibe, "на 10-й поляне монстр крепче")
 
-	# +12% за поляну: 100 * (1 + 0.12*10) = 220
-	var expected := int(round(shallow.max_vibe * (1.0 + BattleState.VIBE_DEPTH_SCALE * 10)))
+	# Доля за поляну живёт в progression.json → battle.vibe_depth_scale
+	var expected := int(round(shallow.max_vibe * (1.0 + Balance.vibe_depth_scale() * 10)))
 	check_eq(deep.max_vibe, expected, "масштаб ровно по формуле GDD")
 
 

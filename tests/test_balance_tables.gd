@@ -19,6 +19,7 @@ func run_tests() -> void:
 	_test_weights_sum_to_hundred()
 	_test_rarity_weights_shift_with_depth()
 	_test_victory_chest_odds()
+	_test_fallbacks_match_tables()
 
 
 ## Главная проверка файла: значения приходят ИЗ JSON.
@@ -145,3 +146,49 @@ func _test_victory_chest_odds() -> void:
 	var common := Balance.victory_chest_odds(MonsterData.Rarity.COMMON)
 	var legendary := Balance.victory_chest_odds(MonsterData.Rarity.LEGENDARY)
 	check(legendary[2] > common[2], "за легендарного чаще выпадает дорогая вещь")
+
+
+## Запасные константы обязаны совпадать с таблицами. Они включаются молча —
+## только при битом JSON — и разъехавшийся fallback подменяет баланс так,
+## что этого не видит никто. Ровно так жил FALLBACK_STRIKE_SCALE:
+## 1.0/1.4/2.0… в коде против 1.5/1.9/2.4… в таблице.
+func _test_fallbacks_match_tables() -> void:
+	var progression := _load_json("res://data/progression.json")
+	var multipliers: Dictionary = progression.get("grade_multipliers", {})
+	var stat: Dictionary = multipliers.get("stat_scale", {})
+	var strike: Dictionary = multipliers.get("strike_scale", {})
+	var friendship: Dictionary = progression.get("friendship", {})
+	var thresholds: Dictionary = friendship.get("thresholds", {})
+
+	for i in GRADES.size():
+		var key: String = GRADES[i]
+		check_close(float(stat.get(key, -1.0)), Balance.FALLBACK_STAT_SCALE[i],
+			"fallback крепости совпадает с таблицей (%s)" % key)
+		check_close(float(strike.get(key, -1.0)), Balance.FALLBACK_STRIKE_SCALE[i],
+			"fallback удара совпадает с таблицей (%s)" % key)
+		check_eq(int(thresholds.get(key, -1)), int(Balance.FALLBACK_THRESHOLDS[i]),
+			"fallback порога дружбы совпадает с таблицей (%s)" % key)
+
+	var levels: Dictionary = progression.get("instance_levels", {})
+	var curve: Array = levels.get("xp_to_next_level", [])
+	check_eq(curve.size(), Balance.FALLBACK_XP_CURVE.size(),
+		"длина запасной кривой опыта совпадает с таблицей")
+	for i in mini(curve.size(), Balance.FALLBACK_XP_CURVE.size()):
+		check_eq(int(curve[i]), int(Balance.FALLBACK_XP_CURVE[i]),
+			"fallback кривой опыта: ступень %d" % (i + 1))
+
+	var drops := _load_json("res://data/drop_tables.json")
+	var glades: Dictionary = drops.get("glade_types", {})
+	var glade_weights: Dictionary = glades.get("weights_percent", {})
+	for key: String in Balance.FALLBACK_GLADE_WEIGHTS:
+		check_close(float(glade_weights.get(key, -1.0)),
+			float(Balance.FALLBACK_GLADE_WEIGHTS[key]),
+			"fallback весов полян совпадает с таблицей (%s)" % key)
+
+
+func _load_json(path: String) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		check(false, "таблица не прочиталась: %s" % path)
+		return {}
+	return parsed
