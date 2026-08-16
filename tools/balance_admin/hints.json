@@ -1,0 +1,36 @@
+{
+  "_readme": [
+    "Подсказки схемы для админки: file.json:dot.path с * — какой виджет рисовать.",
+    "Новые конфиги работают и без подсказок (generic-виджеты по инференсу);",
+    "сюда добавляют то, что по данным не угадать."
+  ],
+  "widgets": [
+    {
+      "match": "drop_tables.json:monster_rarity_by_depth.examples_percent*",
+      "widget": "doc",
+      "kind": "doc",
+      "hint": "Документация: валидатор пересчитывает и предупреждает о дрейфе"
+    },
+    {
+      "match": "*.json:*banned_regions",
+      "widget": "string_list"
+    },
+    {
+      "match": "merchant.json:prices_silver.seeds_by_tier",
+      "widget": "tier_map",
+      "hint": "Цена семени по тиру фрукта"
+    },
+    {
+      "match": "drop_tables.json:victory_chest.odds_percent_by_monster_rarity.*",
+      "sum_to": 100.0
+    },
+    {
+      "match": "fruits.json:tiers",
+      "widget": "tier_sections"
+    },
+    {
+      "match": "drop_tables.json:soft_death.kept_full",
+      "widget": "string_list"
+    }
+  ]
+}

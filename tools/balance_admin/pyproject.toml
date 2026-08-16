@@ -1,0 +1,22 @@
+[project]
+name = "beatroot-balance-admin"
+version = "0.1.0"
+description = "Локальная HTTP-админка балансовых таблиц BEATROOT"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+balance-admin = "beatroot_balance_admin.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["beatroot_balance_admin"]

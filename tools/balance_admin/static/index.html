@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BEATROOT · баланс</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="layout">
+  <nav id="sidebar">
+    <h1>BEATROOT<span>баланс</span></h1>
+    <div class="nav-section" id="nav-configs"><h2>Таблицы</h2></div>
+    <div class="nav-section" id="nav-entities"><h2>Сущности</h2></div>
+    <div class="nav-section" id="nav-tools">
+      <h2>Инструменты</h2>
+      <button class="nav-item" data-view="backups">Бэкапы</button>
+    </div>
+  </nav>
+  <main id="main">
+    <div id="topbar">
+      <div id="crumbs">—</div>
+      <div id="actions">
+        <span id="dirty-dot" hidden>●</span>
+        <button id="save-btn" hidden>Сохранить</button>
+      </div>
+    </div>
+    <div id="problems" hidden></div>
+    <div id="content"><p class="muted">Выбери таблицу слева.</p></div>
+  </main>
+</div>
+
+<div id="modal" hidden>
+  <div id="modal-box">
+    <div id="modal-head">
+      <div id="modal-tabs"></div>
+      <input id="modal-search" placeholder="фильтр по имени…">
+      <button id="modal-close">✕</button>
+    </div>
+    <div id="modal-grid"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

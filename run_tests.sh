@@ -38,6 +38,16 @@ else
   printf "%-20s %s\n" "artgen" "пропущен: uv sync --extra test"
 fi
 
+# Тесты балансовой админки: формат записи, валидатор, бэкапы, .tres-патч.
+if (cd tools/balance_admin && uv run --extra test python -c "import pytest" >/dev/null 2>&1); then
+  line=$(cd tools/balance_admin && uv run --extra test pytest tests -q 2>&1 | tail -1)
+  printf "%-20s %s\n" "balance_admin" "$line"
+  total=$((total + $(echo "$line" | grep -oE "[0-9]+ passed" | grep -oE "^[0-9]+" || echo 0)))
+  failed=$((failed + $(echo "$line" | grep -oE "[0-9]+ failed" | grep -oE "^[0-9]+" || echo 0)))
+else
+  printf "%-20s %s\n" "balance_admin" "пропущен: uv sync --extra test"
+fi
+
 echo
 echo "ИТОГО: $total пройдено, $failed провалено"
 [ "$failed" -eq 0 ]
