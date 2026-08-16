@@ -9,7 +9,4 @@ display_name = "Ростик"
 genre = 1
 favorite_fruit_id = "drum_berry"
 motif_id = "luchik"
-base_vibe = 46
-base_health = 100
-base_power = 4.0
 sprite_path = "res://art/monster/disco_sprout_common.png"

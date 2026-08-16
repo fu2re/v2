@@ -1,0 +1,15 @@
+{
+  "_readme": [
+    "Базовые статы видов монстров (GDD §6). Читает Balance; Registry накатывает",
+    "их на ресурсы при загрузке. Идентичность вида — жанр, мотив, любимый фрукт,",
+    "спрайт — остаётся в data/monsters/*.tres.",
+    "base_power — урон по Настрою за идеальное попадание."
+  ],
+  "species": {
+    "banjo_moth":   { "base_vibe": 66, "base_health": 110, "base_power": 5.0 },
+    "bass_bear":    { "base_vibe": 56, "base_health": 120, "base_power": 4.5 },
+    "beat_serpent": { "base_vibe": 40, "base_health": 140, "base_power": 5.5 },
+    "disco_sprout": { "base_vibe": 46, "base_health": 100, "base_power": 4.0 },
+    "synth_slime":  { "base_vibe": 52, "base_health": 100, "base_power": 4.0 }
+  }
+}

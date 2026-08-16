@@ -16,26 +16,40 @@ const PROGRESSION_PATH := "res://data/progression.json"
 const DROP_TABLES_PATH := "res://data/drop_tables.json"
 const MERCHANT_PATH := "res://data/merchant.json"
 const FRUITS_PATH := "res://data/fruits.json"
+const BATTLE_PATH := "res://data/battle.json"
+const MONSTERS_PATH := "res://data/monsters.json"
+const GEAR_PATH := "res://data/gear.json"
+const COSMETICS_PATH := "res://data/cosmetics.json"
 
 ## Порядок грейдов. Совпадает с MonsterData.Rarity и с ключами в JSON —
 ## имя грейда служит ключом во всех таблицах.
 const GRADE_KEYS := ["common", "uncommon", "rare", "unique", "epic", "legendary"]
 
-## Запасные значения на случай испорченного или отсутствующего файла.
-##
-## Игра не имеет права упасть из-за данных: битый JSON — это плохая картинка
-## баланса, а не конец сессии. Тот же принцип, что в ChartLoader.
-const FALLBACK_STAT_SCALE := [1.0, 1.15, 1.3, 1.5, 1.7, 2.0]
-const FALLBACK_STRIKE_SCALE := [1.5, 1.9, 2.4, 3.1, 4.0, 5.0]
-const FALLBACK_THRESHOLDS := [100, 150, 200, 250, 300, 400]
-const FALLBACK_XP_CURVE := [0, 100, 220, 370, 550, 770, 1030, 1340, 1700, 2120]
-const FALLBACK_GLADE_WEIGHTS := {"battle": 65.0, "wild_bush": 12.0, "campfire": 8.0, "encounter": 15.0}
+## Запасных КОПИЙ таблиц здесь больше нет — только нейтральные заглушки
+## в геттерах. Копии требовали теста паритета «fallback == JSON», а он
+## краснел бы от каждой легитимной правки баланса в редакторе. Игра
+## по-прежнему не падает из-за данных: битый JSON — это плохая картинка
+## баланса (и push_error в логе), а не конец сессии. Полноту таблиц
+## сторожит tests/test_balance_tables.gd (_test_tables_complete).
 
 static var _progression: Dictionary = {}
 static var _drops: Dictionary = {}
 static var _merchant: Dictionary = {}
 static var _fruits: Dictionary = {}
+static var _battle: Dictionary = {}
+static var _monsters: Dictionary = {}
+static var _gear: Dictionary = {}
+static var _cosmetics: Dictionary = {}
 static var _loaded := false
+
+## Кеш горячего пути. Judge.grade() дёргается на каждый тап, а подача нот —
+## каждый кадр: ходить по словарям там нельзя, поэтому скаляры оценки
+## разбираются один раз при загрузке в типизированные поля.
+static var _judge_perfect: float = 0.05
+static var _judge_good: float = 0.11
+static var _judge_late: float = 0.18
+static var _judge_effects: Dictionary = {}
+static var _combo_steps: Array = []
 
 
 static func ensure_loaded() -> void:
@@ -45,7 +59,22 @@ static func ensure_loaded() -> void:
 	_drops = _read(DROP_TABLES_PATH)
 	_merchant = _read(MERCHANT_PATH)
 	_fruits = _read(FRUITS_PATH)
+	_battle = _read(BATTLE_PATH)
+	_monsters = _read(MONSTERS_PATH)
+	_gear = _read(GEAR_PATH)
+	_cosmetics = _read(COSMETICS_PATH)
+	_cache_battle_scalars()
 	_loaded = true
+
+
+static func _cache_battle_scalars() -> void:
+	var judge := _section(_battle, "judge")
+	_judge_perfect = float(judge.get("perfect_window", 0.05))
+	_judge_good = float(judge.get("good_window", 0.11))
+	_judge_late = float(judge.get("late_window", 0.18))
+	_judge_effects = _section(judge, "effects")
+	var steps: Variant = judge.get("combo_steps", [])
+	_combo_steps = steps if typeof(steps) == TYPE_ARRAY else []
 
 
 ## Перечитать таблицы. Нужно редактору и тестам, правящим JSON на ходу.
@@ -90,7 +119,8 @@ static func grade_stat_scale(grade: int) -> float:
 	var scales := _section(multipliers, "stat_scale")
 	var value: Variant = scales.get(grade_key(grade), null)
 	if value == null:
-		return FALLBACK_STAT_SCALE[clampi(grade, 0, FALLBACK_STAT_SCALE.size() - 1)]
+		push_error("Нет множителя статов для грейда %s" % grade_key(grade))
+		return 1.0
 	return float(value)
 
 
@@ -106,7 +136,8 @@ static func grade_strike_scale(grade: int) -> float:
 	var scales := _section(multipliers, "strike_scale")
 	var value: Variant = scales.get(grade_key(grade), null)
 	if value == null:
-		return FALLBACK_STRIKE_SCALE[clampi(grade, 0, FALLBACK_STRIKE_SCALE.size() - 1)]
+		push_error("Нет множителя удара для грейда %s" % grade_key(grade))
+		return 1.0
 	return float(value)
 
 
@@ -128,15 +159,9 @@ static func friendship_threshold(grade: int) -> int:
 	var thresholds := _section(friendship, "thresholds")
 	var value: Variant = thresholds.get(grade_key(grade), null)
 	if value == null:
-		return FALLBACK_THRESHOLDS[clampi(grade, 0, FALLBACK_THRESHOLDS.size() - 1)]
+		push_error("Нет порога дружбы для грейда %s" % grade_key(grade))
+		return 100
 	return int(value)
-
-
-## Запасные прибавки дружбы — копия progression.json → friendship.gains.
-## Сверяются тестом с таблицей, как и остальные fallback'и.
-const FALLBACK_FRIENDSHIP_GAINS := {
-	"victory": 10, "victory_s_rank": 15, "favorite_fruit": 35, "other_fruit": 10,
-}
 
 
 ## Прибавка дружбы за событие: победа, S-ранг, угощение (GDD §6.1).
@@ -146,7 +171,7 @@ static func friendship_gain(key: String) -> int:
 	ensure_loaded()
 	var friendship := _section(_progression, "friendship")
 	var gains := _section(friendship, "gains")
-	return int(gains.get(key, FALLBACK_FRIENDSHIP_GAINS.get(key, 0)))
+	return int(gains.get(key, 0))
 
 
 # --- уровни экземпляра -------------------------------------------------------
@@ -171,7 +196,8 @@ static func xp_for_level(level: int) -> int:
 	var curve: Variant = levels.get("xp_to_next_level", [])
 	var table: Array = curve if typeof(curve) == TYPE_ARRAY else []
 	if table.is_empty():
-		table = FALLBACK_XP_CURVE
+		# Заглушка на случай битой таблицы: линейная лестница вместо кривой
+		return clampi(level - 1, 0, max_level() - 1) * 100
 	var index := clampi(level - 1, 0, table.size() - 1)
 	return int(table[index])
 
@@ -237,7 +263,12 @@ static func glade_weights() -> Dictionary:
 	ensure_loaded()
 	var types := _section(_drops, "glade_types")
 	var weights := _section(types, "weights_percent")
-	return weights if not weights.is_empty() else FALLBACK_GLADE_WEIGHTS
+	if weights.is_empty():
+		# Заглушка на случай битой таблицы: лента из одних боёв — заметно
+		# сломанная, но играбельная
+		push_error("Веса полян не прочитались — лента только из боёв")
+		return {"battle": 100.0}
+	return weights
 
 
 static func encounter_weights() -> Dictionary:
@@ -295,7 +326,7 @@ static func rarity_weights(depth: int) -> PackedFloat32Array:
 			out.append(0.0)
 			continue
 
-		var start := float(base.get(key, FALLBACK_STAT_SCALE[i]))
+		var start := float(base.get(key, 0.0))
 		var step := float(per_shift.get(key, 0.0))
 		var weight := start + step * shift
 		if key == "common":
@@ -367,6 +398,28 @@ static func seed_price(tier: int) -> int:
 	return int(value)
 
 
+## Период ротации витрины усадьбы. В таблице — минуты (их читает человек),
+## коду нужны секунды.
+static func merchant_rotation_seconds() -> int:
+	ensure_loaded()
+	var farm := _section(_merchant, "farm_merchant")
+	return int(farm.get("rotation_minutes", 10)) * 60
+
+
+## Сколько вещей в ротации витрины усадьбы сверх постоянных семян.
+static func farm_gear_slots() -> int:
+	ensure_loaded()
+	var farm := _section(_merchant, "farm_merchant")
+	return int(farm.get("rotating_gear_slots", 2))
+
+
+## Сколько товаров у лесного торговца.
+static func forest_merchant_slots() -> int:
+	ensure_loaded()
+	var forest := _section(_merchant, "forest_merchant")
+	return int(forest.get("stock_size", 3))
+
+
 ## Семена каких культур продаются в лавках. Базовые — те же, что в стартовом
 ## наборе; дикие виды добываются только с кустов в лесу (GDD §7.3): продавать
 ## их значило бы обесценить весь контур «лес → семена → ферма».
@@ -376,6 +429,33 @@ static func base_seed_ids() -> Array:
 	var value: Variant = farm.get("base_seed_ids", [])
 	var ids: Array = value if typeof(value) == TYPE_ARRAY else []
 	return ids if not ids.is_empty() else ["drum_berry", "echo_pear"]
+
+
+# --- серебро забега ----------------------------------------------------------
+
+## База серебра за поляну. Формула одна на все награды забега:
+## base * (1 + depth_scale * depth), округление на стороне вызова.
+static func base_silver() -> int:
+	ensure_loaded()
+	return int(_section(_drops, "run_rewards").get("base_silver_per_glade", 8))
+
+
+static func reward_depth_scale() -> float:
+	ensure_loaded()
+	return float(_section(_drops, "run_rewards").get("depth_scale", 0.15))
+
+
+## База горсти серебра из куста с лутом — меньше поляны: встреча-бонус
+## не должна обгонять честный бой.
+static func loot_bush_silver_base() -> float:
+	ensure_loaded()
+	return float(_section(_drops, "run_rewards").get("loot_bush_silver_base", 5))
+
+
+## Утешительные монетки от бабки, когда подарочный пул пуст.
+static func granny_fallback_silver() -> int:
+	ensure_loaded()
+	return int(_section(_drops, "run_rewards").get("granny_fallback_silver", 12))
 
 
 # --- бабка -------------------------------------------------------------------
@@ -505,3 +585,162 @@ static func fruit_buff_cap(key: String) -> float:
 	var buffs := _section(_fruits, "buffs")
 	var caps := _section(buffs, "max_total")
 	return float(caps.get(key, 0.0))
+
+
+# --- статы сущностей (monsters.json / gear.json / cosmetics.json) ------------
+# Числа видов и предметов. Registry накатывает их на загруженные ресурсы;
+# пустая строка означает «вида нет в таблице» — это ошибка данных,
+# и Registry оставит дефолты класса, а валидатор тестов её поймает.
+
+static func monster_stats(id: String) -> Dictionary:
+	ensure_loaded()
+	return _section(_section(_monsters, "species"), id)
+
+
+static func gear_stats(id: String) -> Dictionary:
+	ensure_loaded()
+	return _section(_section(_gear, "items"), id)
+
+
+static func cosmetic_stats(id: String) -> Dictionary:
+	ensure_loaded()
+	return _section(_section(_cosmetics, "items"), id)
+
+
+# --- бой: удары и щит (battle.json) ------------------------------------------
+# Дизайн-обоснования чисел — прозой в самой таблице, рядом со значениями.
+
+static func _battle_section(key: String) -> Dictionary:
+	ensure_loaded()
+	return _section(_battle, key)
+
+
+static func strike_damage() -> int:
+	return int(_battle_section("strikes").get("strike_damage", 15))
+
+
+static func crit_multiplier() -> int:
+	return int(_battle_section("strikes").get("crit_multiplier", 4))
+
+
+## Тяжёлый удар — производная, а не отдельное число: особая нота ВСЕГДА
+## вчетверо (crit_multiplier) больнее обычной, и разъехаться им нельзя.
+static func heavy_strike_damage() -> int:
+	return strike_damage() * crit_multiplier()
+
+
+static func miss_damage() -> int:
+	return int(_battle_section("strikes").get("miss_damage", 3))
+
+
+static func skill_miss_damage() -> int:
+	return int(_battle_section("strikes").get("skill_miss_damage", 6))
+
+
+static func stray_free_taps() -> int:
+	return int(_battle_section("strikes").get("stray_free_taps", 3))
+
+
+static func stray_tap_damage() -> int:
+	return int(_battle_section("strikes").get("stray_tap_damage", 2))
+
+
+static func max_blow_share() -> float:
+	return float(_battle_section("strikes").get("max_blow_share", 0.9))
+
+
+static func attack_multiplier() -> float:
+	return float(_battle_section("attack").get("attack_multiplier", 2.2))
+
+
+static func min_series_length() -> int:
+	return int(_battle_section("attack").get("min_series_length", 3))
+
+
+static func base_shield() -> int:
+	return int(_battle_section("shield").get("base_shield", 40))
+
+
+static func shield_restore() -> int:
+	return int(_battle_section("shield").get("shield_restore", 2))
+
+
+# --- бой: спецдвижения -------------------------------------------------------
+
+static func skill_attack_bonus() -> float:
+	return float(_battle_section("skills").get("attack_bonus", 1.5))
+
+
+static func skill_shield_gain() -> int:
+	return int(_battle_section("skills").get("shield_gain", 6))
+
+
+static func skill_health_gain() -> int:
+	return int(_battle_section("skills").get("health_gain", 5))
+
+
+static func skill_combo_gain() -> int:
+	return int(_battle_section("skills").get("combo_gain", 5))
+
+
+static func skill_window_boost() -> float:
+	return float(_battle_section("skills").get("window_boost", 1.25))
+
+
+static func skill_window_bars() -> float:
+	return float(_battle_section("skills").get("window_bars", 4.0))
+
+
+# --- бой: оценка тайминга ----------------------------------------------------
+# Горячий путь: значения отдаются из кеша, заполненного при загрузке.
+
+static func judge_perfect_window() -> float:
+	ensure_loaded()
+	return _judge_perfect
+
+
+static func judge_good_window() -> float:
+	ensure_loaded()
+	return _judge_good
+
+
+static func judge_late_window() -> float:
+	ensure_loaded()
+	return _judge_late
+
+
+static func judge_effect(key: String) -> float:
+	ensure_loaded()
+	return float(_judge_effects.get(key, 0.0))
+
+
+## Множитель комбо: шаги таблицы проверяются от старших к младшим,
+## ниже первого порога — 1.0.
+static func combo_multiplier(combo: int) -> float:
+	ensure_loaded()
+	var best := 1.0
+	var best_combo := -1
+	for entry: Variant in _combo_steps:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var threshold := int(entry.get("combo", 0))
+		if combo >= threshold and threshold > best_combo:
+			best_combo = threshold
+			best = float(entry.get("multiplier", 1.0))
+	return best
+
+
+# --- бой: жанровое кольцо ----------------------------------------------------
+
+static func genre_advantage() -> float:
+	return float(_battle_section("genre").get("advantage_multiplier", 1.4))
+
+
+static func genre_disadvantage() -> float:
+	return float(_battle_section("genre").get("disadvantage_multiplier", 0.7))
+
+
+## Кольцо преимуществ жанров: ключ бьёт значение. Ключи строковые
+## (rock/disco/folk/electro), отсутствие жанра означает нейтральность.
+static func genre_beats() -> Dictionary:
+	return _section(_battle_section("genre"), "beats")

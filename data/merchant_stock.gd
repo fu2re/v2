@@ -13,26 +13,24 @@ extends RefCounted
 ##   не исчезает навсегда, и опоздать невозможно — меняются только
 ##   те несколько строк, ради которых интересно заглянуть ещё раз.
 
-const ROTATION_SECONDS := 600
+## Период ротации и размеры прилавков — в data/merchant.json (читает Balance).
+## Дубли-константы здесь уже разъезжались с таблицей — источник ровно один.
 
-## Сколько чего лежит на витрине усадьбы сверх постоянных семян.
-const FARM_GEAR_SLOTS := 2
-
-## Сколько товаров у лесного торговца.
-const FOREST_SLOTS := 3
+static func rotation_seconds() -> int:
+	return Balance.merchant_rotation_seconds()
 
 
 ## Номер текущей витрины. Он же зерно: перезаход в игру витрину
 ## не перебрасывает, потому что считается от часов, а не от рандома.
 static func rotation_index(now_seconds: int = -1) -> int:
 	var stamp := now_seconds if now_seconds >= 0 else int(Time.get_unix_time_from_system())
-	return stamp / ROTATION_SECONDS
+	return stamp / rotation_seconds()
 
 
 ## Сколько секунд до следующей витрины — для подписи «обновится через…».
 static func seconds_until_rotation(now_seconds: int = -1) -> int:
 	var stamp := now_seconds if now_seconds >= 0 else int(Time.get_unix_time_from_system())
-	return ROTATION_SECONDS - (stamp % ROTATION_SECONDS)
+	return rotation_seconds() - (stamp % rotation_seconds())
 
 
 ## Витрина усадьбы: базовые семена всегда плюс несколько вещей по ротации.
@@ -49,7 +47,7 @@ static func farm_stock(rotation: int = -1) -> Array:
 	# весь контур «лес → семя → ферма» можно было пройти не выходя со двора
 	out.append_array(_base_seeds())
 
-	out.append_array(_rotate(_affordable_gear(), index + 7, FARM_GEAR_SLOTS))
+	out.append_array(_rotate(_affordable_gear(), index + 7, Balance.farm_gear_slots()))
 	return out
 
 
@@ -68,7 +66,7 @@ static func forest_stock(depth: int) -> Array:
 	pool.sort_custom(func(a, b): return price_of(a) < price_of(b))
 
 	var out: Array = []
-	for i in FOREST_SLOTS:
+	for i in Balance.forest_merchant_slots():
 		out.append(pool[(depth * 7 + i * 3) % pool.size()])
 	return out
 

@@ -9,7 +9,4 @@ display_name = "Пыльца"
 genre = 2
 favorite_fruit_id = "loop_fig"
 motif_id = "pyltsa"
-base_vibe = 66
-base_health = 110
-base_power = 5.0
 sprite_path = "res://art/monster/banjo_moth_common.png"

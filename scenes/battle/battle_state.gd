@@ -14,98 +14,80 @@ signal combo_changed(combo: int, multiplier: float)
 signal victory()
 signal defeat()
 
-## Урон за пропущенный щит — атака монстра дошла до цели.
-## Урон монстра за пропущенную атаку.
-##
-## Поднят с 10: на низких грейдах монстры почти не кусались, и бой
-## с обычным превращался в формальность — попадать в такт было незачем.
-const STRIKE_DAMAGE := 15
-## Крит монстра — бывшая нота-зелье. ВЧЕТВЕРО больнее обычного удара.
-##
-## Особая нота обязана чувствоваться особой, а не отличаться силуэтом.
-## Вчетверо — это уже событие: пропустил крит, и щит снесло целиком,
-## а цифра на экране красная и вдвое крупнее обычной.
-const CRIT_MULTIPLIER := 4
-const HEAVY_STRIKE_DAMAGE := STRIKE_DAMAGE * CRIT_MULTIPLIER
-## Урон за обычный промах. Мал намеренно: щит гасит его несколько раз подряд,
-## и ребёнок успевает поймать ритм прежде, чем это станет больно.
-const MISS_DAMAGE := 3
+## Все числа боя — в data/battle.json (читает Balance), там же прозой
+## дизайн-обоснования каждого. Здесь только короткие делегаты: `const`
+## не может звать функции, а вызывающим удобнее короткое имя класса боя.
 
-## Промах по скиллу дороже обычного (GDD §4.2.4).
-##
-## Особая нота требует особого внимания: если бы она стоила столько же,
-## сколько бит, левая кнопка ничем не отличалась бы от правой.
-const SKILL_MISS_DAMAGE := 6
+static func strike_damage() -> int:
+	return Balance.strike_damage()
 
-## Эффекты спецдвижений по стихии гуардиана (GDD §4.2.4).
-## Маленькие и мгновенные: скилл — приправа к бою, а не вторая система.
-const SKILL_ATTACK_BONUS := 1.5
-const SKILL_SHIELD_GAIN := 6
-const SKILL_HEALTH_GAIN := 5
-const SKILL_COMBO_GAIN := 5
-const SKILL_WINDOW_BOOST := 1.25
-const SKILL_WINDOW_BARS := 4.0
-## Сколько щита возвращает попадание по ноте-щиту.
-##
-## Совсем немного намеренно. Щит — расходуемый буфер на весь забег, а не
-## возобновляемый ресурс: когда попадание возвращало восемь, забег переставал
-## быть испытанием на выносливость — буфер чинился быстрее, чем тратился.
-const SHIELD_RESTORE := 2
 
-## Какую долю здоровья способен снять ОДИН удар после щита.
-##
-## Множители перемножаются: крит вчетверо больнее обычного удара, а грейд
-## добавляет своё сверху — на вершине это давало удар, убивающий полностью
-## прокачанного гуардиана с одного пропуска. Игра для детей 7+ не имеет права
-## заканчивать забег до того, как игрок понял, что произошло: пропустил крит —
-## осталась полоска, а не экран поражения. Второй пропуск уже убивает.
-##
-## Доля намеренно велика. Порог обязан быть милостью на самом верху, а не
-## тихой правкой баланса: на 0.6 он обрезал крит и на ОБЫЧНОМ монстре, где
-## тот и так не убивал, — вчетверо больнее превращалось в 2.6 раза, и особая
-## нота теряла смысл ровно там, где ребёнок встречает её впервые.
-const MAX_BLOW_SHARE := 0.9
+static func crit_multiplier() -> int:
+	return Balance.crit_multiplier()
 
-## Сколько лишних тапов подряд прощается, прежде чем они начнут стоить.
-##
-## Ноль был бы наказанием за любопытство: ребёнок, впервые увидевший экран,
-## тыкает в него, и платить за это он не должен. Но и бесплатным спам быть
-## не может — см. STRAY_TAP_DAMAGE.
-const STRAY_FREE_TAPS := 3
 
-## Цена каждого лишнего тапа СВЕРХ прощённых.
-##
-## Живой отчёт: «могу просто всегда жать вправо и не получать урона».
-## Так и было: рваная серия отнимала у игрока его собственный урон, но
-## здоровье не трогала, поэтому долбить правую кнопку двадцать раз в секунду
-## было строго выгодно — каждый бит попадал в своё окно сам собой, а девятнадцать
-## промахов между ними не стоили ничего. Ритм-игра при этом отменялась: «когда»
-## переставало иметь значение.
-##
-## Цена мала намеренно. Она не должна убивать — она должна сделать спам
-## ХУЖЕ игры по такту, а этого достаточно: непрерывная долбёжка съедает щит
-## за несколько секунд, и дальше каждый лишний тап идёт в здоровье.
-const STRAY_TAP_DAMAGE := 2
+static func heavy_strike_damage() -> int:
+	return Balance.heavy_strike_damage()
 
-## Базовый запас щита.
-##
-## Щит СКВОЗНОЙ, как и здоровье: забег — это испытание на выносливость,
-## и буфер не обновляется на каждой поляне. Разница между ними в том,
-## что щит чинится в бою нотами-щитами, а здоровье — только у костра.
-const BASE_SHIELD := 40
 
-## Сколько нот подряд обязана содержать серия, чтобы атака в её конце
-## считалась заслуженной. Ниже — атака проходит, но слабее не бывает:
-## короткие связки не должны давать тот же результат, что длинные.
-const MIN_SERIES_LENGTH := 3
+static func miss_damage() -> int:
+	return Balance.miss_damage()
 
-## Множитель атаки.
-##
-## Подобран так, чтобы чистое прохождение всего трека выбивало монстра
-## примерно к его концу, а не на середине. Слишком крупный множитель
-## обрывал бой раньше мелодии — это чинится здесь, а не в чарте.
-## Охраняется тестом на длину боя.
-const ATTACK_MULTIPLIER := 2.2
+
+static func skill_miss_damage() -> int:
+	return Balance.skill_miss_damage()
+
+
+static func skill_attack_bonus() -> float:
+	return Balance.skill_attack_bonus()
+
+
+static func skill_shield_gain() -> int:
+	return Balance.skill_shield_gain()
+
+
+static func skill_health_gain() -> int:
+	return Balance.skill_health_gain()
+
+
+static func skill_combo_gain() -> int:
+	return Balance.skill_combo_gain()
+
+
+static func skill_window_boost() -> float:
+	return Balance.skill_window_boost()
+
+
+static func skill_window_bars() -> float:
+	return Balance.skill_window_bars()
+
+
+static func shield_restore() -> int:
+	return Balance.shield_restore()
+
+
+static func max_blow_share() -> float:
+	return Balance.max_blow_share()
+
+
+static func stray_free_taps() -> int:
+	return Balance.stray_free_taps()
+
+
+static func stray_tap_damage() -> int:
+	return Balance.stray_tap_damage()
+
+
+static func base_shield() -> int:
+	return Balance.base_shield()
+
+
+static func min_series_length() -> int:
+	return Balance.min_series_length()
+
+
+static func attack_multiplier() -> float:
+	return Balance.attack_multiplier()
 
 ## Кто танцует. Оба — ЭКЗЕМПЛЯРЫ: грейд и уровень принадлежат существу,
 ## а не виду, и статы боя считаются от них (GDD §6.3, §6.5).
@@ -117,8 +99,8 @@ var max_vibe: int = 100
 var vibe: int = 100
 var max_health: int = 100
 var health: int = 100
-var max_shield: int = BASE_SHIELD
-var shield: int = BASE_SHIELD
+var max_shield: int = Balance.base_shield()
+var shield: int = Balance.base_shield()
 
 ## Суммарный эффект надетого на гуардиана. Считается один раз на бой
 ## и дальше не пересчитывается — снаряжение внутри боя не меняется.
@@ -132,7 +114,7 @@ var experience_scale: float = 1.0
 
 var combo: int = 0
 var max_combo: int = 0
-## Сколько лишних тапов подряд без единой взятой ноты (см. STRAY_TAP_DAMAGE).
+## Сколько лишних тапов подряд без единой взятой ноты (см. stray_tap_damage).
 var stray_run: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
@@ -203,7 +185,7 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 
 	# Щит переносится с прошлой поляны. -1 означает «начать с полного»
 	# и нужен только для отдельных боёв вне забега: обучение, тесты
-	max_shield = BASE_SHIELD
+	max_shield = Balance.base_shield()
 	shield = max_shield if starting_shield < 0 else clampi(starting_shield, 0, max_shield)
 
 	combo = 0
@@ -252,7 +234,7 @@ func register_hit(grade: int) -> int:
 		# Возвращаем урон СО ЗНАКОМ МИНУС: вызывающему надо отличить
 		# «попал и снял столько-то с монстра» от «промазал и получил сам»,
 		# а иначе цифра над героем и цифра над монстром неразличимы
-		return -_take_damage(MISS_DAMAGE)
+		return -_take_damage(Balance.miss_damage())
 
 	combo += 1
 	max_combo = maxi(max_combo, combo)
@@ -279,7 +261,7 @@ func register_attack(grade: int) -> int:
 		combo = 0
 		combo_changed.emit(combo, 1.0)
 		series_clean = false
-		_take_damage(MISS_DAMAGE)
+		_take_damage(Balance.miss_damage())
 		_reset_series()
 		return 0
 
@@ -287,7 +269,7 @@ func register_attack(grade: int) -> int:
 	max_combo = maxi(max_combo, combo)
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
 
-	if not series_clean or series_length < MIN_SERIES_LENGTH:
+	if not series_clean or series_length < Balance.min_series_length():
 		attacks_wasted += 1
 		_reset_series()
 		return 0
@@ -297,7 +279,7 @@ func register_attack(grade: int) -> int:
 	# Сила удара экземпляра уже включает грейд и уровень
 	var power := (guardian.power() if guardian != null else 4.0) + power_bonus
 	var amount := int(round(
-		power * ATTACK_MULTIPLIER * Judge.effect(grade)
+		power * Balance.attack_multiplier() * Judge.effect(grade)
 			* Judge.combo_multiplier(combo) * genre_multiplier() * experience_scale
 			* next_attack_bonus
 	))
@@ -332,9 +314,9 @@ func register_stray_tap() -> int:
 	# «потыкал в экран» и «долблю кнопку» именно в этом: первое обрывается
 	# попаданием, второе — нет
 	stray_run += 1
-	if stray_run <= STRAY_FREE_TAPS:
+	if stray_run <= Balance.stray_free_taps():
 		return 0
-	return -_take_damage(STRAY_TAP_DAMAGE)
+	return -_take_damage(Balance.stray_tap_damage())
 
 
 ## Пауза в музыке обрывает серию.
@@ -372,7 +354,7 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 		combo = 0
 		combo_changed.emit(combo, 1.0)
 		series_clean = false
-		return -_take_damage(SKILL_MISS_DAMAGE)
+		return -_take_damage(Balance.skill_miss_damage())
 
 	combo += 1
 	max_combo = maxi(max_combo, combo)
@@ -385,20 +367,20 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 	match guardian.genre():
 		MonsterData.Genre.ROCK:
 			# Камень: топот — следующая удавшаяся атака бьёт сильнее
-			next_attack_bonus = SKILL_ATTACK_BONUS
+			next_attack_bonus = Balance.skill_attack_bonus()
 		MonsterData.Genre.DISCO:
 			# Солнце: вспышка чинит буфер прощения
-			restore_shield(SKILL_SHIELD_GAIN)
+			restore_shield(Balance.skill_shield_gain())
 		MonsterData.Genre.FOLK:
 			# Листва: дыхание леса возвращает немного сил
-			restore_health(SKILL_HEALTH_GAIN)
+			restore_health(Balance.skill_health_gain())
 		MonsterData.Genre.ELECTRO:
 			# Искра: разряд подбрасывает комбо
-			combo += SKILL_COMBO_GAIN
+			combo += Balance.skill_combo_gain()
 			max_combo = maxi(max_combo, combo)
 		MonsterData.Genre.LATIN:
 			# Ветер: порыв ненадолго расширяет окна попадания
-			window_boost_until_beat = current_beat + float(beats_per_bar) * SKILL_WINDOW_BARS
+			window_boost_until_beat = current_beat + float(beats_per_bar) * Balance.skill_window_bars()
 
 	combo_changed.emit(combo, Judge.combo_multiplier(combo))
 	# Удачный скилл урона по герою не наносит — цифре взяться неоткуда
@@ -408,7 +390,7 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 ## Ширина окон с учётом снаряжения и действующего порыва Ветра.
 func effective_window_scale(current_beat: float = 0.0) -> float:
 	if current_beat <= window_boost_until_beat:
-		return window_scale * SKILL_WINDOW_BOOST
+		return window_scale * Balance.skill_window_boost()
 	return window_scale
 
 
@@ -431,7 +413,7 @@ func block_strike() -> void:
 	# Принятый щит продолжает серию: это тоже точное движение в такт,
 	# и разрывать связку из-за него было бы несправедливо
 	series_length += 1
-	restore_shield(SHIELD_RESTORE)
+	restore_shield(Balance.shield_restore())
 
 
 ## Щит пропущен — атака монстра дошла до цели.
@@ -449,7 +431,7 @@ func take_strike(heavy: bool = false) -> int:
 	grade_counts[Judge.Grade.MISS] += 1
 	combo = 0
 	combo_changed.emit(combo, 1.0)
-	return _take_damage(HEAVY_STRIKE_DAMAGE if heavy else STRIKE_DAMAGE)
+	return _take_damage(Balance.heavy_strike_damage() if heavy else Balance.strike_damage())
 
 
 ## Урон идёт СНАЧАЛА в щит и только потом в здоровье.
@@ -476,9 +458,9 @@ func _take_damage(amount: int) -> int:
 		return total
 
 	# Ни один удар не отнимает больше доли запаса — с полного здоровья
-	# забег не может кончиться одним пропуском (см. MAX_BLOW_SHARE).
+	# забег не может кончиться одним пропуском (см. max_blow_share).
 	# На низких грейдах порог не достаётся вовсе: там крит и так меньше
-	var cap := maxi(int(round(max_health * MAX_BLOW_SHARE)), 1)
+	var cap := maxi(int(round(max_health * Balance.max_blow_share())), 1)
 	if damage > cap:
 		total -= damage - cap
 		damage = cap

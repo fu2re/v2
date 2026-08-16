@@ -149,7 +149,7 @@ func _test_rotation_is_time_based() -> void:
 	check_eq(MerchantStock.rotation_index(stamp), MerchantStock.rotation_index(stamp),
 		"один и тот же момент даёт ту же витрину")
 
-	var next := stamp + MerchantStock.ROTATION_SECONDS
+	var next := stamp + MerchantStock.rotation_seconds()
 	check(MerchantStock.rotation_index(next) > MerchantStock.rotation_index(stamp),
 		"через десять минут витрина другая")
 
@@ -163,7 +163,7 @@ func _test_rotation_is_time_based() -> void:
 	check(differs, "состав витрины обновился")
 
 	var left := MerchantStock.seconds_until_rotation(stamp)
-	check(left > 0 and left <= MerchantStock.ROTATION_SECONDS,
+	check(left > 0 and left <= MerchantStock.rotation_seconds(),
 		"до смены витрины осталось разумное время (%d с)" % left)
 
 
@@ -202,7 +202,7 @@ func _test_forest_stock_is_stable() -> void:
 	print("Лесной торговец не меняет товар")
 	var first := MerchantStock.forest_stock(7)
 	var again := MerchantStock.forest_stock(7)
-	check_eq(first.size(), MerchantStock.FOREST_SLOTS, "три товара")
+	check_eq(first.size(), Balance.forest_merchant_slots(), "три товара")
 
 	var same := true
 	for i in first.size():

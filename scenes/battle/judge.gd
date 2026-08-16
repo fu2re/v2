@@ -4,22 +4,18 @@ extends RefCounted
 ## Оценка тайминга. Чистая логика без узлов и состояния сцены —
 ## именно поэтому её можно прогнать headless и не гадать, честен ли бой.
 ##
-## Окна из GDD §4.3. Знак дельты: положительная — игрок опоздал.
+## Окна и множители — в data/battle.json (judge), читаются через Balance:
+## это баланс, и он правится без программиста. Знак дельты:
+## положительная — игрок опоздал.
 
 enum Grade { PERFECT, GOOD, EARLY_LATE, MISS }
 
-const PERFECT_WINDOW := 0.050
-const GOOD_WINDOW := 0.110
-const LATE_WINDOW := 0.180
-
-## Множитель эффекта по оценке. Нулевой эффект промаха значит «атака
-## не сработала»; свою цену промах платит отдельно (MISS_DAMAGE
-## в BattleState) — здесь только сила попадания.
-const EFFECT := {
-	Grade.PERFECT: 1.0,
-	Grade.GOOD: 0.6,
-	Grade.EARLY_LATE: 0.3,
-	Grade.MISS: 0.0,
+## Ключи оценок в таблице battle.json → judge.effects.
+const GRADE_KEYS := {
+	Grade.PERFECT: "perfect",
+	Grade.GOOD: "good",
+	Grade.EARLY_LATE: "early_late",
+	Grade.MISS: "miss",
 }
 
 const GRADE_NAMES := {
@@ -30,21 +26,33 @@ const GRADE_NAMES := {
 }
 
 
+static func perfect_window() -> float:
+	return Balance.judge_perfect_window()
+
+
+static func good_window() -> float:
+	return Balance.judge_good_window()
+
+
+static func late_window() -> float:
+	return Balance.judge_late_window()
+
+
 ## Оценить попадание. window_scale расширяет окна снаряжением (обувь).
 static func grade(delta_seconds: float, window_scale: float = 1.0) -> Grade:
 	var d := absf(delta_seconds)
-	if d <= PERFECT_WINDOW * window_scale:
+	if d <= Balance.judge_perfect_window() * window_scale:
 		return Grade.PERFECT
-	if d <= GOOD_WINDOW * window_scale:
+	if d <= Balance.judge_good_window() * window_scale:
 		return Grade.GOOD
-	if d <= LATE_WINDOW * window_scale:
+	if d <= Balance.judge_late_window() * window_scale:
 		return Grade.EARLY_LATE
 	return Grade.MISS
 
 
 ## Попадает ли нота вообще в зону оценки.
 static func in_range(delta_seconds: float, window_scale: float = 1.0) -> bool:
-	return absf(delta_seconds) <= LATE_WINDOW * window_scale
+	return absf(delta_seconds) <= Balance.judge_late_window() * window_scale
 
 
 static func grade_name(g: Grade) -> String:
@@ -52,16 +60,10 @@ static func grade_name(g: Grade) -> String:
 
 
 static func effect(g: Grade) -> float:
-	return EFFECT.get(g, 0.0)
+	return Balance.judge_effect(GRADE_KEYS.get(g, ""))
 
 
-## Множитель комбо по GDD §4.3. Взрослый выбивает монстра быстрее,
-## но и ребёнок доходит до конца — просто медленнее.
+## Множитель комбо (battle.json → judge.combo_steps). Взрослый выбивает
+## монстра быстрее, но и ребёнок доходит до конца — просто медленнее.
 static func combo_multiplier(combo: int) -> float:
-	if combo >= 50:
-		return 3.0
-	if combo >= 25:
-		return 2.0
-	if combo >= 10:
-		return 1.5
-	return 1.0
+	return Balance.combo_multiplier(combo)

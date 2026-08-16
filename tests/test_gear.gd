@@ -254,6 +254,6 @@ func _test_save_roundtrip() -> void:
 ## Провести чистую серию и ударить. Обычные биты урона не наносят,
 ## поэтому победить можно только так (GDD §4.3).
 func _clean_attack(state: BattleState, grade := Judge.Grade.PERFECT) -> int:
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		state.register_hit(Judge.Grade.PERFECT)
 	return state.register_attack(grade)

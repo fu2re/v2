@@ -7,6 +7,3 @@ script = ExtResource("1")
 id = "sparkle_notes"
 display_name = "Искристые ноты"
 slot = 4
-rarity = 1
-price_gold = 160
-in_crates = true

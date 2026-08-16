@@ -27,6 +27,9 @@ const SLOT_HINTS := {
 @export var slot: Slot = Slot.BELT
 @export var rarity: MonsterData.Rarity = MonsterData.Rarity.COMMON
 
+## Числа предмета — из data/gear.json (накатывает Registry). Значения здесь —
+## лишь дефолты на случай дырки в таблице; правь JSON, а не .tres.
+
 ## Множитель окон тайминга. 1.2 означает окна на 20% шире — прощает промахи.
 @export var window_scale: float = 1.0
 ## Прибавка к урону по Настрою.

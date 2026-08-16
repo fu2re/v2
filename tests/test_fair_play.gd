@@ -46,7 +46,7 @@ func _test_spam_earns_nothing() -> void:
 
 	var honest := BattleState.new()
 	honest.setup(MonsterInstance.create("synth_slime", COMMON), guardian, 100)
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		honest.register_hit(Judge.Grade.PERFECT)
 	var honest_damage := honest.register_attack(Judge.Grade.PERFECT)
 	check(honest_damage > 0, "честная связка бьёт (%d)" % honest_damage)
@@ -54,7 +54,7 @@ func _test_spam_earns_nothing() -> void:
 	# Тот же путь, но между нотами игрок долбит по пустому месту
 	var spammer := BattleState.new()
 	spammer.setup(MonsterInstance.create("synth_slime", COMMON), guardian, 100)
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		spammer.register_hit(Judge.Grade.PERFECT)
 		spammer.register_stray_tap()
 		spammer.register_stray_tap()
@@ -198,7 +198,7 @@ func _test_stray_tap_does_not_hurt_health() -> void:
 
 	var health := state.health
 	var shield := state.shield
-	for i in BattleState.STRAY_FREE_TAPS:
+	for i in BattleState.stray_free_taps():
 		state.register_stray_tap()
 
 	check_eq(state.health, health, "здоровье цело: ребёнок пробует экран")
@@ -213,7 +213,7 @@ func _test_stray_tap_does_not_hurt_health() -> void:
 	# И счёт обрывается взятой нотой: пауза с попаданием возвращает прощение
 	state.register_hit(Judge.Grade.PERFECT)
 	var after_hit := state.shield
-	for i in BattleState.STRAY_FREE_TAPS:
+	for i in BattleState.stray_free_taps():
 		state.register_stray_tap()
 	check_eq(state.shield, after_hit,
 		"после взятой ноты счёт лишних тапов начинается заново")
@@ -403,9 +403,9 @@ func _test_damage_grows_sharply_with_grade() -> void:
 ## переставала накапливаться и решение «идти дальше или уйти» обесценивалось.
 func _test_shield_and_campfire_are_stingy() -> void:
 	print("Щит и костёр возвращают понемногу")
-	check(BattleState.SHIELD_RESTORE <= 3,
-		"нота-щит возвращает совсем немного (%d)" % BattleState.SHIELD_RESTORE)
-	check(BattleState.SHIELD_RESTORE > 0, "но всё же возвращает")
+	check(BattleState.shield_restore() <= 3,
+		"нота-щит возвращает совсем немного (%d)" % BattleState.shield_restore())
+	check(BattleState.shield_restore() > 0, "но всё же возвращает")
 
 	# Костёр сам по себе не лечит вовсе: у него едят фрукты, и цена лечения —
 	# упущенное угощение (GDD §8.2.3)
@@ -415,7 +415,7 @@ func _test_shield_and_campfire_are_stingy() -> void:
 
 	# Починка щита обязана быть дешевле пропущенной атаки, иначе выгодно
 	# ловить удары ради восстановления
-	check(BattleState.SHIELD_RESTORE < BattleState.STRIKE_DAMAGE,
+	check(BattleState.shield_restore() < BattleState.strike_damage(),
 		"починка дешевле пропущенного удара")
 
 	GameState.reset()
@@ -426,7 +426,7 @@ func _test_shield_and_campfire_are_stingy() -> void:
 	# Даже бесконечная починка не делает щит вечным: удар снимает больше
 	state.shield = 10
 	var before := state.shield
-	state.restore_shield(BattleState.SHIELD_RESTORE)
+	state.restore_shield(BattleState.shield_restore())
 	state.take_strike()
 	check(state.shield + state.health < before + state.max_health,
 		"после удара с починкой запас всё равно меньше")

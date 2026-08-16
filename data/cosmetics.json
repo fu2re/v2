@@ -1,0 +1,24 @@
+{
+  "_readme": [
+    "Магазинные числа косметики (SHOP.md). Читает Balance; Registry накатывает",
+    "их на ресурсы при загрузке. Слот и имя — в data/cosmetics/*.tres.",
+    "У косметики НЕТ геймплейных полей — это закреплено структурой CosmeticData.",
+    "rarity — грейд-ключ (та же лестница, что у монстров).",
+    "in_crates: попадает ли вещь в пул пластинки; инвариант SHOP.md §4",
+    "(каждый грейд шансов — непустой пул) проверяется tests/test_shop.tscn."
+  ],
+  "items": {
+    "aurora_notes":    { "price_gold": 400, "rarity": "unique",   "in_crates": true },
+    "crown_of_beats":  { "price_gold": 900, "rarity": "epic",     "in_crates": false },
+    "disco_overalls":  { "price_gold": 200, "rarity": "uncommon", "in_crates": true },
+    "moonwalk_emote":  { "price_gold": 420, "rarity": "unique",   "in_crates": true },
+    "mossy_plot":      { "price_gold": 90,  "rarity": "common",   "in_crates": true },
+    "polka_overalls":  { "price_gold": 100, "rarity": "common",   "in_crates": true },
+    "sparkle_notes":   { "price_gold": 160, "rarity": "uncommon", "in_crates": true },
+    "spin_emote":      { "price_gold": 180, "rarity": "uncommon", "in_crates": true },
+    "starlight_cloak": { "price_gold": 450, "rarity": "unique",   "in_crates": true },
+    "straw_hat":       { "price_gold": 80,  "rarity": "common",   "in_crates": true },
+    "sunflower_hat":   { "price_gold": 180, "rarity": "uncommon", "in_crates": true },
+    "watering_can":    { "price_gold": 80,  "rarity": "common",   "in_crates": true }
+  }
+}

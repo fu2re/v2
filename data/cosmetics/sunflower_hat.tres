@@ -7,6 +7,3 @@ script = ExtResource("1")
 id = "sunflower_hat"
 display_name = "Подсолнух на голову"
 slot = 1
-rarity = 1
-price_gold = 180
-in_crates = true

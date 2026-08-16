@@ -7,6 +7,3 @@ script = ExtResource("1")
 id = "aurora_notes"
 display_name = "Северное сияние"
 slot = 4
-rarity = 3
-price_gold = 400
-in_crates = true

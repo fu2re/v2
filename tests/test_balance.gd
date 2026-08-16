@@ -201,8 +201,8 @@ func _test_deep_monsters_need_progression() -> void:
 	var ready := _play_sloppy(chart, "beat_serpent", 12, top, 0.85)
 	note("здоровье %d/%d, щит %d, принято ударов %d, крит бьёт %d, обычный %d"
 		% [ready.health, ready.max_health, ready.shield, ready.strikes_taken,
-			int(BattleState.HEAVY_STRIKE_DAMAGE * ready.strike_scale),
-			int(BattleState.STRIKE_DAMAGE * ready.strike_scale)])
+			int(BattleState.heavy_strike_damage() * ready.strike_scale),
+			int(BattleState.strike_damage() * ready.strike_scale)])
 	check(ready.did_win,
 		"с плащом и опытом та же игра побеждает (Настрой %d из %d)"
 			% [ready.vibe, ready.max_vibe])

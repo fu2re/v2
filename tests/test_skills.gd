@@ -146,6 +146,6 @@ func _test_without_guardian_skill_is_plain_beat() -> void:
 
 
 func _clean_attack(state: BattleState) -> int:
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		state.register_hit(Judge.Grade.PERFECT)
 	return state.register_attack(Judge.Grade.PERFECT)

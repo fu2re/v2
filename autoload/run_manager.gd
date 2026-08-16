@@ -13,11 +13,9 @@ signal health_changed(current: int, maximum: int)
 ## и читается через Balance.soft_death_loss: половина, а не всё — ребёнок
 ## должен уносить домой хоть что-то с каждого забега.
 
-## Награды растут с глубиной (GDD §8.3).
-const REWARD_DEPTH_SCALE := 0.15
-## База серебра за поляну. Имя было BASE_SEEDS: наградой когда-то были
-## семена, потом ими стало серебро, а имя врало.
-const BASE_SILVER := 8
+## Награды растут с глубиной (GDD §8.3). База и коэффициент — в таблице
+## drop_tables.json → run_rewards: раньше формула жила здесь константами,
+## а таблица описывала её прозой, и обе версии могли разъехаться молча.
 
 ## Доли грейдов, сдвиг с глубиной и пол обычных живут в таблице
 ## `data/drop_tables.json` и читаются через `Balance.rarity_weights`.
@@ -41,8 +39,8 @@ var health: int = 100
 var max_health: int = 100
 ## Щит тоже сквозной: забег на выносливость, и буфер не обновляется
 ## на каждой поляне. Чинится только попаданиями по нотам-щитам.
-var shield: int = BattleState.BASE_SHIELD
-var max_shield: int = BattleState.BASE_SHIELD
+var shield: int = BattleState.base_shield()
+var max_shield: int = BattleState.base_shield()
 var current_glade: Glade = null
 
 ## Добыча забега: ключ фрукта -> количество.
@@ -75,7 +73,7 @@ func start_run(new_guardian_key: String) -> bool:
 	max_health = guardian.max_health() \
 		+ int(GameState.gear_bonuses(new_guardian_key).get("health_bonus", 0))
 	health = max_health
-	max_shield = BattleState.BASE_SHIELD
+	max_shield = BattleState.base_shield()
 	shield = max_shield
 	depth = 0
 	run_fruits.clear()
@@ -104,7 +102,7 @@ func _generate(for_depth: int) -> Glade:
 	var glade := Glade.new()
 	glade.depth = for_depth
 	glade.type = _pick_type()
-	glade.silver_reward = int(round(BASE_SILVER * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
+	glade.silver_reward = int(round(Balance.base_silver() * (1.0 + Balance.reward_depth_scale() * for_depth)))
 
 	match glade.type:
 		Glade.Type.BATTLE:
@@ -383,7 +381,7 @@ func shake_bush(for_depth: int) -> String:
 				return "Сундук в ветвях: %s!" % item.display_name
 
 	# Горсть серебра — и запасной вариант, если чего-то из пула не оказалось
-	var silver := int(round(5.0 * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
+	var silver := int(round(Balance.loot_bush_silver_base() * (1.0 + Balance.reward_depth_scale() * for_depth)))
 	add_loot_silver(silver)
 	return "Горсть серебра: +%d" % silver
 
@@ -423,7 +421,7 @@ func pay_granny(amount: int) -> String:
 	# Запасной вариант — серебро. Подарок обязан быть материальным:
 	# «тёплое слово» после того, как игрок отдал ей деньги,
 	# читается как обман, а не как трогательность
-	var coins := 12
+	var coins := Balance.granny_fallback_silver()
 	add_loot_silver(coins)
 	return "Горсть монеток на дорожку: +%d" % coins
 

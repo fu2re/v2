@@ -39,11 +39,18 @@ const MIN_CONTRAST_EPS := 0.0001
 ## Минимальный интервал между СОСЕДНИМИ нотами, в секундах.
 ##
 ## Средняя плотность (MAX_DENSITY) этого не ловит: пара шестнадцатых
-## на 256 BPM стоит в 59 мс при окне тапа ±110 мс (Judge.GOOD_WINDOW) —
+## на 256 BPM стоит в 59 мс при окне тапа ±110 мс (окно GOOD) —
 ## окно накрывает обе ноты, тап засчитывает ближайшую, вторая уходит
 ## в промах и рвёт серию. Запас 1.2 оставляет ошибке место: тап в свои
 ## ±110 мс всегда ближе к своей ноте, чем к соседней.
-const MIN_NOTE_INTERVAL_SECONDS := Judge.GOOD_WINDOW * 1.2
+##
+## ЗАМОРОЖЕНО литералом (0.110 * 1.2), а не выведено из окна в battle.json:
+## правила разметки — контракт трёхсот уже сгенерированных чартов, и правка
+## окна оценки не имеет права молча их инвалидировать. Тот же литерал —
+## в tools/chartgen/beatroot_chartgen/chart.py. Если окно GOOD в battle.json
+## сузится так, что good_window * 1.2 превысит это число, валидатор админки
+## предупредит.
+const MIN_NOTE_INTERVAL_SECONDS := 0.132
 
 ## Серия — связка нот без длинной паузы. Атака её завершает.
 const SERIES_GAP := 2.0
@@ -200,8 +207,8 @@ static func _check_note_interval(chart: ChartData, out: Array[Problem]) -> void:
 		var gap := chart.note_beats[i] - chart.note_beats[i - 1]
 		if gap < min_beats - MIN_CONTRAST_EPS:
 			out.append(Problem.new(chart.note_beats[i],
-				"ноты в %.0f мс друг от друга — окно тапа (±%.0f мс) накрывает обе"
-					% [gap * 60.0 / chart.bpm * 1000.0, Judge.GOOD_WINDOW * 1000.0]))
+				"ноты в %.0f мс друг от друга — минимум %.0f мс, иначе окно тапа накрывает обе"
+					% [gap * 60.0 / chart.bpm * 1000.0, MIN_NOTE_INTERVAL_SECONDS * 1000.0]))
 			return
 
 

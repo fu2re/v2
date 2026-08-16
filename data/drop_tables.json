@@ -9,6 +9,15 @@
     "Цены торговца — в data/merchant.json, прогрессия — в data/progression.json."
   ],
 
+  "run_rewards": {
+    "description": "Серебро забега. Формула везде одна: base * (1 + depth_scale * depth), округление.",
+    "base_silver_per_glade": 8,
+    "depth_scale": 0.15,
+    "loot_bush_silver_base": 5,
+    "granny_fallback_silver": 12,
+    "_granny_fallback_silver": "Утешительные монетки, когда подарочный пул бабки пуст: «тёплое слово» после того, как игрок отдал ей деньги, читается как обман."
+  },
+
   "glade_types": {
     "description": "Шанс типа поляны при каждом свайпе (GDD §8.2). v0.4: торговец и событие объединены в тип «Встреча».",
     "weights_percent": {
@@ -38,7 +47,7 @@
       "gear_chest_like_victory": 2
     },
     "why": "Куст — источник СЕМЯН, а не склад вещей. Зелья упразднены (GDD §4.2.3), сундук из частой находки стал редкой удачей: когда он выпадал каждый седьмой раз, снаряжение обесценивалось и лавка теряла смысл. Фрукт с куста возможен, но редок: фрукты растят, а не подбирают.",
-    "silver_handful": "5 * (1 + 0.15 * depth), округление",
+    "silver_handful": "loot_bush_silver_base * (1 + depth_scale * depth) — числа в run_rewards, код читает их же",
     "chest_note": "Сундук роллится как victory_chest для монстра обычного грейда."
   },
 
@@ -133,7 +142,7 @@
       "seed_of_same_fruit": 1,
       "fruit_chance_percent": 15,
       "fruits_when_lucky": 1,
-      "silver": "8 * (1 + 0.15 * depth), округление"
+      "silver": "base_silver_per_glade * (1 + depth_scale * depth) — числа в run_rewards, код читает их же"
     }
   },
 

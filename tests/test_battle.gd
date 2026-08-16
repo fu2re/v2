@@ -86,7 +86,7 @@ func _test_shield_absorbs_before_health() -> void:
 	# Излишек последнего удара честно перетекает в здоровье — это верно,
 	# и тест обязан это допускать, а не считать поломкой
 	var guard := 0
-	while s.shield >= BattleState.MISS_DAMAGE and guard < 100:
+	while s.shield >= BattleState.miss_damage() and guard < 100:
 		guard += 1
 		s.register_hit(Judge.Grade.MISS)
 		check_eq(s.health, health_before,
@@ -103,7 +103,7 @@ func _test_shield_absorbs_before_health() -> void:
 	check(s.health < health_at_zero_shield, "без щита промахи бьют прямо по здоровью")
 	# Урон масштабируется злостью грейда (strike_scale), поэтому сверяем
 	# с ценой ПОСЛЕ множителя, а не с голой константой
-	var expected := maxi(int(round(BattleState.MISS_DAMAGE * s.strike_scale)), 1)
+	var expected := maxi(int(round(BattleState.miss_damage() * s.strike_scale)), 1)
 	check_eq(health_at_zero_shield - s.health, expected,
 		"без щита промах стоит ровно свою цену")
 
@@ -160,7 +160,7 @@ func _test_attack_needs_clean_series() -> void:
 
 	# Чистая серия достаточной длины — атака проходит
 	var clean := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		clean.register_hit(Judge.Grade.PERFECT)
 	var dealt := clean.register_attack(Judge.Grade.PERFECT)
 	check(dealt > 0, "после чистой серии атака нанесла урон (%d)" % dealt)
@@ -169,10 +169,10 @@ func _test_attack_needs_clean_series() -> void:
 
 	# Один промах в серии — атака вхолостую
 	var dirty := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		dirty.register_hit(Judge.Grade.PERFECT)
 	dirty.register_hit(Judge.Grade.MISS)
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		dirty.register_hit(Judge.Grade.PERFECT)
 	var wasted := dirty.register_attack(Judge.Grade.PERFECT)
 	check_eq(wasted, 0, "промах в серии обнулил атаку")
@@ -189,7 +189,7 @@ func _test_attack_needs_clean_series() -> void:
 func _test_series_resets_after_attack() -> void:
 	print("Атака завершает серию")
 	var s := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		s.register_hit(Judge.Grade.PERFECT)
 	s.register_attack(Judge.Grade.PERFECT)
 	check_eq(s.series_length, 0, "серия обнулена")
@@ -203,7 +203,7 @@ func _test_series_resets_after_attack() -> void:
 func _test_pause_breaks_series() -> void:
 	print("Пауза обрывает серию")
 	var s := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		s.register_hit(Judge.Grade.PERFECT)
 	s.break_series()
 	check_eq(s.series_length, 0, "пауза обнулила серию")
@@ -215,14 +215,14 @@ func _test_gear_raises_attack_damage() -> void:
 	print("Снаряжение усиливает атаку")
 	GameState.reset()
 	var bare := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		bare.register_hit(Judge.Grade.PERFECT)
 	var bare_damage := bare.register_attack(Judge.Grade.PERFECT)
 
 	GameState.add_gear("thunder_pick")
 	GameState.equip(GameState.tame("disco_sprout", MonsterData.Rarity.COMMON).key(), "thunder_pick")
 	var geared := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		geared.register_hit(Judge.Grade.PERFECT)
 	var geared_damage := geared.register_attack(Judge.Grade.PERFECT)
 
@@ -240,14 +240,14 @@ func _test_fruit_buffs_raise_attack_damage() -> void:
 	RunManager.run_buffs.clear()
 
 	var plain := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		plain.register_hit(Judge.Grade.PERFECT)
 	var plain_damage := plain.register_attack(Judge.Grade.PERFECT)
 
 	# Инжир (тир 2): удар +1.2 — ровно то, что обещает сумка
 	RunManager.add_buff({"power_bonus": 1.2})
 	var fed := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		fed.register_hit(Judge.Grade.PERFECT)
 	var fed_damage := fed.register_attack(Judge.Grade.PERFECT)
 
@@ -269,7 +269,7 @@ func _test_attack_quality_matters() -> void:
 	var damages := {}
 	for grade in [Judge.Grade.PERFECT, Judge.Grade.GOOD, Judge.Grade.EARLY_LATE]:
 		var s := _make()
-		for i in BattleState.MIN_SERIES_LENGTH:
+		for i in BattleState.min_series_length():
 			s.register_hit(Judge.Grade.PERFECT)
 		damages[grade] = s.register_attack(grade)
 
@@ -284,16 +284,16 @@ func _test_genre_advantage() -> void:
 	print("Преимущество жанра")
 	# disco_sprout (диско) против bass_bear (рок): диско слабо против рока
 	var weak := _make("bass_bear", "disco_sprout")
-	check_eq(weak.genre_multiplier(), MonsterData.DISADVANTAGE_MULTIPLIER,
+	check_eq(weak.genre_multiplier(), Balance.genre_disadvantage(),
 		"диско в невыгоде против рока")
 
 	# bass_bear (рок) против disco_sprout (диско): рок бьёт диско
 	var strong := _make("disco_sprout", "bass_bear")
-	check_eq(strong.genre_multiplier(), MonsterData.ADVANTAGE_MULTIPLIER,
+	check_eq(strong.genre_multiplier(), Balance.genre_advantage(),
 		"рок в преимуществе над диско")
 
 	# Урон приходит только с атакой, поэтому сравниваем её, а не обычный бит
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		strong.register_hit(Judge.Grade.PERFECT)
 		weak.register_hit(Judge.Grade.PERFECT)
 	check(strong.register_attack(Judge.Grade.PERFECT)
@@ -320,7 +320,7 @@ func _test_victory_and_defeat() -> void:
 	var victories := [0]
 	won.victory.connect(func(): victories[0] += 1)
 	while not won.is_over:
-		for i in BattleState.MIN_SERIES_LENGTH:
+		for i in BattleState.min_series_length():
 			won.register_hit(Judge.Grade.PERFECT)
 		won.register_attack(Judge.Grade.PERFECT)
 	check(won.did_win, "Настрой сбит — победа")
@@ -332,7 +332,7 @@ func _test_victory_and_defeat() -> void:
 	won.register_attack(Judge.Grade.PERFECT)
 	check_eq(won.vibe, vibe_after, "после победы попадания уже не считаются")
 
-	var lost := _make("synth_slime", "disco_sprout", BattleState.STRIKE_DAMAGE)
+	var lost := _make("synth_slime", "disco_sprout", BattleState.strike_damage())
 	lost.shield = 0  # щит уже выбит: урон пойдёт прямо в здоровье
 	var defeats := [0]
 	lost.defeat.connect(func(): defeats[0] += 1)
@@ -397,14 +397,14 @@ func _test_experience_raises_damage() -> void:
 	print("Опыт против вида усиливает удар")
 	GameState.reset()
 	var fresh := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		fresh.register_hit(Judge.Grade.PERFECT)
 	var first := fresh.register_attack(Judge.Grade.PERFECT)
 
 	for i in 10:
 		GameState.add_battle_experience("synth_slime")
 	var learned := _make()
-	for i in BattleState.MIN_SERIES_LENGTH:
+	for i in BattleState.min_series_length():
 		learned.register_hit(Judge.Grade.PERFECT)
 	var later := learned.register_attack(Judge.Grade.PERFECT)
 
@@ -438,7 +438,7 @@ func _test_crit_hits_four_times_harder() -> void:
 	# Сравниваем ОТНОШЕНИЕ с допуском: множитель применяется до округления,
 	# и 23×4 не обязано в точности совпасть с round(60×1.5)
 	var ratio := float(crit) / maxf(normal, 1.0)
-	check(absf(ratio - BattleState.CRIT_MULTIPLIER) < 0.15,
+	check(absf(ratio - BattleState.crit_multiplier()) < 0.15,
 		"крит (%d) примерно вчетверо больше обычного (%d), отношение %.2f" % [
 			crit, normal, ratio])
 	check(crit > 0, "и он вообще что-то снимает")

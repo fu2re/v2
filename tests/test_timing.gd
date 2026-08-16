@@ -24,30 +24,55 @@ func _frames(count: int) -> void:
 
 func _test_judge_windows() -> void:
 	print("Judge: границы окон")
+	# Границы берутся из таблицы, а не литералами: правка battle.json
+	# не должна краснить тест — он проверяет ЛОГИКУ окон, а не их ширину
+	var perfect := Judge.perfect_window()
+	var good := Judge.good_window()
+	var late := Judge.late_window()
+	check(perfect < good and good < late, "окна строго упорядочены")
 	check_eq(Judge.grade(0.0), Judge.Grade.PERFECT, "точное попадание")
-	check_eq(Judge.grade(0.049), Judge.Grade.PERFECT, "у самой границы Perfect")
-	check_eq(Judge.grade(-0.049), Judge.Grade.PERFECT, "Perfect симметричен по знаку")
-	check_eq(Judge.grade(0.051), Judge.Grade.GOOD, "сразу за границей Perfect")
-	check_eq(Judge.grade(0.109), Judge.Grade.GOOD, "у границы Good")
-	check_eq(Judge.grade(0.120), Judge.Grade.EARLY_LATE, "за границей Good")
-	check_eq(Judge.grade(0.181), Judge.Grade.MISS, "за окном оценки")
-	check_eq(Judge.grade(-0.181), Judge.Grade.MISS, "промах симметричен")
+	check_eq(Judge.grade(perfect - 0.001), Judge.Grade.PERFECT, "у самой границы Perfect")
+	check_eq(Judge.grade(-(perfect - 0.001)), Judge.Grade.PERFECT, "Perfect симметричен по знаку")
+	check_eq(Judge.grade(perfect + 0.001), Judge.Grade.GOOD, "сразу за границей Perfect")
+	check_eq(Judge.grade(good - 0.001), Judge.Grade.GOOD, "у границы Good")
+	check_eq(Judge.grade(good + 0.001), Judge.Grade.EARLY_LATE, "за границей Good")
+	check_eq(Judge.grade(late + 0.001), Judge.Grade.MISS, "за окном оценки")
+	check_eq(Judge.grade(-(late + 0.001)), Judge.Grade.MISS, "промах симметричен")
 
-	# Обувь расширяет окна (GDD §9.1) — то, что раньше было Good, станет Perfect
-	check_eq(Judge.grade(0.080, 2.0), Judge.Grade.PERFECT, "расширенное окно от снаряжения")
+	# Обувь расширяет окна (GDD §9.1) — то, что раньше было Good, станет Perfect:
+	# полтора окна Perfect при вдвое расширенных окнах — всегда Perfect
+	check_eq(Judge.grade(perfect * 1.5, 2.0), Judge.Grade.PERFECT,
+		"расширенное окно от снаряжения")
 
-	check(Judge.in_range(0.180), "0.180 ещё в зоне оценки")
-	check(not Judge.in_range(0.181), "0.181 уже вне зоны")
+	check(Judge.in_range(late), "край окна ещё в зоне оценки")
+	check(not Judge.in_range(late + 0.001), "за краем уже вне зоны")
 
 
 func _test_combo() -> void:
 	print("Judge: множитель комбо")
+	# Ступени сверяются с сырым battle.json: тест ловит «таблица не читается»,
+	# но не мешает дизайнеру двигать пороги
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/battle.json"))
+	var battle: Dictionary = parsed if typeof(parsed) == TYPE_DICTIONARY else {}
+	var judge: Dictionary = battle.get("judge", {})
+	var steps: Array = judge.get("combo_steps", [])
+	if steps.is_empty():
+		check(false, "combo_steps есть в battle.json")
+		return
+
 	check_eq(Judge.combo_multiplier(0), 1.0, "комбо 0")
-	check_eq(Judge.combo_multiplier(9), 1.0, "комбо 9 — ещё без бонуса")
-	check_eq(Judge.combo_multiplier(10), 1.5, "комбо 10")
-	check_eq(Judge.combo_multiplier(25), 2.0, "комбо 25")
-	check_eq(Judge.combo_multiplier(50), 3.0, "комбо 50")
-	check_eq(Judge.combo_multiplier(999), 3.0, "потолок множителя")
+	var first: Dictionary = steps[0]
+	check_eq(Judge.combo_multiplier(int(first.get("combo", 0)) - 1), 1.0,
+		"до первого порога без бонуса")
+	for entry: Variant in steps:
+		var step: Dictionary = entry
+		check_eq(Judge.combo_multiplier(int(step.get("combo", 0))),
+			float(step.get("multiplier", 0.0)),
+			"комбо %d по таблице" % int(step.get("combo", 0)))
+	var last: Dictionary = steps[steps.size() - 1]
+	check_eq(Judge.combo_multiplier(9999), float(last.get("multiplier", 0.0)),
+		"потолок множителя")
 
 
 func _test_chart_loading() -> void:

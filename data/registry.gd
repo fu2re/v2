@@ -23,7 +23,57 @@ static func ensure_loaded() -> void:
 	_fruits = _scan(FRUIT_DIR)
 	_gear = _scan(GEAR_DIR)
 	_cosmetics = _scan(COSMETIC_DIR)
+	_apply_balance_stats()
 	_loaded = true
+
+
+## Перечитать каталоги и таблицы статов заново — для редактора и тестов,
+## правящих данные на ходу. Одного Balance.reload() мало: числа уже
+## накачаны в закешированные ресурсы, и без пересканирования там останутся
+## старые значения.
+static func reload() -> void:
+	_loaded = false
+	ensure_loaded()
+
+
+## Числа сущностей живут в JSON (monsters.json / gear.json / cosmetics.json),
+## а .tres хранит только идентичность: имя, жанр, слот, спрайт. Здесь таблицы
+## накатываются на загруженные ресурсы — источник чисел ровно один.
+## Вида нет в таблице — ошибка данных: остаются дефолты класса, о чём и кричим.
+static func _apply_balance_stats() -> void:
+	for id: String in _monsters:
+		var stats := Balance.monster_stats(id)
+		if stats.is_empty():
+			push_error("Монстра %s нет в data/monsters.json — статы остались дефолтными" % id)
+			continue
+		var m: MonsterData = _monsters[id]
+		m.base_vibe = int(stats.get("base_vibe", m.base_vibe))
+		m.base_health = int(stats.get("base_health", m.base_health))
+		m.base_power = float(stats.get("base_power", m.base_power))
+
+	for id: String in _gear:
+		var stats := Balance.gear_stats(id)
+		if stats.is_empty():
+			push_error("Снаряжения %s нет в data/gear.json — числа остались дефолтными" % id)
+			continue
+		var g: GearData = _gear[id]
+		g.window_scale = float(stats.get("window_scale", g.window_scale))
+		g.power_bonus = float(stats.get("power_bonus", g.power_bonus))
+		g.health_bonus = int(stats.get("health_bonus", g.health_bonus))
+		g.shield_reduction = float(stats.get("shield_reduction", g.shield_reduction))
+		g.price = int(stats.get("price", g.price))
+
+	for id: String in _cosmetics:
+		var stats := Balance.cosmetic_stats(id)
+		if stats.is_empty():
+			push_error("Косметики %s нет в data/cosmetics.json — числа остались дефолтными" % id)
+			continue
+		var c: CosmeticData = _cosmetics[id]
+		c.price_gold = int(stats.get("price_gold", c.price_gold))
+		var rarity_index := Balance.grade_index(String(stats.get("rarity", "")))
+		if rarity_index >= 0:
+			c.rarity = rarity_index as MonsterData.Rarity
+		c.in_crates = bool(stats.get("in_crates", c.in_crates))
 
 
 static func _scan(dir_path: String) -> Dictionary:

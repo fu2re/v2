@@ -229,7 +229,7 @@ func _expire_missed() -> void:
 	var i := 0
 	while i < _active.size():
 		var note: Note = _active[i]
-		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW * state.effective_window_scale(Conductor.song_beat):
+		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.late_window() * state.effective_window_scale(Conductor.song_beat):
 			_miss(note)
 			# Пропуск может закончить бой, а _end_battle очищает список нот.
 			# Без этой проверки цикл продолжал работать с индексом в уже
@@ -265,7 +265,7 @@ func _miss(note: Note) -> void:
 			# показывает сколько именно
 			_popup_damage(absi(state.register_hit(Judge.Grade.MISS)),
 				_hero.position, false)
-	note_judged.emit(Judge.Grade.MISS, Judge.LATE_WINDOW)
+	note_judged.emit(Judge.Grade.MISS, Judge.late_window())
 
 
 ## Показать, сработала атака или прошла вхолостую.

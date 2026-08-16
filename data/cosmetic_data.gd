@@ -25,6 +25,9 @@ const SLOT_NAMES := {
 @export var id: String = ""
 @export var display_name: String = ""
 @export var slot: Slot = Slot.OUTFIT
+
+## Магазинные числа (rarity, price_gold, in_crates) — из data/cosmetics.json,
+## накатывает Registry. Значения здесь — дефолты на случай дырки в таблице.
 @export var rarity: MonsterData.Rarity = MonsterData.Rarity.COMMON
 
 ## Цена прямой покупки в золоте.

@@ -7,6 +7,3 @@ script = ExtResource("1")
 id = "crown_of_beats"
 display_name = "Корона битов"
 slot = 1
-rarity = 4
-price_gold = 900
-in_crates = false

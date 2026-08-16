@@ -19,18 +19,26 @@ func run_tests() -> void:
 	_test_weights_sum_to_hundred()
 	_test_rarity_weights_shift_with_depth()
 	_test_victory_chest_odds()
-	_test_fallbacks_match_tables()
+	_test_tables_complete()
+	_test_entity_tables_match_registry()
 
 
 ## Главная проверка файла: значения приходят ИЗ JSON.
 ##
-## Сверяется с числом, которого нет среди запасных констант — если файл
-## перестанет читаться, подмена сразу видна.
+## Геттеры сверяются с СЫРЫМ разбором файла, а не с литералами: перестанет
+## читаться файл — геттер отдаст заглушку и разойдётся с сырым значением,
+## а правка баланса дизайнером тест не краснит.
 func _test_tables_are_actually_read() -> void:
 	Balance.reload()
 
+	var progression := _load_json("res://data/progression.json")
+	var multipliers: Dictionary = progression.get("grade_multipliers", {})
+	var stat_scale: Dictionary = multipliers.get("stat_scale", {})
+	var levels: Dictionary = progression.get("instance_levels", {})
+
 	var legendary := Balance.grade_stat_scale(MonsterData.Rarity.LEGENDARY)
-	check_close(legendary, 2.0, "множитель легендарного берётся из progression.json")
+	check_close(legendary, float(stat_scale.get("legendary", -1.0)),
+		"множитель легендарного берётся из progression.json")
 
 	# То же число обязано доехать до боевой формулы, а не остаться в таблице.
 	# Проверяется НАБЛЮДАЕМЫЙ стат экземпляра, а не обёртка-делегат: обёртка
@@ -46,8 +54,23 @@ func _test_tables_are_actually_read() -> void:
 		Balance.grade_strike_scale(MonsterData.Rarity.LEGENDARY),
 		"удар экземпляра считается по табличной шкале удара")
 
-	check_eq(Balance.max_level(), 10, "потолок уровня из таблицы")
-	check_close(Balance.level_stat_bonus(), 0.08, "прибавка за уровень из таблицы")
+	check_eq(Balance.max_level(), int(levels.get("max_level", -1)),
+		"потолок уровня из таблицы")
+	check_close(Balance.level_stat_bonus(),
+		float(levels.get("stat_bonus_per_level", -1.0)),
+		"прибавка за уровень из таблицы")
+
+	# Числа боя тоже обязаны доезжать из таблицы до наблюдаемого результата
+	var battle := _load_json("res://data/battle.json")
+	var strikes: Dictionary = battle.get("strikes", {})
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("disco_sprout", MonsterData.Rarity.COMMON),
+		null, 100)
+	var dealt := state.take_strike(false)
+	var expected := maxi(int(round(float(strikes.get("strike_damage", -1))
+		* state.strike_scale)), 1)
+	check_eq(dealt, expected,
+		"пропущенный щит стоит столько, сколько написано в battle.json")
 
 
 func _test_grade_scale_is_monotonic() -> void:
@@ -156,42 +179,175 @@ func _test_victory_chest_odds() -> void:
 	check(legendary[2] > common[2], "за легендарного чаще выпадает дорогая вещь")
 
 
-## Запасные константы обязаны совпадать с таблицами. Они включаются молча —
-## только при битом JSON — и разъехавшийся fallback подменяет баланс так,
-## что этого не видит никто. Ровно так жил FALLBACK_STRIKE_SCALE:
-## 1.0/1.4/2.0… в коде против 1.5/1.9/2.4… в таблице.
-func _test_fallbacks_match_tables() -> void:
-	var progression := _load_json("res://data/progression.json")
-	var multipliers: Dictionary = progression.get("grade_multipliers", {})
-	var stat: Dictionary = multipliers.get("stat_scale", {})
-	var strike: Dictionary = multipliers.get("strike_scale", {})
-	var friendship: Dictionary = progression.get("friendship", {})
-	var thresholds: Dictionary = friendship.get("thresholds", {})
+## Полнота таблиц: каждый ключ, который читает код, обязан существовать
+## в JSON. Заглушки в геттерах включаются молча, и дырка в таблице иначе
+## подменила бы баланс так, что этого не видит никто. Раньше эту роль играл
+## тест паритета fallback-констант, но копии таблиц в коде краснели бы
+## от каждой легитимной правки баланса в редакторе.
+##
+## Список инвариантов продублирован в валидаторе админки
+## (tools/balance_admin) — правь ОБА места.
+func _test_tables_complete() -> void:
+	var required := _required_paths()
+	for file: String in required:
+		var parsed := _load_json(file)
+		if parsed.is_empty():
+			check(false, "таблица пуста или не прочиталась: %s" % file)
+			continue
+		for path: String in required[file]:
+			check(_has_path(parsed, path), "%s: есть %s" % [file.get_file(), path])
 
-	for i in GRADES.size():
-		var key: String = GRADES[i]
-		check_close(float(stat.get(key, -1.0)), Balance.FALLBACK_STAT_SCALE[i],
-			"fallback крепости совпадает с таблицей (%s)" % key)
-		check_close(float(strike.get(key, -1.0)), Balance.FALLBACK_STRIKE_SCALE[i],
-			"fallback удара совпадает с таблицей (%s)" % key)
-		check_eq(int(thresholds.get(key, -1)), int(Balance.FALLBACK_THRESHOLDS[i]),
-			"fallback порога дружбы совпадает с таблицей (%s)" % key)
 
-	var levels: Dictionary = progression.get("instance_levels", {})
-	var curve: Array = levels.get("xp_to_next_level", [])
-	check_eq(curve.size(), Balance.FALLBACK_XP_CURVE.size(),
-		"длина запасной кривой опыта совпадает с таблицей")
-	for i in mini(curve.size(), Balance.FALLBACK_XP_CURVE.size()):
-		check_eq(int(curve[i]), int(Balance.FALLBACK_XP_CURVE[i]),
-			"fallback кривой опыта: ступень %d" % (i + 1))
+func _required_paths() -> Dictionary:
+	var paths := {
+		"res://data/progression.json": [
+			"instance_levels.max_level",
+			"instance_levels.stat_bonus_per_level",
+			"instance_levels.xp_to_next_level",
+			"xp_sources.battle_victory_base",
+			"xp_sources.battle_victory_per_enemy_grade",
+			"xp_sources.battle_victory_s_rank_bonus",
+			"xp_sources.battle_defeat_share",
+			"xp_sources.feeding_by_fruit_tier",
+			"xp_sources.feeding_favorite_multiplier",
+			"battle.vibe_depth_scale",
+			"species_experience.damage_step_per_encounter",
+			"species_experience.damage_cap",
+			"friendship.gains.victory",
+			"friendship.gains.victory_s_rank",
+			"friendship.gains.favorite_fruit",
+			"friendship.gains.other_fruit",
+		],
+		"res://data/drop_tables.json": [
+			"run_rewards.base_silver_per_glade",
+			"run_rewards.depth_scale",
+			"run_rewards.loot_bush_silver_base",
+			"run_rewards.granny_fallback_silver",
+			"glade_types.weights_percent.battle",
+			"glade_types.weights_percent.wild_bush",
+			"glade_types.weights_percent.campfire",
+			"glade_types.weights_percent.encounter",
+			"encounter_types.weights_percent.merchant",
+			"loot_bush.weights_percent.silver_handful",
+			"granny.ask_min_fraction",
+			"granny.ask_max_fraction",
+			"granny.gift_weights_percent.seed_tier_up",
+			"monster_rarity_by_depth.depth_shift.divisor",
+			"monster_rarity_by_depth.depth_shift.max_shift",
+			"monster_rarity_by_depth.depth_shift.common_floor",
+			"wild_bush.yield.seed_of_same_fruit",
+			"wild_bush.yield.fruit_chance_percent",
+			"wild_bush.yield.fruits_when_lucky",
+			"soft_death.lost_percent.run_fruits",
+			"soft_death.lost_percent.run_silver",
+			"cosmetic_crate.price_gold",
+			"cosmetic_crate.pity.guaranteed_after_opens",
+			"cosmetic_crate.pity.min_rarity",
+		],
+		"res://data/merchant.json": [
+			"forest_merchant.stock_size",
+			"farm_merchant.rotation_minutes",
+			"farm_merchant.rotating_gear_slots",
+			"farm_merchant.base_seed_ids",
+			"prices_silver.seeds_by_tier.0",
+			"prices_silver.seeds_by_tier.1",
+			"prices_silver.seeds_by_tier.2",
+			"prices_silver.seeds_by_tier.3",
+		],
+		"res://data/fruits.json": [
+			"buffs.max_total",
+		],
+		"res://data/battle.json": [
+			"strikes.strike_damage",
+			"strikes.crit_multiplier",
+			"strikes.miss_damage",
+			"strikes.skill_miss_damage",
+			"strikes.stray_free_taps",
+			"strikes.stray_tap_damage",
+			"strikes.max_blow_share",
+			"attack.attack_multiplier",
+			"attack.min_series_length",
+			"shield.base_shield",
+			"shield.shield_restore",
+			"skills.attack_bonus",
+			"skills.shield_gain",
+			"skills.health_gain",
+			"skills.combo_gain",
+			"skills.window_boost",
+			"skills.window_bars",
+			"judge.perfect_window",
+			"judge.good_window",
+			"judge.late_window",
+			"judge.effects.perfect",
+			"judge.effects.good",
+			"judge.effects.early_late",
+			"judge.effects.miss",
+			"judge.combo_steps",
+			"genre.advantage_multiplier",
+			"genre.disadvantage_multiplier",
+			"genre.beats.rock",
+		],
+	}
+	for grade: String in GRADES:
+		paths["res://data/progression.json"].append("grade_multipliers.stat_scale.%s" % grade)
+		paths["res://data/progression.json"].append("grade_multipliers.strike_scale.%s" % grade)
+		paths["res://data/progression.json"].append("friendship.thresholds.%s" % grade)
+		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.base_weights.%s" % grade)
+		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.unlock_depth.%s" % grade)
+		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.depth_shift.per_shift.%s" % grade)
+		paths["res://data/drop_tables.json"].append("victory_chest.drop_chance_percent_by_monster_rarity.%s" % grade)
+		paths["res://data/drop_tables.json"].append("victory_chest.odds_percent_by_monster_rarity.%s" % grade)
+	for tier in 4:
+		paths["res://data/fruits.json"].append("tiers.%d.grow_seconds" % tier)
+		paths["res://data/fruits.json"].append("tiers.%d.friendship_scale" % tier)
+		paths["res://data/fruits.json"].append("tiers.%d.heal" % tier)
+	return paths
 
-	var drops := _load_json("res://data/drop_tables.json")
-	var glades: Dictionary = drops.get("glade_types", {})
-	var glade_weights: Dictionary = glades.get("weights_percent", {})
-	for key: String in Balance.FALLBACK_GLADE_WEIGHTS:
-		check_close(float(glade_weights.get(key, -1.0)),
-			float(Balance.FALLBACK_GLADE_WEIGHTS[key]),
-			"fallback весов полян совпадает с таблицей (%s)" % key)
+
+func _has_path(root: Dictionary, path: String) -> bool:
+	var node: Variant = root
+	for part in path.split("."):
+		if typeof(node) != TYPE_DICTIONARY or not node.has(part):
+			return false
+		node = node[part]
+	return true
+
+
+## Таблицы сущностей и .tres обязаны описывать один и тот же набор:
+## строка без ресурса — мусор, ресурс без строки — статы-невидимки
+## из дефолтов класса. Оба случая — ошибка данных, а не «ну подставится».
+func _test_entity_tables_match_registry() -> void:
+	Registry.reload()
+
+	var monsters := _load_json("res://data/monsters.json")
+	var species: Dictionary = monsters.get("species", {})
+	var monster_list := Registry.all_monsters()
+	check(not monster_list.is_empty(), "в реестре есть монстры")
+	for m in monster_list:
+		check(species.has(m.id), "монстр %s описан в monsters.json" % m.id)
+	for id: String in species:
+		check(Registry.monster(id) != null, "строка %s в monsters.json имеет .tres" % id)
+
+	var gear_table := _load_json("res://data/gear.json")
+	var gear_items: Dictionary = gear_table.get("items", {})
+	var gear_list := Registry.all_gear()
+	check(not gear_list.is_empty(), "в реестре есть снаряжение")
+	for g in gear_list:
+		check(gear_items.has(g.id), "снаряжение %s описано в gear.json" % g.id)
+		# Цена — единственное, по чему сортируются трети сундука: нулевая
+		# означает, что строка не доехала до ресурса
+		check(g.price > 0, "у %s цена из таблицы больше нуля" % g.id)
+	for id: String in gear_items:
+		check(Registry.gear(id) != null, "строка %s в gear.json имеет .tres" % id)
+
+	var cosmetics := _load_json("res://data/cosmetics.json")
+	var cosmetic_items: Dictionary = cosmetics.get("items", {})
+	var cosmetic_list := Registry.all_cosmetics()
+	check(not cosmetic_list.is_empty(), "в реестре есть косметика")
+	for c in cosmetic_list:
+		check(cosmetic_items.has(c.id), "косметика %s описана в cosmetics.json" % c.id)
+	for id: String in cosmetic_items:
+		check(Registry.cosmetic(id) != null, "строка %s в cosmetics.json имеет .tres" % id)
 
 
 func _load_json(path: String) -> Dictionary:

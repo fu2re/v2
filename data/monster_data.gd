@@ -45,16 +45,10 @@ const RARITY_COLORS := [
 ## Грейд влияет на то, сколько встреч нужно, но НЕ на шанс — приручение
 ## гарантировано (GDD §6.3), и у каждого грейда своя шкала (GDD §6.1).
 
-## Кто кого бьёт. Ветер нейтрален: без преимуществ и слабостей.
-const BEATS := {
-	Genre.ROCK: Genre.DISCO,
-	Genre.DISCO: Genre.FOLK,
-	Genre.FOLK: Genre.ELECTRO,
-	Genre.ELECTRO: Genre.ROCK,
-}
-
-const ADVANTAGE_MULTIPLIER := 1.4
-const DISADVANTAGE_MULTIPLIER := 0.7
+## Кто кого бьёт и насколько — в data/battle.json → genre (читает Balance).
+## Ключи там строковые (rock/disco/...), общие с чартами: enum — деталь
+## GDScript, а таблицу правит дизайнер. Ветер нейтрален: его нет в кольце.
+const GENRE_KEYS := ["rock", "disco", "folk", "electro", "latin"]
 
 ## Грейд НЕ здесь: он принадлежит экземпляру, а не виду (GDD §6.3) —
 ## любой вид может встретиться в любом грейде. Поле rarity у вида было
@@ -73,6 +67,9 @@ const DISADVANTAGE_MULTIPLIER := 0.7
 ## в пяти аранжировках и шести темпах, поэтому монстру достаточно назвать его.
 @export var motif_id: String = ""
 
+## Базовые статы вида — из data/monsters.json (накатывает Registry).
+## Значения здесь — лишь дефолты на случай дырки в таблице; править
+## их надо в JSON, иначе правка молча потеряется при загрузке.
 @export var base_vibe: int = 100
 @export var base_health: int = 100
 ## Урон по Настрою за идеальное попадание.
@@ -83,14 +80,15 @@ const DISADVANTAGE_MULTIPLIER := 0.7
 var _sprite: Texture2D = null
 
 
-## Порог дружбы для конкретного грейда ЭТОЙ встречи.
-##
 ## Множитель урона против другого жанра.
 static func genre_multiplier(attacker: Genre, defender: Genre) -> float:
-	if BEATS.get(attacker, -1) == defender:
-		return ADVANTAGE_MULTIPLIER
-	if BEATS.get(defender, -1) == attacker:
-		return DISADVANTAGE_MULTIPLIER
+	var beats := Balance.genre_beats()
+	var attacker_key: String = GENRE_KEYS[attacker]
+	var defender_key: String = GENRE_KEYS[defender]
+	if String(beats.get(attacker_key, "")) == defender_key:
+		return Balance.genre_advantage()
+	if String(beats.get(defender_key, "")) == attacker_key:
+		return Balance.genre_disadvantage()
 	return 1.0
 
 

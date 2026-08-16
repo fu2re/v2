@@ -9,7 +9,4 @@ display_name = "Вьюн"
 genre = 4
 favorite_fruit_id = "chord_apple"
 motif_id = "volna"
-base_vibe = 40
-base_health = 140
-base_power = 5.5
 sprite_path = "res://art/monster/beat_serpent_common.png"
