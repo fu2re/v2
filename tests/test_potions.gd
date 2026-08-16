@@ -12,7 +12,9 @@ const COMMON := MonsterData.Rarity.COMMON
 func run_tests() -> void:
 	_test_registry()
 	_test_inventory()
-	_test_cheapest_goes_first()
+	_test_bag_has_a_limit()
+
+	_test_full_bag_refuses_purchase()
 	await _test_note_absent_without_potions()
 	await _test_note_present_with_potions()
 	await _test_special_drinks_normal_saves()
@@ -27,7 +29,9 @@ func _frames(count: int) -> void:
 func _test_registry() -> void:
 	print("Зелья загружаются")
 	var all := Registry.all_potions()
-	check(all.size() >= 2, "зелья в реестре (%d)" % all.size())
+	# Зелье в игре ровно одно и намеренно: выбор посреди ритмической фразы
+	# игрок всё равно не успевает сделать
+	check(all.size() >= 1, "зелья в реестре (%d)" % all.size())
 	for potion in all:
 		check(not potion.id.is_empty(), "у зелья есть id")
 		check(potion.restore_health > 0, "%s лечит" % potion.id)
@@ -40,30 +44,50 @@ func _test_inventory() -> void:
 	GameState.reset()
 	check(not GameState.has_any_potion(), "сумка пуста")
 
-	GameState.add_potion("berry_cordial", 2)
-	check_eq(GameState.potion_count("berry_cordial"), 2, "морсов два")
+	GameState.add_potion("health_potion", 2)
+	check_eq(GameState.potion_count("health_potion"), 2, "отваров два")
 	check(GameState.has_any_potion(), "есть что пить")
 
 	var restored := GameState.consume_potion()
 	check(restored > 0, "глоток вернул здоровье (%d)" % restored)
-	check_eq(GameState.potion_count("berry_cordial"), 1, "остался один")
+	check_eq(GameState.potion_count("health_potion"), 1, "остался один")
 
 	GameState.consume_potion()
 	check(not GameState.has_any_potion(), "сумка снова пуста")
 	check_eq(GameState.consume_potion(), 0, "пить нечего — и ничего не возвращается")
 
 
-## Дорогое бережётся само: в ритме выбирать некогда.
-func _test_cheapest_goes_first() -> void:
-	print("Первым пьётся самое слабое")
+## Сумка зелий ограничена: три глотка — предел, а не склад.
+func _test_bag_has_a_limit() -> void:
+	print("С собой не больше трёх")
 	GameState.reset()
-	GameState.add_potion("honey_brew")
-	GameState.add_potion("berry_cordial")
 
-	var cordial := Registry.potion("berry_cordial")
-	check_eq(GameState.next_potion().id, "berry_cordial", "следующим идёт морс")
-	check_eq(GameState.consume_potion(), cordial.restore_health, "он и выпит")
-	check_eq(GameState.next_potion().id, "honey_brew", "отвар остался на потом")
+	var taken := GameState.add_potion("health_potion", 10)
+	check_eq(taken, GameState.MAX_POTIONS, "взято ровно столько, сколько влезло")
+	check_eq(GameState.total_potions(), GameState.MAX_POTIONS, "в сумке предел")
+	check(not GameState.has_potion_room(), "места больше нет")
+
+	check_eq(GameState.add_potion("health_potion", 1), 0, "сверх предела не берётся")
+	check_eq(GameState.total_potions(), GameState.MAX_POTIONS, "и число не выросло")
+
+	# Выпил — место освободилось
+	GameState.consume_potion()
+	check(GameState.has_potion_room(), "после глотка место есть")
+
+
+## Покупка сверх предела не должна забирать серебро: молча съеденные деньги
+## выглядят как работающая покупка, и это худший вид поломки.
+func _test_full_bag_refuses_purchase() -> void:
+	print("Полная сумка не даёт купить")
+	GameState.reset()
+	GameState.add_silver(500)
+	GameState.add_potion("health_potion", GameState.MAX_POTIONS)
+
+	var potion := Registry.potion("health_potion")
+	var silver_before := GameState.silver
+	check(not MerchantStock.buy(potion), "покупка отклонена")
+	check_eq(GameState.silver, silver_before, "серебро на месте")
+	check_eq(GameState.total_potions(), GameState.MAX_POTIONS, "зелий не прибавилось")
 
 
 func _battle(chart_id: String = "demo_disco") -> Node2D:
@@ -111,7 +135,7 @@ func _test_note_absent_without_potions() -> void:
 func _test_note_present_with_potions() -> void:
 	print("С зельем нота-зелье остаётся")
 	GameState.reset()
-	GameState.add_potion("berry_cordial", 3)
+	GameState.add_potion("health_potion", 3)
 
 	var battle: Node2D = await _battle()
 	battle.begin(ChartLoader.load_by_id("demo_disco", "normal"))
@@ -128,7 +152,7 @@ func _test_note_present_with_potions() -> void:
 func _test_special_drinks_normal_saves() -> void:
 	print("Особая кнопка пьёт, обычная сберегает")
 	GameState.reset()
-	GameState.add_potion("berry_cordial", 2)
+	GameState.add_potion("health_potion", 2)
 
 	var battle: Node2D = await _battle()
 	battle.begin(ChartLoader.load_by_id("demo_disco", "normal"))
@@ -142,14 +166,14 @@ func _test_special_drinks_normal_saves() -> void:
 	# Тип явно: чтение через узел даёт Variant
 	var health_before: int = battle.state.health
 	battle._judge_tap(NoteRules.Lane.NORMAL)
-	check_eq(GameState.potion_count("berry_cordial"), 2, "обычной кнопкой зелье сбережено")
+	check_eq(GameState.potion_count("health_potion"), 2, "обычной кнопкой зелье сбережено")
 	check_eq(battle.state.health, health_before, "и здоровье не изменилось")
 
 	# Особой кнопкой: зелье выпито, здоровье вернулось
 	var second: Note = battle._pool.acquire(Conductor.song_beat, ChartData.NoteType.SNACK)
 	battle._active.append(second)
 	battle._judge_tap(NoteRules.Lane.SPECIAL)
-	check_eq(GameState.potion_count("berry_cordial"), 1, "особой кнопкой зелье выпито")
+	check_eq(GameState.potion_count("health_potion"), 1, "особой кнопкой зелье выпито")
 	check(battle.state.health > health_before, "и здоровье выросло")
 
 	Conductor.stop()
@@ -160,10 +184,10 @@ func _test_special_drinks_normal_saves() -> void:
 func _test_survives_save() -> void:
 	print("Зелья переживают сейв")
 	GameState.reset()
-	GameState.add_potion("honey_brew", 4)
+	GameState.add_potion("health_potion", 2)
 
 	var restored: Variant = JSON.parse_string(JSON.stringify(GameState.to_dict()))
 	GameState.reset()
 	GameState.from_dict(restored)
 
-	check_eq(GameState.potion_count("honey_brew"), 4, "зелья на месте после сейва")
+	check_eq(GameState.potion_count("health_potion"), 2, "зелья на месте после сейва")

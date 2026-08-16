@@ -535,6 +535,9 @@ func _buy_item(item: Resource) -> void:
 	var id: String = item.id
 	if RunManager.run_silver < price:
 		return
+	# Сумка зелий ограничена — проверяем до списания серебра
+	if item is PotionData and not GameState.has_potion_room():
+		return
 	RunManager.add_loot_silver(-price)
 	if item is PotionData:
 		GameState.add_potion(id)

@@ -70,7 +70,7 @@ func _test_bush_is_never_empty() -> void:
 		var before_silver := RunManager.run_silver
 		var before_seeds := _total_seeds()
 		var before_potions := GameState.total_potions()
-		var before_gear := GameState.owned_gear_ids().size()
+		var before_gear := _total_gear()
 
 		var text := RunManager.shake_bush(5)
 		check(not text.is_empty(), "куст сказал, что дал")
@@ -78,7 +78,7 @@ func _test_bush_is_never_empty() -> void:
 		var got := RunManager.run_silver > before_silver \
 			or _total_seeds() > before_seeds \
 			or GameState.total_potions() > before_potions \
-			or GameState.owned_gear_ids().size() > before_gear
+			or _total_gear() > before_gear
 		check(got, "куст действительно что-то дал (%s)" % text)
 
 	RunManager.go_home()
@@ -113,17 +113,23 @@ func _test_granny_gives_something_back() -> void:
 	_fresh_run()
 	RunManager.run_silver = 200
 
+	const PAID := 10
 	for i in 20:
 		var before_potions := GameState.total_potions()
 		var before_seeds := _total_seeds()
-		var before_gear := GameState.owned_gear_ids().size()
+		var before_gear := _total_gear()
+		var before_silver := RunManager.run_silver
 
-		var gift := RunManager.pay_granny(10)
+		var gift := RunManager.pay_granny(PAID)
 		check(not gift.is_empty(), "подарок назван")
 
+		# Серебро тоже считается подарком: когда сумка зелий полна, бабушка
+		# отсыпает монеток. Сравниваем с тем, что осталось ПОСЛЕ платы, —
+		# иначе собственный взнос игрока замаскировал бы отсутствие подарка
 		var got := GameState.total_potions() > before_potions \
 			or _total_seeds() > before_seeds \
-			or GameState.owned_gear_ids().size() > before_gear
+			or _total_gear() > before_gear \
+			or RunManager.run_silver > before_silver - PAID
 		check(got, "подарок действительно получен (%s)" % gift)
 
 	RunManager.go_home()
@@ -151,3 +157,15 @@ func _test_refusing_granny_costs_nothing() -> void:
 	check(RunManager.run_silver >= 0, "серебро не уходит в минус")
 
 	RunManager.go_home()
+
+
+## Сколько ЕДИНИЦ снаряжения на руках.
+##
+## Считаем штуки, а не виды: повторный плащ увеличивает счётчик своего вида,
+## но не длину списка, и проверка «дал ли куст хоть что-то» на дубликате
+## врала, будто куст оказался пустым.
+func _total_gear() -> int:
+	var total := 0
+	for gear_id: String in GameState.owned_gear_ids():
+		total += GameState.gear_count(gear_id)
+	return total

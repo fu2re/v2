@@ -61,7 +61,7 @@ func _rich_state() -> void:
 	FarmState.add_seed("chord_apple", 2)
 	FarmState.plant(0, "chord_apple")
 	GameState.add_gear("acorn_charm")
-	GameState.add_potion("berry_cordial", 2)
+	GameState.add_potion("health_potion", 2)
 
 
 func _open(path: String) -> Node:

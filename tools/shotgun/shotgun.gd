@@ -72,6 +72,8 @@ func _build_targets() -> void:
 			"setup": _played_a_while},
 		{"name": "10_run_feed", "scene": "res://scenes/run/RunFeed.tscn",
 			"setup": _played_a_while},
+		{"name": "11_battle", "scene": "res://scenes/battle/DanceBattle.tscn",
+			"setup": _ready_for_battle, "after": _spawn_every_note},
 	]
 
 
@@ -120,7 +122,7 @@ func _full_bags() -> void:
 	FarmState.add_seed("drum_berry", 7)
 	FarmState.add_seed("bass_plum", 3)
 	GameState.add_gear("acorn_charm")
-	GameState.add_potion("berry_cordial", 2)
+	GameState.add_potion("health_potion", 2)
 
 
 # --- съёмка ------------------------------------------------------------------
@@ -139,6 +141,14 @@ func _shoot(target: Dictionary) -> void:
 	for i in SETTLE_FRAMES:
 		await get_tree().process_frame
 
+	# Иногда снимку нужно, чтобы на экране что-то происходило: пустой бой
+	# не покажет ни одной ноты
+	if target.has("after"):
+		var after: Callable = target["after"]
+		after.call(instance)
+		for i in 2:
+			await get_tree().process_frame
+
 	# Ждём именно кадр отрисовки: до него текстура вьюпорта пуста
 	await RenderingServer.frame_post_draw
 	var image := _viewport.get_texture().get_image()
@@ -152,3 +162,34 @@ func _shoot(target: Dictionary) -> void:
 	_viewport.remove_child(instance)
 	instance.queue_free()
 	await get_tree().process_frame
+
+
+## Бой с зельями в сумке: снимок нужен, чтобы увидеть форму ноты-бутылочки
+## и счётчик глотков. Обе вещи проверяются только глазом.
+func _ready_for_battle() -> void:
+	_played_a_while()
+	GameState.add_potion("health_potion", GameState.MAX_POTIONS)
+
+
+## Выложить на дорожку по одной ноте каждого типа.
+##
+## Формы нот — единственное, что игрок читает боковым зрением, и проверить
+## их можно только глядя. Расставляем сверху вниз с шагом, чтобы силуэты
+## не наложились друг на друга.
+func _spawn_every_note(battle: Node) -> void:
+	var types := [
+		ChartData.NoteType.BEAT, ChartData.NoteType.ATTACK,
+		ChartData.NoteType.SKILL, ChartData.NoteType.SHIELD,
+		ChartData.NoteType.SNACK,
+	]
+	var pool = battle.get("_pool")
+	var active: Array = battle.get("_active")
+	if pool == null:
+		return
+	# Бой сам расставляет ноты по долям, поэтому сначала глушим его _process,
+	# иначе все пять слипнутся в одну точку у линии суда
+	battle.set_process(false)
+	for i in types.size():
+		var note = pool.acquire(0.0, types[i])
+		note.position = Vector2(540.0, 300.0 + i * 190.0)
+		active.append(note)

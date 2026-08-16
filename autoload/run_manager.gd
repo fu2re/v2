@@ -342,8 +342,12 @@ func shake_bush(for_depth: int) -> String:
 
 	match picked:
 		"potion":
+			# Полная сумка — не повод отдать пустой куст: зелье просто
+			# не влезает, и вместо него достаётся серебро (запасной вариант
+			# внизу). Без этой проверки куст рапортовал бы о зелье, которого
+			# игрок не получил
 			var potions := Registry.all_potions()
-			if not potions.is_empty():
+			if not potions.is_empty() and GameState.has_potion_room():
 				var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
 				GameState.add_potion(potion.id)
 				return "%s — в сумку!" % potion.display_name
@@ -400,12 +404,20 @@ func pay_granny(amount: int) -> String:
 			if item != null:
 				return "Свёрток: %s" % item.display_name
 
+	# Зелье — только если влезает: сумка ограничена (GameState.MAX_POTIONS),
+	# а подарок, о котором сказали, но не отдали, обиднее, чем скромный
 	var potions := Registry.all_potions()
-	if not potions.is_empty():
+	if not potions.is_empty() and GameState.has_potion_room():
 		var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
 		GameState.add_potion(potion.id)
 		return "Гостинец: %s" % potion.display_name
-	return "Тёплое слово и добрый взгляд"
+
+	# Зелье не влезло — бабушка даёт серебро. Подарок обязан быть
+	# материальным: «тёплое слово» после того, как игрок отдал ей деньги,
+	# читается как обман, а не как трогательность
+	var coins := 12
+	add_loot_silver(coins)
+	return "Горсть монеток на дорожку: +%d" % coins
 
 
 ## Выдать снаряжение за побеждённого монстра. Возвращает id или пустую строку.

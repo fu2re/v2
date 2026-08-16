@@ -25,7 +25,6 @@ const TARGETS := {
 	# приручения игрок видит после каждой победы
 	"res://scenes/battle/taming_screen.gd": "res://scenes/battle/TamingScreen.tscn",
 	"res://scenes/calibration/calibration.gd": "res://scenes/calibration/Calibration.tscn",
-	"res://scenes/farm/plant_dance.gd": "res://scenes/farm/PlantDance.tscn",
 }
 
 ## Метод сборки. У сцены боя это не интерфейс, а сцена целиком.

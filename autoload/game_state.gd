@@ -320,12 +320,33 @@ func add_silver(amount: int) -> void:
 
 # --- зелья -------------------------------------------------------------------
 
-func add_potion(potion_id: String, count: int = 1) -> void:
+## Сколько зелий помещается в сумку.
+##
+## Предел, а не место под склад: с тремя глотками бой остаётся боем.
+## Без предела достаточно накопить два десятка отваров, и любая встреча
+## выигрывается перепиванием, а ритм перестаёт что-либо решать.
+const MAX_POTIONS := 3
+
+
+## Положить зелье в сумку. Возвращает, сколько влезло: сверх предела
+## не берём, и покупка сверх него не должна молча съедать серебро.
+func add_potion(potion_id: String, count: int = 1) -> int:
 	if Registry.potion(potion_id) == null:
 		push_error("Неизвестное зелье: %s" % potion_id)
-		return
-	potions[potion_id] = potions.get(potion_id, 0) + count
+		return 0
+	var room := MAX_POTIONS - total_potions()
+	var taken := mini(count, maxi(room, 0))
+	if taken <= 0:
+		return 0
+	potions[potion_id] = potions.get(potion_id, 0) + taken
 	fruits_changed.emit()
+	return taken
+
+
+## Влезет ли ещё хоть одно. Спрашивают лавка и сундук — до того,
+## как взять деньги.
+func has_potion_room() -> bool:
+	return total_potions() < MAX_POTIONS
 
 
 func potion_count(potion_id: String) -> int:
@@ -345,10 +366,12 @@ func has_any_potion() -> bool:
 	return total_potions() > 0
 
 
-## Какое зелье выпьется следующим — самое слабое из имеющихся.
+## Какое зелье выпьется следующим.
 ##
-## Дорогие берегутся сами собой: игрок не должен выбирать в ритме, а тратить
-## лучшее там, где хватило бы простого морса, было бы обидно.
+## Зелье в игре одно, и выбирать не из чего — это намеренно: выбор посреди
+## ритмической фразы игрок всё равно сделать не успевает, а два похожих
+## пузырька в сумке только заставляли жадничать. Перебор остался на случай
+## будущих зелий и берёт слабейшее.
 func next_potion() -> PotionData:
 	var best: PotionData = null
 	for potion_id: String in potions:

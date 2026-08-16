@@ -114,6 +114,12 @@ static func buy(item: Resource) -> bool:
 	if price <= 0 or GameState.silver < price:
 		return false
 
+	# Сумка зелий не резиновая (GameState.MAX_POTIONS). Проверяем ДО того,
+	# как взять серебро: иначе покупка молча съедала бы деньги и ничего
+	# не давала — худший вид поломки, потому что выглядит как работающая
+	if item is PotionData and not GameState.has_potion_room():
+		return false
+
 	GameState.add_silver(-price)
 	if item is FruitData:
 		FarmState.add_seed(item.id, 1)

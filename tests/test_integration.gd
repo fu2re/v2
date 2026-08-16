@@ -45,7 +45,6 @@ func _test_all_scenes_instantiate() -> void:
 		"res://scenes/run/RunFeed.tscn",
 		"res://scenes/battle/DanceBattle.tscn",
 		"res://scenes/battle/TamingScreen.tscn",
-		"res://scenes/farm/PlantDance.tscn",
 		"res://scenes/intro/Splash.tscn",
 		"res://scenes/intro/CharacterSelect.tscn",
 		"res://scenes/intro/Intro.tscn",
@@ -129,15 +128,18 @@ func _test_full_player_journey() -> void:
 	check(GameState.silver > seeds_before, "серебро доехали домой")
 	check(FarmState.seed_count("drum_berry") >= 2, "семена доехали на ферму")
 
-	# 7. Ферма: посадить, станцевать, вырастить, собрать
+	# 7. Ферма: посадить, вырастить, собрать
 	check(FarmState.plant(0, "drum_berry"), "посажено")
-	check(FarmState.apply_dance(0, DanceGrade.Level.PERFECT), "станцевано")
 	FarmState.debug_rewind(86400.0)
 	FarmState.tick()
 	check(FarmState.is_ready(0), "выросло")
 	check_eq(FarmState.harvest(0), "drum_berry", "собрано")
-	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PERFECT), 1,
-		"идеальный танец дал идеальный фрукт")
+	# Качество урожая задаёт сорт семечка: дешёвая ягода даёт обычный плод,
+	# и это наблюдаемый результат, а не внутреннее поле
+	var berry := Registry.fruit("drum_berry")
+	check_eq(GameState.fruit_count("drum_berry",
+		FarmState.quality_for_tier(berry.tier)), 1,
+		"собранный плод лёг в сумку качеством по сорту")
 
 	# 8. Лавка: купить и надеть косметику
 	ShopState.add_gold(1000)
@@ -226,7 +228,6 @@ func _test_whole_state_survives_save() -> void:
 
 	FarmState.add_seed("echo_pear", 4)
 	FarmState.plant(0, "echo_pear")
-	FarmState.apply_dance(0, DanceGrade.Level.GOOD)
 
 	ShopState.add_gold(600)
 	ShopState.daily_limit = 999999
@@ -253,7 +254,6 @@ func _test_whole_state_survives_save() -> void:
 	check(GameState.equipped_gear("disco_sprout:0", GearData.Slot.BELT) != null,
 		"снаряжение осталось надетым на экземпляре")
 	check(not FarmState.is_empty_plot(0), "грядка засажена")
-	check_eq(FarmState.plots[0].dance_level, DanceGrade.Level.GOOD, "танец запомнен")
 	check(ShopState.is_owned(cosmetic.id), "покупка на месте")
 	check_eq(ShopState.pity_counter, 9, "счётчик pity на месте")
 

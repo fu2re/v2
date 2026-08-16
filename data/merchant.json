@@ -42,8 +42,7 @@
       "thunder_pick": 240
     },
     "potions": {
-      "berry_cordial": 30,
-      "honey_brew": 80
+      "health_potion": 45
     },
     "seeds_by_tier": {
       "0": 15,

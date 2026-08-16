@@ -28,7 +28,6 @@ const GRID_LEFT := 58.0
 @onready var _guardian_label: Label = $GuardianLabel
 
 var _plot_buttons: Array[Button] = []
-var _dance: CanvasLayer = null
 var _pending_plot := -1
 
 
@@ -45,10 +44,6 @@ func _ready() -> void:
 	# живого экрана, кнопки под ней видно, но нажать нельзя
 	_seed_picker.visibility_changed.connect(
 		func(): _picker_bg.visible = _seed_picker.visible)
-
-	_dance = preload("res://scenes/farm/PlantDance.tscn").instantiate()
-	add_child(_dance)
-	_dance.finished.connect(_on_dance_finished)
 
 	FarmState.plots_changed.connect(_refresh)
 	FarmState.seeds_changed.connect(_refresh)
@@ -170,8 +165,7 @@ func _plot_label(index: int) -> String:
 	var left := _format_time(FarmState.seconds_left(index))
 	# Значок ноты вместо слова «станцевать»: слово не влезает, а нота
 	# уже означает танец на всех остальных экранах
-	var dance_hint := "  ♪" if FarmState.can_dance(index) else ""
-	return "%d%%\n%s%s" % [percent, left, dance_hint]
+	return "%d%%\n%s" % [percent, left]
 
 
 func _format_time(seconds: float) -> String:
@@ -192,12 +186,6 @@ func _on_plot_pressed(index: int) -> void:
 
 	if FarmState.is_empty_plot(index):
 		_open_seed_picker(index)
-		return
-
-	if FarmState.can_dance(index):
-		var fruit := Registry.fruit(FarmState.plots[index].seed_id)
-		_pending_plot = index
-		_dance.start(fruit.display_name if fruit != null else "растения")
 		return
 
 	_status.text = "Уже растёт. Загляни позже — урожай не пропадёт."
@@ -246,14 +234,6 @@ func _plant_selected(fruit_id: String) -> void:
 func _close_seed_picker() -> void:
 	_seed_picker.visible = false
 	_pending_plot = -1
-
-
-func _on_dance_finished(level: DanceGrade.Level) -> void:
-	if _pending_plot >= 0:
-		FarmState.apply_dance(_pending_plot, level)
-		_status.text = "%s Растение потянулось вверх." % DanceGrade.level_name(level)
-	_pending_plot = -1
-	_refresh()
 
 
 func _go_to_lobby() -> void:

@@ -61,46 +61,45 @@ func _refresh() -> void:
 		_list.add_child(_make_row(item))
 
 
+## Одна строка витрины: картинка, название, цена — всё на одной кнопке.
+##
+## Раньше это были два отдельных узла: подпись сверху и кнопка снизу. Связь
+## между ними держалась только на близости, и витрина рассыпалась на чересполосицу
+## заголовков и пустых плашек — непонятно, к чему относится цена и что вообще
+## нажимать. Одна кнопка на предмет: нажимается ровно то, что видно.
 func _make_row(item: CosmeticData) -> Control:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	# Обёртка не ловит ввод: иначе она перехватывает клики по кнопке внутри
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", MonsterData.rarity_color(item.rarity))
-	title.text = "%s · %s" % [item.display_name, CosmeticData.slot_name(item.slot)]
-	box.add_child(title)
-
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(0, 110)
-	button.add_theme_font_size_override("font_size", 30)
-	# Картинка наряда на самой кнопке: подпись сверху говорит, что это,
-	# а кнопка — сколько стоит; вместе они читаются как одна карточка
+	button.custom_minimum_size = Vector2(0, 150)
+	button.add_theme_font_size_override("font_size", 32)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Цвет грейда — на самой кнопке: редкость видна там же, где название,
+	# и не требует отдельной подписи
+	button.add_theme_color_override("font_color", MonsterData.rarity_color(item.rarity))
 	UIUtil.decorate_row(button, item)
+
+	var caption := "%s · %s" % [item.display_name, CosmeticData.slot_name(item.slot)]
 
 	if ShopState.is_owned(item.id):
 		var worn := ShopState.equipped_in(item.slot)
 		var is_worn := worn != null and worn.id == item.id
-		button.text = "Надето" if is_worn else "Надеть"
+		button.text = "%s\n%s" % [caption, "Надето" if is_worn else "Нажми, чтобы надеть"]
 		button.disabled = is_worn
 		button.pressed.connect(func():
 			ShopState.equip(item.id)
 			_refresh())
 	elif _pending == item.id:
-		button.text = "Купить за %d ♪? Нажми ещё раз" % item.price_gold
+		button.text = "%s\nКупить за %d ♪? Нажми ещё раз" % [caption, item.price_gold]
 		button.pressed.connect(_confirm_buy.bind(item))
 	else:
-		button.text = "%d ♪" % item.price_gold
+		button.text = "%s\n%d ♪" % [caption, item.price_gold]
+		button.disabled = ShopState.gold < item.price_gold
 		button.pressed.connect(func():
 			_pending = item.id
 			_pending_since = Time.get_ticks_msec() / 1000.0
 			_status.text = "Подтверди покупку вторым нажатием"
 			_refresh())
 
-	box.add_child(button)
-	return box
+	return button
 
 
 func _confirm_buy(item: CosmeticData) -> void:

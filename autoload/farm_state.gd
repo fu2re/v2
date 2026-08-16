@@ -18,21 +18,12 @@ const MAX_PLOTS := 16
 const PLOT_BASE_COST := 60
 const PLOT_COST_STEP := 45
 
-## Сокращение времени роста за танец (GDD §7.2). Провала нет: худший
-## исход — обычный рост, а не потерянное растение.
-const DANCE_REDUCTION := {
-	0: 0.0,    # не танцевал
-	1: 0.15,   # слабо
-	2: 0.30,   # хорошо
-	3: 0.40,   # идеально
-}
-
 ## Сколько реального времени засчитывается за один запуск игры.
 ## Защита от перевода системных часов вперёд (открытый вопрос GDD §15.4).
 ## Щедро для честного игрока, конечно для нечестного.
 const MAX_OFFLINE_CREDIT := 86400.0 * 2.0
 
-## Грядки. Каждая — Dictionary: seed_id, grown, needed, dance_level, dance_used.
+## Грядки. Каждая — Dictionary: seed_id, grown, needed.
 var plots: Array = []
 ## Семена в амбаре: fruit_id -> количество.
 var seed_bag: Dictionary = {}
@@ -60,8 +51,6 @@ func _empty_plot() -> Dictionary:
 		"seed_id": "",
 		"grown": 0.0,
 		"needed": 0.0,
-		"dance_level": 0,
-		"dance_used": false,
 	}
 
 
@@ -143,45 +132,22 @@ func plant(index: int, fruit_id: String) -> bool:
 	plot.seed_id = fruit_id
 	plot.grown = 0.0
 	plot.needed = float(fruit.grow_seconds())
-	plot.dance_level = 0
-	plot.dance_used = false
 
 	plots_changed.emit()
 	SaveManager.mark_dirty()
 	return true
 
 
-## Записать результат танца. Танцевать можно один раз за цикл роста:
-## это маленький ритуал, а не кнопка гринда.
-func apply_dance(index: int, level: int) -> bool:
-	if not _valid(index):
-		return false
-	var plot: Dictionary = plots[index]
-	if plot.seed_id.is_empty() or plot.dance_used or plot.grown >= plot.needed:
-		return false
-
-	plot.dance_used = true
-	plot.dance_level = clampi(level, 0, 3)
-	var reduction: float = DANCE_REDUCTION.get(plot.dance_level, 0.0)
-	plot.needed = maxf(plot.needed * (1.0 - reduction), 1.0)
-
-	plots_changed.emit()
-	SaveManager.mark_dirty()
-	return true
-
-
-func can_dance(index: int) -> bool:
-	if not _valid(index):
-		return false
-	var plot: Dictionary = plots[index]
-	return not plot.seed_id.is_empty() and not plot.dance_used and plot.grown < plot.needed
-
-
-## Качество урожая по тому, как станцевали (GDD §7.2).
-static func quality_for_dance(level: int) -> FruitData.Quality:
-	if level >= 3:
+## Качество урожая по СОРТУ семечка (GDD §7.2).
+##
+## Раньше качество задавал танец растению. Мини-игру убрали, и качество
+## переехало на то, что и так было у фрукта, — его сорт: чем дороже и дольше
+## растёт семечко, тем лучше плод. Выдумывать взамен новую механику не стали:
+## качество и так уже есть чем заслужить — семечко надо найти или купить.
+static func quality_for_tier(tier: int) -> FruitData.Quality:
+	if tier >= 3:
 		return FruitData.Quality.PERFECT
-	if level >= 2:
+	if tier >= 1:
 		return FruitData.Quality.JUICY
 	return FruitData.Quality.PLAIN
 
@@ -192,7 +158,8 @@ func harvest(index: int) -> String:
 		return ""
 	var plot: Dictionary = plots[index]
 	var fruit_id: String = plot.seed_id
-	var quality := quality_for_dance(plot.dance_level)
+	var fruit := Registry.fruit(fruit_id)
+	var quality := quality_for_tier(fruit.tier if fruit != null else 0)
 
 	GameState.add_fruit(fruit_id, quality, 1)
 	plots[index] = _empty_plot()

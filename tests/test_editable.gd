@@ -22,8 +22,6 @@ const CODE_BUILT_ALLOWED := {
 	"res://scenes/onboarding/CoachOverlay.tscn": "кольцо и палец рисуются по времени",
 	# Замер задержки: два узла, живёт вне игрового контура
 	"res://scenes/calibration/Calibration.tscn": "служебный экран калибровки",
-	# Мини-игра танца растению: разметка нот рисуется, а не расставляется
-	"res://scenes/farm/PlantDance.tscn": "ноты фразы рисуются по чарту",
 	# Логика запуска без единого видимого узла
 	"res://scenes/Boot.tscn": "нет интерфейса вообще",
 }

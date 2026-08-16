@@ -204,9 +204,8 @@ func _test_loop_is_closed() -> void:
 	check(FarmState.known_seeds.has("loop_fig"), "новая культура открыта")
 	check_eq(FarmState.seed_count("loop_fig"), 1, "семя в амбаре")
 
-	# 3. Посадили, станцевали, вырастили
+	# 3. Посадили, вырастили
 	check(FarmState.plant(0, "loop_fig"), "семя посажено")
-	FarmState.apply_dance(0, DanceGrade.Level.PERFECT)
 	FarmState.debug_rewind(86400.0)
 	FarmState.tick()
 	check(FarmState.is_ready(0), "выросло")
@@ -215,8 +214,12 @@ func _test_loop_is_closed() -> void:
 	# 4. Фрукт годится для приручения — и это тот вид, который любит мотылёк
 	var moth := Registry.monster("banjo_moth")
 	check_eq(moth.favorite_fruit_id, "loop_fig", "мотылёк любит именно этот фрукт")
-	check(GameState.fruit_count("loop_fig", FruitData.Quality.PERFECT) > 0,
-		"идеальный фрукт в сумке")
+	# Качество задаёт сорт семечка: танец растению убран, и «идеальный»
+	# больше не выдаётся за старание — его надо посадить
+	var fig := Registry.fruit("loop_fig")
+	var quality := FarmState.quality_for_tier(fig.tier)
+	check(GameState.fruit_count("loop_fig", quality) > 0,
+		"фрукт в сумке качеством по сорту (%s)" % FruitData.quality_name(quality))
 
 	var bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
 		FruitData.Quality.PERFECT)

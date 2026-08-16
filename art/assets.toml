@@ -184,14 +184,9 @@ cutout = true
 style = "single small drink container, handmade rustic vessel, flat orthographic icon, straight front view, no perspective, thick readable silhouette"
 
 [[asset]]
-id = "berry_cordial"
+id = "health_potion"
 kind = "potion"
-subject = "small corked glass bottle of dark red berry drink, cloth tie around the neck"
-
-[[asset]]
-id = "honey_brew"
-kind = "potion"
-subject = "squat clay jar of golden honey drink, wooden stopper, dripping seal"
+subject = "small corked glass bottle of warm amber herbal drink, cloth tie around the neck"
 
 [kind.cosmetic]
 size = 64

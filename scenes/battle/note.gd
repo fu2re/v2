@@ -58,6 +58,8 @@ func _draw() -> void:
 			_draw_shield()
 		ChartData.NoteType.ATTACK:
 			_draw_star()
+		ChartData.NoteType.SNACK:
+			_draw_flask()
 		_:
 			draw_circle(Vector2.ZERO, RADIUS, _color)
 			draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, _color.lightened(0.4), 5.0, true)
@@ -94,3 +96,36 @@ func _draw_shield() -> void:
 	])
 	draw_colored_polygon(points, _color)
 	draw_polyline(points + PackedVector2Array([points[0]]), Color.WHITE, 5.0, true)
+
+
+## Бутылочка — форма зелья.
+##
+## Раньше зелье рисовалось тем же кругом, что и обычный бит, и отличалось
+## только цветом. В темпе боя цвет не читается: игрок видит круг и жмёт
+## обычную кнопку, теряя глоток. Форма считывается боковым зрением,
+## цвет — нет, поэтому у зелья теперь свой силуэт.
+func _draw_flask() -> void:
+	var r := RADIUS
+	var light := _color.lightened(0.4)
+
+	# Пузатое тело
+	var body := PackedVector2Array([
+		Vector2(-r * 0.42, -r * 0.3), Vector2(r * 0.42, -r * 0.3),
+		Vector2(r * 0.95, r * 0.45), Vector2(r * 0.7, r * 1.25),
+		Vector2(-r * 0.7, r * 1.25), Vector2(-r * 0.95, r * 0.45),
+	])
+	draw_colored_polygon(body, _color)
+	draw_polyline(body + PackedVector2Array([body[0]]), light, 5.0, true)
+
+	# Горлышко и пробка: без них силуэт читается как мешок, а не как склянка
+	var neck := PackedVector2Array([
+		Vector2(-r * 0.36, -r * 1.0), Vector2(r * 0.36, -r * 1.0),
+		Vector2(r * 0.36, -r * 0.24), Vector2(-r * 0.36, -r * 0.24),
+	])
+	draw_colored_polygon(neck, _color)
+	draw_polyline(neck + PackedVector2Array([neck[0]]), light, 4.0, true)
+	draw_rect(Rect2(Vector2(-r * 0.46, -r * 1.35), Vector2(r * 0.92, r * 0.38)), light, true)
+
+	# Блик — он же подсказка «внутри жидкость»
+	draw_line(Vector2(-r * 0.45, r * 0.15), Vector2(-r * 0.28, r * 0.85),
+		Color(1, 1, 1, 0.55), 4.0, true)
