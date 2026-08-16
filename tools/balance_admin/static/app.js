@@ -14,6 +14,43 @@ let REFS = null;
 let current = null;   // {type:'config'|'entities'|'backups', name, data, schema, dirty}
 let validateTimer = null;
 
+// Один плеер на всю страницу: две мелодии разом — это каша, а не прослушка
+const player = new Audio();
+let playingBtn = null;
+
+function togglePlay(stem, btn) {
+  if (playingBtn === btn && !player.paused) { stopAudio(); return; }
+  stopAudio();
+  player.src = `/music/${stem}.ogg`;
+  player.play().catch(() => toast(`Не проигрывается: ${stem}.ogg`, true));
+  playingBtn = btn;
+  btn.classList.add("playing");
+  btn.textContent = "■ " + (btn.dataset.label || "");
+}
+
+function stopAudio() {
+  player.pause();
+  if (playingBtn) {
+    playingBtn.classList.remove("playing");
+    playingBtn.textContent = "▶ " + (playingBtn.dataset.label || "");
+    playingBtn = null;
+  }
+}
+player.addEventListener("ended", stopAudio);
+
+function playButton(label, stemGetter) {
+  const btn = document.createElement("button");
+  btn.className = "play-btn";
+  btn.dataset.label = label;
+  btn.textContent = "▶ " + label;
+  btn.onclick = () => {
+    const stem = stemGetter();
+    if (!stem) { toast("Трека нет", true); return; }
+    togglePlay(stem, btn);
+  };
+  return btn;
+}
+
 const GEAR_SLOTS = ["Пояс", "Плащ", "Головной убор"];
 const COSMETIC_SLOTS = ["Наряд", "Головной убор", "Инструмент",
   "Вид грядки", "Эффект нот", "Танцевальное движение"];
@@ -49,6 +86,9 @@ async function boot() {
   $("#save-btn").onclick = saveCurrent;
   $("#modal-close").onclick = closeModal;
   $("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
+  $("#melody-close").onclick = closeMelodyModal;
+  $("#melody-modal").onclick =
+    (e) => { if (e.target.id === "melody-modal") closeMelodyModal(); };
 }
 
 function activateNav(btn) {
@@ -63,6 +103,7 @@ async function openConfig(name, btn) {
   if (current?.dirty
       && !confirm("Есть несохранённые правки — бросить их?")) return;
   activateNav(btn);
+  stopAudio();
   const payload = await getJSON(`/api/configs/${name}`);
   current = { type: "config", name, data: payload.data,
     schema: payload.schema, readonly: payload.readonly, dirty: false };
@@ -464,19 +505,27 @@ async function openEntities(kind, label, btn) {
   if (current?.dirty
       && !confirm("Есть несохранённые правки — бросить их?")) return;
   activateNav(btn);
+  stopAudio();
   current = { type: "entities", kind, dirty: false };
   $("#crumbs").textContent = label;
   $("#save-btn").hidden = true;
   $("#dirty-dot").hidden = true;
   showProblems(null);
 
+  const extras = {};
+  if (kind === "monsters") {
+    // Список готовых спрайтов: лента грейдов не должна светить битыми img
+    const body = await getJSON("/api/images?dir=monster");
+    extras.monsterImages = new Set(body.files || []);
+  }
+
   const rows = await getJSON(`/api/entities/${kind}`);
   const content = $("#content");
   content.innerHTML = "";
-  for (const row of rows) content.appendChild(entityCard(kind, row));
+  for (const row of rows) content.appendChild(entityCard(kind, row, extras));
 }
 
-function entityCard(kind, row) {
+function entityCard(kind, row, extras) {
   const card = document.createElement("section");
   card.className = "entity-card";
   const title = document.createElement("h3");
@@ -485,6 +534,9 @@ function entityCard(kind, row) {
   card.appendChild(title);
 
   const pending = { identity: {}, stats: {} };
+  // Текущее значение с учётом несохранённых правок: кнопка «послушать»
+  // обязана играть то, что выбрано в селекте, а не то, что на диске
+  const liveValue = (field) => pending.identity[field] ?? row.identity[field];
   const cols = document.createElement("div");
   cols.className = "cols";
   card.appendChild(cols);
@@ -495,6 +547,7 @@ function entityCard(kind, row) {
   colIdentity.innerHTML = "<h5>Идентичность (.tres)</h5>";
   cols.appendChild(colIdentity);
 
+  const identityEls = {};
   for (const field of row.editable_identity) {
     if (!(field in row.identity)) continue;
     const value = row.identity[field];
@@ -503,9 +556,63 @@ function entityCard(kind, row) {
     const lab = document.createElement("label");
     lab.textContent = field;
     wrap.appendChild(lab);
-    wrap.appendChild(identityInput(kind, row, field, value,
-      (v) => { pending.identity[field] = v; enableSave(); }));
+    const input = identityInput(kind, row, field, value,
+      (v) => { pending.identity[field] = v; enableSave(); });
+    identityEls[field] = input;
+    wrap.appendChild(input);
+
+    if (kind === "monsters" && field === "motif_id") {
+      const currentStem = () => {
+        const genreKey = REFS.genre_keys[Number(liveValue("genre"))];
+        const tracks = REFS.track_index[`${genreKey}_${liveValue("motif_id")}`] || {};
+        return tracks.common || Object.values(tracks)[0];
+      };
+      wrap.appendChild(playButton("послушать", currentStem));
+      const pickBtn = document.createElement("button");
+      pickBtn.className = "play-btn";
+      pickBtn.textContent = "мелодии…";
+      pickBtn.onclick = () => openMelodyPicker(
+        REFS.genre_keys[Number(liveValue("genre"))],
+        liveValue("motif_id"),
+        (motif) => {
+          pending.identity.motif_id = motif;
+          identityEls.motif_id.value = motif;
+          enableSave();
+        });
+      wrap.appendChild(pickBtn);
+    }
     colIdentity.appendChild(wrap);
+  }
+
+  // -- лента грейдов: спрайты открываются по конвенции <id>_<грейд>.png,
+  // и увидеть все шесть важнее, чем путь к одному common в .tres
+  if (kind === "monsters" && extras?.monsterImages) {
+    const h = document.createElement("h5");
+    h.textContent = "Грейды";
+    colIdentity.appendChild(h);
+    const strip = document.createElement("div");
+    strip.className = "grade-strip";
+    for (const grade of REFS.grade_keys) {
+      const file = `${row.id}_${grade}.png`;
+      const fig = document.createElement("figure");
+      if (extras.monsterImages.has(file)) {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.src = `/art/monster/${file}`;
+        img.title = file;
+        fig.appendChild(img);
+      } else {
+        const missing = document.createElement("div");
+        missing.className = "missing";
+        missing.textContent = "нет";
+        fig.appendChild(missing);
+      }
+      const cap = document.createElement("figcaption");
+      cap.textContent = grade;
+      fig.appendChild(cap);
+      strip.appendChild(fig);
+    }
+    colIdentity.appendChild(strip);
   }
 
   // -- статы (JSON)
@@ -747,12 +854,78 @@ async function openImagePicker(currentValue, onPick) {
 
 function closeModal() { $("#modal").hidden = true; }
 
+// --- попап мелодий ------------------------------------------------------------
+// Мотив слушают, а не угадывают по имени: каждая строка — все шесть
+// ремиксов (грейд = темп). Выбрать можно только мотив с полным комплектом
+// чартов текущего жанра — неполный бой молча уйдёт на запасной трек.
+
+function openMelodyPicker(genreKey, currentMotif, onPick) {
+  const modal = $("#melody-modal");
+  const list = $("#melody-list");
+  modal.hidden = false;
+  $("#melody-title").textContent =
+    `Мелодии · жанр ${GENRE_NAMES[genreKey] || genreKey}`;
+  list.innerHTML = "";
+
+  for (const motif of REFS.motif_ids) {
+    const pair = `${genreKey}_${motif}`;
+    const tracks = REFS.track_index[pair] || {};
+    const chartGrades = REFS.chart_index[pair] || [];
+    const complete = REFS.grade_keys.every((g) => chartGrades.includes(g));
+
+    const rowEl = document.createElement("div");
+    rowEl.className = "melody-row" + (motif === currentMotif ? " current" : "");
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = REFS.motif_titles[motif] || motif;
+    const id = document.createElement("span");
+    id.className = "id";
+    id.textContent = motif + (motif === currentMotif ? " · текущий" : "");
+    name.appendChild(id);
+    rowEl.appendChild(name);
+
+    const grades = document.createElement("div");
+    grades.className = "grades";
+    for (const grade of REFS.grade_keys) {
+      const stem = tracks[grade];
+      if (!stem) continue;
+      const bpm = stem.split("_").pop();
+      grades.appendChild(playButton(`${grade} · ${bpm}`, () => stem));
+    }
+    if (!grades.children.length) {
+      const none = document.createElement("span");
+      none.className = "muted";
+      none.textContent = "треков нет";
+      grades.appendChild(none);
+    }
+    rowEl.appendChild(grades);
+
+    const pick = document.createElement("button");
+    pick.className = "pick";
+    pick.textContent = "выбрать";
+    pick.disabled = !complete;
+    if (!complete)
+      pick.title = `чартов ${chartGrades.length}/6 — выбрать нельзя`;
+    pick.onclick = () => { onPick(motif); closeMelodyModal(); };
+    rowEl.appendChild(pick);
+
+    list.appendChild(rowEl);
+  }
+}
+
+function closeMelodyModal() {
+  stopAudio();
+  $("#melody-modal").hidden = true;
+}
+
 // --- бэкапы -------------------------------------------------------------------
 
 async function openBackups(btn) {
   if (current?.dirty
       && !confirm("Есть несохранённые правки — бросить их?")) return;
   activateNav(btn);
+  stopAudio();
   current = { type: "backups", dirty: false };
   $("#crumbs").textContent = "Бэкапы";
   $("#save-btn").hidden = true;

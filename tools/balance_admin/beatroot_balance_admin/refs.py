@@ -55,6 +55,30 @@ def motif_ids(root: Path) -> list[str]:
     return [m["id"] for m in data.get("motifs", []) if "id" in m]
 
 
+def motif_titles(root: Path) -> dict[str, str]:
+    with open(root / "data" / "motifs.json", encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {m["id"]: str(m.get("title", m["id"]))
+            for m in data.get("motifs", []) if "id" in m}
+
+
+def track_index(root: Path) -> dict[str, dict[str, str]]:
+    """Стемы треков: жанр_мотив -> {грейд -> имя файла без .ogg}.
+
+    music/*.ogg зеркалит charts/ один в один; индекс строится из имён —
+    трек, как и чарт, никем не объявляется: он ЕСТЬ или его НЕТ.
+    Нужен кнопке «послушать»: грейд определяет темп ремикса.
+    """
+    out: dict[str, dict[str, str]] = {}
+    for path in (root / "music").glob("*.ogg"):
+        match = _CHART_NAME.match(path.stem)
+        if match is None:
+            continue
+        key = f"{match['genre']}_{match['motif']}"
+        out.setdefault(key, {})[match["grade"]] = path.stem
+    return out
+
+
 def chart_index(root: Path) -> dict[str, list[str]]:
     """Какие грейды реально существуют для пары жанр_мотив.
 
@@ -104,7 +128,9 @@ def all_refs(root: Path) -> dict:
         "gear_ids": entity_ids(root, "gear"),
         "cosmetic_ids": entity_ids(root, "cosmetics"),
         "motif_ids": motif_ids(root),
+        "motif_titles": motif_titles(root),
         "chart_index": chart_index(root),
+        "track_index": track_index(root),
         "display_names": {
             kind: display_names(root, kind) for kind in ENTITY_DIRS
         },

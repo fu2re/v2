@@ -204,6 +204,7 @@ def create_app(root: Path) -> FastAPI:
     # --- статика -------------------------------------------------------------
 
     app.mount("/art", StaticFiles(directory=root / "art"), name="art")
+    app.mount("/music", StaticFiles(directory=root / "music"), name="music")
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/")
