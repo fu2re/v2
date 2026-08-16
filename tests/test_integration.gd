@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Интеграционный прогон всей игры.
 ##
@@ -8,12 +8,7 @@ extends Node
 ## выставлялся при обходе публичного входа. Такое ловится только проходом
 ## целиком.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	_fresh_game()
 
 	await _test_all_scenes_instantiate()
@@ -21,25 +16,6 @@ func _ready() -> void:
 	_test_deep_run_survives()
 	_test_whole_state_survives_save()
 	_test_new_player_can_reach_first_taming()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _fresh_game() -> void:
@@ -69,8 +45,9 @@ func _test_all_scenes_instantiate() -> void:
 		"res://scenes/run/RunFeed.tscn",
 		"res://scenes/battle/DanceBattle.tscn",
 		"res://scenes/battle/TamingScreen.tscn",
-		"res://scenes/farm/PlantDance.tscn",
-		"res://scenes/onboarding/Onboarding.tscn",
+		"res://scenes/intro/Splash.tscn",
+		"res://scenes/intro/CharacterSelect.tscn",
+		"res://scenes/intro/Intro.tscn",
 		"res://scenes/calibration/Calibration.tscn",
 		"res://tools/chart_forge/ChartForge.tscn",
 	]
@@ -104,12 +81,12 @@ func _test_full_player_journey() -> void:
 	# Стартовый набор, как его выдаёт SaveManager новой игре
 	FarmState.add_seed("drum_berry", 3)
 	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	check(GameState.is_tamed("disco_sprout"), "стартовый друг есть")
 
 	# 1. Уходим в лес
-	check(RunManager.start_run(GameState.guardian_id()), "забег начался")
+	check(RunManager.start_run(GameState.guardian_key()), "забег начался")
 
 	# 2. Идём, пока не встретим бой
 	var battle_glade: Glade = null
@@ -122,10 +99,10 @@ func _test_full_player_journey() -> void:
 	if battle_glade == null:
 		return
 
-	# 3. Бой до победы
-	var monster := Registry.monster(battle_glade.monster_id)
+	# 3. Бой до победы. Противник — экземпляр встречи: вид и грейд с поляны
+	var monster := MonsterInstance.create(battle_glade.monster_id, battle_glade.grade)
 	var state := BattleState.new()
-	state.setup(monster, Registry.monster(RunManager.guardian_id), RunManager.health,
+	state.setup(monster, GameState.instance(RunManager.guardian_key), RunManager.health,
 		battle_glade.depth)
 	var swings := 0
 	while not state.is_over and swings < 500:
@@ -134,10 +111,16 @@ func _test_full_player_journey() -> void:
 	check(state.did_win, "бой выигран за %d попаданий" % swings)
 	check(swings < 500, "победа достижима, а не бесконечна")
 
-	# 4. Приручение: победа плюс угощение
-	var before := GameState.get_friendship(monster.id)
-	GameState.add_friendship(monster.id, GameState.FRIENDSHIP_WIN)
-	check(GameState.get_friendship(monster.id) > before, "дружба выросла после боя")
+	# 4. Приручение: победа плюс угощение. Дружба копится шкале ЭТОГО грейда.
+	#
+	# Берём ОБЫЧНЫЙ грейд встреченного вида: на поляне мог попасться редкий,
+	# а в закрытую ступень дружба теперь не копится вовсе, и проверка мерила бы
+	# запрет вместо начисления
+	var step := MonsterData.Rarity.COMMON
+	var before := GameState.get_friendship(monster.species_id, step)
+	GameState.add_friendship(monster.species_id, step, GameState.FRIENDSHIP_WIN)
+	check(GameState.get_friendship(monster.species_id, step) > before,
+		"дружба выросла после боя")
 
 	# 5. Ритм переносится на следующую поляну
 	RunManager.set_health(state.health)
@@ -150,15 +133,18 @@ func _test_full_player_journey() -> void:
 	check(GameState.silver > seeds_before, "серебро доехали домой")
 	check(FarmState.seed_count("drum_berry") >= 2, "семена доехали на ферму")
 
-	# 7. Ферма: посадить, станцевать, вырастить, собрать
+	# 7. Ферма: посадить, вырастить, собрать
 	check(FarmState.plant(0, "drum_berry"), "посажено")
-	check(FarmState.apply_dance(0, DanceGrade.Level.PERFECT), "станцевано")
 	FarmState.debug_rewind(86400.0)
 	FarmState.tick()
 	check(FarmState.is_ready(0), "выросло")
 	check_eq(FarmState.harvest(0), "drum_berry", "собрано")
-	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PERFECT), 1,
-		"идеальный танец дал идеальный фрукт")
+	# Качество урожая задаёт сорт семечка: дешёвая ягода даёт обычный плод,
+	# и это наблюдаемый результат, а не внутреннее поле
+	var berry := Registry.fruit("drum_berry")
+	check_eq(GameState.fruit_count("drum_berry",
+		FarmState.quality_for_tier(berry.tier)), 1,
+		"собранный плод лёг в сумку качеством по сорту")
 
 	# 8. Лавка: купить и надеть косметику
 	ShopState.add_gold(1000)
@@ -173,7 +159,7 @@ func _test_full_player_journey() -> void:
 	# power_bonus пропускала утечку, спрятанную в расчёте урона.
 	# Мутационный прогон это показал, и тест переписан под факт.
 	var geared := BattleState.new()
-	geared.setup(monster, Registry.monster("disco_sprout"), 100, 0)
+	geared.setup(monster, GameState.tame("disco_sprout", MonsterData.Rarity.COMMON), 100, 0)
 	var damage_with_cosmetics := _clean_attack(geared)
 	var groove_with_cosmetics := geared.max_health
 
@@ -183,7 +169,7 @@ func _test_full_player_journey() -> void:
 	ShopState.equipped.clear()
 
 	var bare := BattleState.new()
-	bare.setup(monster, Registry.monster("disco_sprout"), 100, 0)
+	bare.setup(monster, GameState.tame("disco_sprout", MonsterData.Rarity.COMMON), 100, 0)
 	var damage_bare := _clean_attack(bare)
 
 	check_eq(damage_with_cosmetics, damage_bare,
@@ -200,9 +186,9 @@ func _test_full_player_journey() -> void:
 func _test_deep_run_survives() -> void:
 	print("Глубокий забег выдерживает 60 полян")
 	_fresh_game()
-	GameState.add_friendship("disco_sprout", 999)
-	GameState.set_guardian("disco_sprout")
-	RunManager.start_run("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
+	RunManager.start_run("disco_sprout:0")
 
 	var battles := 0
 	for i in 60:
@@ -214,13 +200,12 @@ func _test_deep_run_survives() -> void:
 			continue
 
 		battles += 1
-		var monster := Registry.monster(glade.monster_id)
-		check(monster != null, "поляна %d: монстр существует" % glade.depth)
-		if monster == null:
-			continue
+		# Экземпляр встречи: вид и грейд роллятся поляной
+		var monster := MonsterInstance.create(glade.monster_id, glade.grade)
+		check(monster.data() != null, "поляна %d: монстр существует" % glade.depth)
 
 		var state := BattleState.new()
-		state.setup(monster, Registry.monster("disco_sprout"), RunManager.health, glade.depth)
+		state.setup(monster, GameState.tame("disco_sprout", MonsterData.Rarity.COMMON), RunManager.health, glade.depth)
 		check(state.max_vibe > 0, "глубина %d: Настрой положителен" % glade.depth)
 
 		var swings := 0
@@ -238,17 +223,16 @@ func _test_whole_state_survives_save() -> void:
 	print("Всё состояние переживает сейв")
 	_fresh_game()
 
-	GameState.add_friendship("bass_bear", 70)
-	GameState.add_friendship("disco_sprout", 999)
-	GameState.set_guardian("disco_sprout")
+	GameState.add_friendship("bass_bear", MonsterData.Rarity.COMMON, 70)
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	GameState.add_fruit("loop_fig", FruitData.Quality.JUICY, 3)
 	GameState.add_silver(250)
 	GameState.add_gear("spring_boots")
-	GameState.equip("disco_sprout", "spring_boots")
+	GameState.equip("disco_sprout:0", "spring_boots")
 
 	FarmState.add_seed("echo_pear", 4)
 	FarmState.plant(0, "echo_pear")
-	FarmState.apply_dance(0, DanceGrade.Level.GOOD)
 
 	ShopState.add_gold(600)
 	ShopState.daily_limit = 999999
@@ -268,14 +252,13 @@ func _test_whole_state_survives_save() -> void:
 	FarmState.from_dict(restored["farm"])
 	ShopState.from_dict(restored["shop"])
 
-	check_eq(GameState.get_friendship("bass_bear"), 70, "дружба восстановилась")
-	check_eq(GameState.guardian_id(), "disco_sprout", "гуардиан восстановился")
+	check_eq(GameState.get_friendship("bass_bear", MonsterData.Rarity.COMMON), 70, "дружба восстановилась")
+	check_eq(GameState.guardian_key(), "disco_sprout:0", "гуардиан восстановился")
 	check_eq(GameState.fruit_count("loop_fig", FruitData.Quality.JUICY), 3, "фрукты на месте")
 	check_eq(GameState.silver, 250, "серебро на месте")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null,
-		"снаряжение осталось надетым")
+	check(GameState.equipped_gear("disco_sprout:0", GearData.Slot.BELT) != null,
+		"снаряжение осталось надетым на экземпляре")
 	check(not FarmState.is_empty_plot(0), "грядка засажена")
-	check_eq(FarmState.plots[0].dance_level, DanceGrade.Level.GOOD, "танец запомнен")
 	check(ShopState.is_owned(cosmetic.id), "покупка на месте")
 	check_eq(ShopState.pity_counter, 9, "счётчик pity на месте")
 
@@ -293,41 +276,39 @@ func _test_new_player_can_reach_first_taming() -> void:
 	# Существование стартового контента проверяется ЯВНО. Раньше тест
 	# при опечатке в id просто выполнял меньше проверок и всё равно
 	# отчитывался «0 провалено» — мутационный прогон это вскрыл.
-	var starter := Registry.monster(SaveManager.STARTER_GUARDIAN)
-	check(starter != null,
-		"стартовый гуардиан '%s' существует в реестре" % SaveManager.STARTER_GUARDIAN)
-	if starter == null:
-		return
-
 	check(not SaveManager.STARTER_SEEDS.is_empty(), "стартовые семена заданы")
 	for fruit_id: String in SaveManager.STARTER_SEEDS:
 		check(Registry.fruit(fruit_id) != null, "стартовое семя '%s' существует" % fruit_id)
 		FarmState.add_seed(fruit_id, SaveManager.STARTER_SEEDS[fruit_id])
 
-	GameState.add_friendship(SaveManager.STARTER_GUARDIAN, starter.friendship_threshold())
-	GameState.set_guardian(SaveManager.STARTER_GUARDIAN)
-	check_eq(GameState.guardian_id(), SaveManager.STARTER_GUARDIAN,
-		"стартовый гуардиан действительно выбран")
-
-	check(not GameState.guardian_id().is_empty(), "есть с кем идти в лес")
+	# Гуардиана из коробки больше НЕТ: первого игрок добывает в интро (§15.5).
+	# Это и проверяем — новая игра начинается с пустой коллекции
+	check(GameState.guardian() == null, "новая игра начинается без гуардиана")
+	check(GameState.all_instances().is_empty(), "коллекция пуста")
 	check(not FarmState.available_seeds().is_empty(), "есть что сажать")
 
-	# Дойти до нового друга, кроме стартового
-	RunManager.start_run(GameState.guardian_id())
+	# Первый друг приходит из интро: побеждённый монстр всегда обычного грейда
+	var first := GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	check(GameState.guardian() != null, "после интро гуардиан появился")
+	check_eq(GameState.guardian_key(), first.key(), "первый друг стал гуардианом сам")
+
+	# Дойти до второго друга — уже штатным путём, через шкалу дружбы
+	RunManager.start_run(GameState.guardian_key())
 	var tamed_new := ""
 	for i in 400:
 		var glade := RunManager.advance()
 		if glade.type != Glade.Type.BATTLE:
 			continue
-		if glade.monster_id == SaveManager.STARTER_GUARDIAN:
+		if glade.monster_id == first.species_id and glade.grade == first.grade:
 			continue
-		if GameState.add_friendship(glade.monster_id, GameState.FRIENDSHIP_WIN):
+		if GameState.add_friendship(glade.monster_id, glade.grade, GameState.FRIENDSHIP_WIN):
 			tamed_new = glade.monster_id
 			break
 	RunManager.go_home()
 
 	check(not tamed_new.is_empty(), "новый друг достижим за разумное число боёв")
-	check(GameState.tamed.size() >= 2, "коллекция выросла (%d)" % GameState.tamed.size())
+	check(GameState.all_instances().size() >= 2,
+		"коллекция выросла (%d)" % GameState.all_instances().size())
 
 
 ## Провести чистую серию и ударить. Обычные биты урона не наносят,

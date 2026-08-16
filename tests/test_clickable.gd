@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Каждая кнопка должна быть кликабельной.
 ##
@@ -10,17 +10,14 @@ extends Node
 ## Тест повторяет логику выбора Godot: среди контролов, накрывающих точку,
 ## побеждает последний в порядке обхода дерева.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 
 	_prepare_state()
 
 	for path in [
+		"res://scenes/lobby/Lobby.tscn",
 		"res://scenes/farm/Farm.tscn",
+		"res://scenes/merchant/Merchant.tscn",
 		"res://scenes/collection/Collection.tscn",
 		"res://scenes/shop/Shop.tscn",
 		"res://scenes/inventory/Inventory.tscn",
@@ -34,14 +31,40 @@ func _ready() -> void:
 	await _check_panel("res://scenes/farm/Farm.tscn", "выбор семян",
 		func(root): root._open_seed_picker(0))
 	await _check_panel("res://scenes/collection/Collection.tscn", "снаряжение",
-		func(root): root._open_gear("disco_sprout"))
+		func(root): root._open_gear("disco_sprout:0"))
+	await _check_panel("res://scenes/collection/Collection.tscn", "угощение",
+		func(root): root._open_feed("disco_sprout:0"))
 	await _check_panel("res://scenes/run/RunFeed.tscn", "костёр",
 		func(root): root._open_campfire())
 	await _check_panel("res://scenes/run/RunFeed.tscn", "торговец",
 		func(root): root._open_merchant(RunManager.current_glade))
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
+	# Экран победы — единственная панель, которая открывается ПОВЕРХ живой
+	# сцены боя. Именно там кнопка «Угостить» и оказалась погребена: панель
+	# лежала на нулевом слое, а бой со своим HUD — выше
+	await _check_panel("res://scenes/run/RunFeed.tscn", "победа поверх боя",
+		func(root): _open_victory(root))
+
+
+## Показать экран победы так же, как это делает игра: со сценой боя на месте.
+##
+## Без боя под панелью проверка бессмысленна — накрывать её будет нечему,
+## и первая версия этого теста именно поэтому ничего не поймала.
+func _open_victory(root: Node) -> void:
+	var glade := RunManager.current_glade
+	if glade == null:
+		return
+	if glade.type != Glade.Type.BATTLE:
+		glade.type = Glade.Type.BATTLE
+		glade.monster_id = "disco_sprout"
+	root._start_battle(glade)
+
+	var monster := MonsterInstance.create(glade.monster_id, glade.grade)
+	root._pending_taming = monster
+	# Показ идёт по шагам с паузами; ждать их здесь незачем — проверка
+	# смотрит, доступна ли кнопка, а она появляется в конце
+	var prizes: Array[Dictionary] = [{"text": "+12 серебра", "item": null}]
+	root._play_victory(monster, prizes, {}, {}, 0)
 
 
 ## Состояние, при котором панели вообще есть что показать.
@@ -52,21 +75,17 @@ func _prepare_state() -> void:
 	FarmState.add_seed("drum_berry", 3)
 	FarmState.add_seed("echo_pear", 2)
 
-	var starter := Registry.monster("disco_sprout")
-	GameState.add_friendship("disco_sprout", starter.friendship_threshold())
-	GameState.add_friendship("bass_bear", Registry.monster("bass_bear").friendship_threshold())
-	GameState.set_guardian("disco_sprout")
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.tame("bass_bear", MonsterData.Rarity.COMMON)
+	GameState.set_guardian("disco_sprout:0")
 	GameState.add_gear("spring_boots")
 	GameState.add_silver(500)
 	ShopState.add_gold(500)
 
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
+	# Без фиксированного зерна поляны выпадают случайно, а вместе с ними
+	# и набор кнопок: прогон к прогону число проверок гуляло, и падение
+	# ниже прежнего было бы неотличимо от невезения
+	RunManager.set_seed(7)
 
 
 func _check_scene(path: String) -> void:
@@ -93,6 +112,10 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 
 	if opener.is_valid():
 		opener.call(root)
+		# Панель победы собирается по шагам с паузами, и кнопки появляются
+		# в конце показа. Ждём его целиком: иначе проверка мерила бы кадр,
+		# в котором кнопок ещё нет по замыслу, а не по ошибке
+		await get_tree().create_timer(2.6).timeout
 		for i in 2:
 			await get_tree().process_frame
 
@@ -116,6 +139,13 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 	for button in buttons:
 		if order.find(button) < modal_index:
 			continue
+		# Кнопка, укатившаяся за край прокрутки, кликов не получает и от Godot:
+		# ScrollContainer режет и рисование, и ввод. Такая кнопка не выглядит
+		# нажимаемой, а значит и к этому классу багов не относится — её просто
+		# надо домотать. Без этой оговорки тест ругался на каждый длинный
+		# список, стоило добавить в него пару строк
+		if _clipped_away(button):
+			continue
 		checked += 1
 		var point := button.get_global_rect().get_center()
 		var winner := _topmost_at(order, point)
@@ -132,6 +162,21 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 	for i in 2:
 		await get_tree().process_frame
 	Conductor.stop()
+
+
+## Скрыта ли кнопка обрезкой родителя-прокрутки.
+##
+## Проверяется ЦЕНТР: наполовину выехавшая кнопка остаётся нажимаемой
+## и по-прежнему обязана быть доступной, а вот уехавшая целиком — нет.
+func _clipped_away(button: Button) -> bool:
+	var point := button.get_global_rect().get_center()
+	var parent := button.get_parent()
+	while parent != null:
+		if parent is Control and (parent is ScrollContainer or parent.clip_contents):
+			if not (parent as Control).get_global_rect().has_point(point):
+				return true
+		parent = parent.get_parent()
+	return false
 
 
 ## Индекс последней подложки, перекрывающей экран целиком.
@@ -156,10 +201,43 @@ func _last_backdrop_index(order: Array[Control]) -> int:
 ## Обход в том же порядке, в каком Godot строит дерево контролов:
 ## чем позже узел, тем он выше в разборе ввода.
 func _collect_controls(node: Node, out: Array[Control]) -> void:
+	var flat: Array[Control] = []
+	_walk_controls(node, flat)
+
+	# Сортируем по СЛОЮ, а не только по порядку в дереве.
+	#
+	# Godot разбирает ввод по CanvasLayer: слой с бо́льшим номером получает
+	# клик первым, независимо от того, где узел лежит в дереве. Пока модель
+	# этого не знала, тест считал панель победы доступной — а на живом экране
+	# её накрывала сцена боя со своим слоем, и кнопка «Угостить» не нажималась.
+	# Сортировка устойчивая, поэтому внутри одного слоя порядок дерева цел.
+	var indexed: Array = []
+	for i in flat.size():
+		indexed.append([_layer_of(flat[i]), i, flat[i]])
+	indexed.sort_custom(func(a, b):
+		if a[0] != b[0]:
+			return a[0] < b[0]
+		return a[1] < b[1])
+
+	for entry: Array in indexed:
+		out.append(entry[2])
+
+
+func _walk_controls(node: Node, out: Array[Control]) -> void:
 	if node is Control:
 		out.append(node)
 	for child in node.get_children():
-		_collect_controls(child, out)
+		_walk_controls(child, out)
+
+
+## На каком слое рисуется узел. Вне CanvasLayer это нулевой слой сцены.
+func _layer_of(node: Node) -> int:
+	var parent := node.get_parent()
+	while parent != null:
+		if parent is CanvasLayer:
+			return (parent as CanvasLayer).layer
+		parent = parent.get_parent()
+	return 0
 
 
 ## Кто получит клик в этой точке. Идём с конца: побеждает последний,

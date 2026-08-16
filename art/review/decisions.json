@@ -1,0 +1,587 @@
+{
+  "updated": "2026-08-16T06:06:14+00:00",
+  "decisions": {
+    "disco_sprout_common": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "banjo_moth_common": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "hero_kid": {
+      "status": "принят",
+      "variant": "03",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "drum_berry": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "echo_pear": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "bass_plum": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "loop_fig": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "chord_apple": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "soft_slippers": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "spring_boots": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "cloud_shoes": {
+      "status": "принят",
+      "variant": "2-01",
+      "attempt": 2,
+      "at": "2026-08-15T10:23:49+00:00"
+    },
+    "tin_whistle": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "brass_bell": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "thunder_pick": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "acorn_charm": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "river_stone": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "polka_overalls": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "disco_overalls": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "starlight_cloak": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "straw_hat": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "sunflower_hat": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "crown_of_beats": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "watering_can": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "mossy_plot": {
+      "status": "принят",
+      "variant": "5-00",
+      "attempt": 5,
+      "at": "2026-08-15T11:16:41+00:00"
+    },
+    "glade_campfire": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "prop_chest": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "prop_seed_pouch": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "bass_bear_common": {
+      "status": "принят",
+      "variant": "6-05",
+      "attempt": 7,
+      "at": "2026-08-15T11:05:37+00:00"
+    },
+    "beat_serpent_common": {
+      "status": "принят",
+      "variant": "2-00",
+      "attempt": 2,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "heartwood_amulet": {
+      "status": "принят",
+      "variant": "3-02",
+      "attempt": 3,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "glade_battle": {
+      "status": "принят",
+      "variant": "2-00",
+      "attempt": 2,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "glade_wild_bush": {
+      "status": "принят",
+      "variant": "2-00",
+      "attempt": 2,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "glade_merchant": {
+      "status": "принят",
+      "variant": "2-02",
+      "attempt": 2,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "glade_event": {
+      "status": "принят",
+      "variant": "2-00",
+      "attempt": 2,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "prop_farm_plot": {
+      "status": "принят",
+      "variant": "2-00",
+      "attempt": 7,
+      "at": "2026-08-15T11:05:37+00:00"
+    },
+    "synth_slime_common": {
+      "status": "принят",
+      "variant": "1-02",
+      "attempt": 1,
+      "at": "2026-08-15T10:04:36+00:00"
+    },
+    "hero_girl": {
+      "status": "принят",
+      "variant": "03",
+      "attempt": 0,
+      "at": "2026-08-15T11:05:37+00:00"
+    },
+    "disco_sprout_uncommon": {
+      "status": "принят",
+      "variant": "06",
+      "attempt": 0,
+      "at": "2026-08-15T11:16:41+00:00"
+    },
+    "bass_bear_uncommon": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T11:16:41+00:00"
+    },
+    "banjo_moth_uncommon": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T11:16:41+00:00"
+    },
+    "synth_slime_uncommon": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T11:16:41+00:00"
+    },
+    "beat_serpent_uncommon": {
+      "status": "принят",
+      "variant": "1-00",
+      "attempt": 1,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "disco_sprout_rare": {
+      "status": "принят",
+      "variant": "07",
+      "attempt": 0,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "bass_bear_rare": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "banjo_moth_rare": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "synth_slime_rare": {
+      "status": "принят",
+      "variant": "04",
+      "attempt": 0,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "splash_bg": {
+      "status": "принят",
+      "variant": "03",
+      "attempt": 0,
+      "at": "2026-08-15T12:06:03+00:00"
+    },
+    "disco_sprout_unique": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:08:37+00:00"
+    },
+    "bass_bear_unique": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T12:08:37+00:00"
+    },
+    "banjo_moth_unique": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T12:08:37+00:00"
+    },
+    "synth_slime_unique": {
+      "status": "принят",
+      "variant": "04",
+      "attempt": 0,
+      "at": "2026-08-15T12:08:37+00:00"
+    },
+    "beat_serpent_rare": {
+      "status": "принят",
+      "variant": "1-05",
+      "attempt": 1,
+      "at": "2026-08-15T12:22:48+00:00"
+    },
+    "disco_sprout_epic": {
+      "status": "принят",
+      "variant": "06",
+      "attempt": 0,
+      "at": "2026-08-15T12:22:48+00:00"
+    },
+    "bass_bear_epic": {
+      "status": "принят",
+      "variant": "06",
+      "attempt": 0,
+      "at": "2026-08-15T12:22:48+00:00"
+    },
+    "banjo_moth_epic": {
+      "status": "принят",
+      "variant": "06",
+      "attempt": 0,
+      "at": "2026-08-15T12:22:48+00:00"
+    },
+    "synth_slime_epic": {
+      "status": "принят",
+      "variant": "04",
+      "attempt": 0,
+      "at": "2026-08-15T12:22:48+00:00"
+    },
+    "disco_sprout_legendary": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T12:29:33+00:00"
+    },
+    "bass_bear_legendary": {
+      "status": "принят",
+      "variant": "07",
+      "attempt": 0,
+      "at": "2026-08-15T12:29:33+00:00"
+    },
+    "banjo_moth_legendary": {
+      "status": "принят",
+      "variant": "03",
+      "attempt": 0,
+      "at": "2026-08-15T12:29:33+00:00"
+    },
+    "synth_slime_legendary": {
+      "status": "принят",
+      "variant": "04",
+      "attempt": 0,
+      "at": "2026-08-15T12:29:33+00:00"
+    },
+    "beat_serpent_unique": {
+      "status": "принят",
+      "variant": "1-07",
+      "attempt": 1,
+      "at": "2026-08-15T12:36:35+00:00"
+    },
+    "beat_serpent_epic": {
+      "status": "принят",
+      "variant": "07",
+      "attempt": 0,
+      "at": "2026-08-15T12:33:36+00:00"
+    },
+    "beat_serpent_legendary": {
+      "status": "принят",
+      "variant": "05",
+      "attempt": 0,
+      "at": "2026-08-15T12:36:35+00:00"
+    },
+    "building_garden": {
+      "status": "принят",
+      "variant": "1-03",
+      "attempt": 1,
+      "at": "2026-08-15T21:09:45+00:00"
+    },
+    "building_guardians": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:51:16+00:00"
+    },
+    "building_forest": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:51:16+00:00"
+    },
+    "screen_lobby": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:51:16+00:00"
+    },
+    "screen_guardians": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T12:51:16+00:00"
+    },
+    "screen_inventory": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T12:51:16+00:00"
+    },
+    "building_storehouse": {
+      "status": "принят",
+      "variant": "1-04",
+      "attempt": 1,
+      "at": "2026-08-15T21:09:45+00:00"
+    },
+    "forest_01": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_02": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_03": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_04": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_05": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_06": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_07": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_08": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_09": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_10": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_11": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_12": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_13": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_14": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_15": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_16": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_17": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_18": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_19": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "forest_20": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-15T20:52:21+00:00"
+    },
+    "screen_farm": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-15T21:09:45+00:00"
+    },
+    "building_merchant": {
+      "status": "принят",
+      "variant": "03",
+      "attempt": 0,
+      "at": "2026-08-15T21:12:08+00:00"
+    },
+    "glade_encounter": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T21:12:08+00:00"
+    },
+    "screen_merchant": {
+      "status": "принят",
+      "variant": "00",
+      "attempt": 0,
+      "at": "2026-08-15T21:12:08+00:00"
+    },
+    "coin_gold": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-16T05:57:47+00:00"
+    },
+    "coin_silver": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-16T05:57:47+00:00"
+    },
+    "app_icon": {
+      "status": "принят",
+      "variant": "2-02",
+      "attempt": 2,
+      "at": "2026-08-16T06:06:14+00:00"
+    }
+  }
+}

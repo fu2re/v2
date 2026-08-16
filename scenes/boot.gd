@@ -7,6 +7,8 @@ extends Node
 ## автозагрузчиков и главной сцены иначе становится неявным.
 
 func _ready() -> void:
-	# Один кадр, чтобы _ready всех автозагрузчиков точно отработал
+	# Один кадр, чтобы _ready всех автозагрузчиков точно отработал.
+	# Дальше — заставка: разогрев (реестр, таблицы, индекс чартов) стал
+	# длиннее одного кадра, и держать игрока перед чёрным экраном нельзя
 	await get_tree().process_frame
-	get_tree().change_scene_to_file(OnboardingState.entry_scene())
+	get_tree().change_scene_to_file("res://scenes/intro/Splash.tscn")

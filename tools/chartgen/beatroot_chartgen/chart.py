@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .song import Song
 
-NOTE_TYPES = ("beat", "skill", "shield", "snack", "attack")
+NOTE_TYPES = ("beat", "skill", "shield", "heavy", "attack")
 
 # Серия — это связка нот без длинной паузы. Атака ЗАВЕРШАЕТ серию: следующая
 # нота начинает новую. Поэтому в длинной связке атак несколько, а не одна.
@@ -18,6 +18,15 @@ NOTE_TYPES = ("beat", "skill", "shield", "snack", "attack")
 SERIES_GAP = 2.0
 # Короче — не серия, а обрывок; атака после такого не заслужена.
 MIN_SERIES_NOTES = 3
+# Сложность боевого трека — это грейд монстра, и ничего больше.
+#
+# Отдельной оси easy/normal/hard у боевой музыки нет: чем реже монстр,
+# тем быстрее он атакует битами. Три старых ключа остались только ради
+# `farm_folk` и `demo_disco` — на них держатся обучение и танец растению,
+# и трогать выверенный онбординг ради единообразия имён смысла нет.
+GRADES = ("common", "uncommon", "rare", "unique", "epic", "legendary")
+LEGACY_DIFFICULTIES = ("easy", "normal", "hard")
+
 # Через столько нот связку пора венчать ударом, даже если пауза не подошла.
 # Без этого на плотных чартах вся песня складывалась в одну серию с единственной
 # атакой в конце, и монстра было нечем побеждать.
@@ -27,14 +36,52 @@ MIN_SERIES_NOTES = 3
 # чарте с вдвое меньшим числом нот его просто нечем добить. Сложность меняет
 # то, насколько трудно вести серию чисто, а не то, сколько урона доступно.
 TARGET_SERIES_NOTES = {
-    "easy": 4,
-    "normal": 6,
-    "hard": 8,
+    "common": 4, "uncommon": 4, "rare": 5,
+    "unique": 5, "epic": 6, "legendary": 6,
+    "easy": 4, "normal": 6, "hard": 8,
 }
 
-# Максимальная плотность нот в секунду. Ограничение из GDD §10.3 —
-# верхняя граница подобрана под то, что успевает семилетний ребёнок.
-MAX_DENSITY = {"easy": 2.0, "normal": 4.0, "hard": 8.0}
+# Окно, в котором считается плотность. Две секунды, а не одна.
+#
+# Длина окна выглядит мелочью, но именно она задаёт, сколько РАЗЛИЧИМЫХ
+# ступеней сложности вообще существует. Нот в окне целое число, поэтому
+# на односекундном окне пределы «3.0» и «3.5» — это одно и то же ограничение
+# (больше трёх нельзя), и грейды схлопывались попарно: редкий сравнивался
+# с уникальным, эпический с легендарным. На двухсекундном окне те же ставки
+# становятся числами 6 и 7 — шесть разных ступеней вместо трёх.
+#
+# Две секунды всё ещё локальны: всплеск из пяти нот за треть секунды
+# в такое окно попадает целиком и будет пойман.
+DENSITY_WINDOW_SECONDS = 2.0
+
+# Сколько нот допустимо в окне. Делённое на два — это ноты в секунду:
+# от 2.0 на обычном до 4.5 на легендарном.
+#
+# Числа ниже прежних восьми из GDD §10.3, и причина не в осторожности,
+# а в том, что изменился смысл сложности. Пока сложность выбирал игрок,
+# восемь нот в секунду были верхней полкой для тех, кто её захотел.
+# Теперь сложность навязана грейдом встреченного монстра: ребёнок не может
+# отказаться от эпика, а приручение по GDD §6.3 гарантировано и требует
+# победы. Значит верхний грейд обязан проходиться, а не «быть доступным», —
+# иначе редкие виды оказываются заперты от той аудитории, ради которой
+# игра и делается.
+#
+# Верхние 4.5 ноты в секунду — это нота каждые 222 мс при окне промаха
+# ±180 мс (GDD §4.3). Ребёнок успевает; взрослый ведёт связки чисто
+# и набирает комбо. Обе цели достигнуты, непроходимости нет.
+MAX_NOTES_PER_WINDOW = {
+    "common": 4, "uncommon": 5, "rare": 6,
+    "unique": 7, "epic": 8, "legendary": 9,
+    "easy": 4, "normal": 8, "hard": 16,
+}
+
+# На самом низу остаются только целые доли: ребёнок попадает по счёту
+# «раз-два-три-четыре».
+#
+# Необычный сюда НЕ входит, хотя по смыслу напрашивался. С фильтром целых долей
+# он давал ровно те же ноты, что и обычный, на мотивах, написанных четвертями, —
+# и лестница начиналась с пустой ступени.
+STRONG_BEATS_ONLY = ("common", "easy")
 
 # Минимальный разрыв между щитами в долях. Меньше — игрок физически не успевает.
 MIN_SHIELD_GAP = 2.0
@@ -97,7 +144,7 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     Ноты берутся из ведущей дорожки, а не из анализа аудио: источник тот же,
     что и у звука, поэтому попадание в сетку точное по построению.
     """
-    if difficulty not in MAX_DENSITY:
+    if difficulty not in MAX_NOTES_PER_WINDOW:
         raise ValueError(f"неизвестная сложность: {difficulty}")
 
     bpb = song.beats_per_bar
@@ -108,15 +155,15 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     # Первый такт оставляем пустым — игроку нужно поймать ритм до первой ноты
     candidates = sorted({n.beat for n in lead.notes if n.beat >= bpb})
 
-    if difficulty == "easy":
-        # Только сильные доли: ребёнок попадает по счёту «раз-два-три-четыре»
+    if difficulty in STRONG_BEATS_ONLY:
         candidates = [b for b in candidates if abs(b - round(b)) < 1e-6]
-    elif difficulty == "hard":
-        hat = song.track("hat")
-        if hat is not None:
-            extra = {n.beat for n in hat.notes if n.beat >= bpb * 2 and n.beat % 1.0 != 0}
-            candidates = sorted(set(candidates) | extra)
 
+    # Ноты берутся ТОЛЬКО с ведущей дорожки — игрок отбивает мелодию.
+    #
+    # Раньше на верхних грейдах сюда подмешивались офф-битовые удары хэта,
+    # и это была ошибка: кандидатов становилось втрое больше потолка, ножницы
+    # выбрасывали две трети, и какие ноты доживут до чарта решал порядок
+    # обхода, а не музыка. Игрок отбивал не мелодию, а прореженный хэт.
     beats = {b: "beat" for b in candidates}
 
     # Атаки монстра: раз в 4 такта, начиная с 4-го. Каждой предшествует замах.
@@ -135,18 +182,31 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
             del beats[b]
         beats[s] = "shield"
 
-    # Скилл и перекус ставим в такты без атак, чтобы не смешивать задачи
-    _retype(beats, at=bpb * 6, new_type="skill", avoid=shields)
-    _retype(beats, at=bpb * 14, new_type="skill", avoid=shields)
-    _retype(beats, at=bpb * 10 + 2, new_type="snack", avoid=shields)
+    # Скилл и перекус ставим в такты без атак, чтобы не смешивать задачи.
+    #
+    # Позиции — доли от длины песни, а не абсолютные такты. Раньше здесь стояли
+    # такты 6, 14 и 10, и на песне короче шестнадцати тактов эти ноты просто
+    # не появлялись: у farm_folk (12 тактов) не было ни одного перекуса
+    # на двух сложностях из трёх. Темп теперь свой у каждого грейда, длина
+    # песни вместе с ним плавает, и абсолютные номера тактов ломались бы
+    # на каждом втором треке.
+    # Держать скилл и перекус на секунду в стороне от щитов. Прореживание
+    # не имеет права выбросить ни то, ни другое — это смысловые ноты, а не
+    # ритм-наполнение, — поэтому два таких события рядом гарантированно
+    # пробивают потолок плотности, и починить это позже уже нечем.
+    window = 1.0 / song.sec_per_beat
+    total = song.total_beats
+    for at in (total * 0.35, total * 0.85):
+        _retype(beats, at=at, new_type="skill", avoid=shields, min_gap=window)
+    _retype(beats, at=total * 0.6, new_type="heavy", avoid=shields, min_gap=window)
 
     notes = [ChartNote(b, t) for b, t in beats.items()]
     notes = _ease_in(notes, until=bpb * 2)
-    notes = _thin(notes, MAX_DENSITY[difficulty], song.sec_per_beat)
+    notes = _thin(notes, MAX_NOTES_PER_WINDOW[difficulty], song.sec_per_beat)
     notes = _mark_attacks(notes, TARGET_SERIES_NOTES.get(difficulty, 6))
 
     return Chart(
-        id=song.id,
+        id=song.chart_id,
         genre=song.genre,
         bpm=song.bpm,
         difficulty=difficulty,
@@ -158,9 +218,17 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     )
 
 
-def _retype(beats: dict[float, str], at: float, new_type: str, avoid: list[float]) -> None:
-    """Превратить ближайшую к `at` обычную ноту в ноту другого типа."""
-    plain = [b for b, t in beats.items() if t == "beat" and b not in avoid]
+def _retype(beats: dict[float, str], at: float, new_type: str, avoid: list[float],
+            min_gap: float = 0.0) -> None:
+    """Превратить ближайшую к `at` обычную ноту в ноту другого типа.
+
+    `min_gap` — на сколько долей новая нота обязана отстоять от каждой ноты
+    из `avoid`. Ноль означает «только не на той же доле», как было раньше.
+    """
+    plain = [
+        b for b, t in beats.items()
+        if t == "beat" and all(abs(b - a) >= min_gap for a in avoid)
+    ]
     if not plain:
         return
     nearest = min(plain, key=lambda b: abs(b - at))
@@ -218,21 +286,43 @@ def _ease_in(notes: list[ChartNote], until: float) -> list[ChartNote]:
     ]
 
 
-def _thin(notes: list[ChartNote], max_per_sec: float, sec_per_beat: float) -> list[ChartNote]:
+def _thin(notes: list[ChartNote], limit: int, sec_per_beat: float) -> list[ChartNote]:
     """Проредить обычные ноты до допустимой плотности.
 
     Ноты-щиты, скиллы и перекусы неприкосновенны: они несут смысл, а не ритм-наполнение.
+    Но место в окне они занимают наравне со всеми, и раньше это не учитывалось:
+    прореживание считало только обычные ноты, а проверка — все подряд. На трёх
+    целых сложностях расхождение не проявлялось, а на шести грейдах генератор
+    начал выпускать чарты, которые его же валидатор браковал: щит на сильной
+    доле добавлял лишнюю ноту к уже отобранным.
+
+    Поэтому здесь считается ровно то же, что проверяет `validate`: сколько нот
+    любого типа попадает в окно длиной DENSITY_WINDOW_SECONDS.
     """
-    min_gap = (1.0 / max_per_sec) / sec_per_beat
+    window = DENSITY_WINDOW_SECONDS / sec_per_beat  # окно, выраженное в долях
+    limit = max(limit, 1)
+
+    def _in_window(kept: list[ChartNote], beat: float) -> int:
+        return sum(1 for k in kept if beat - k.beat < window - 1e-9)
+
     kept: list[ChartNote] = []
-    last_plain = -1e9
     for n in sorted(notes, key=lambda x: x.beat):
-        if n.type != "beat":
-            kept.append(n)
+        if n.type == "beat":
+            if _in_window(kept, n.beat) < limit:
+                kept.append(n)
             continue
-        if n.beat - last_plain >= min_gap - 1e-6:
-            kept.append(n)
-            last_plain = n.beat
+
+        # Щит, скилл и перекус не выбрасываются никогда — вместо этого
+        # им расчищают место. Так и правильнее по игре: подход к щиту обязан
+        # быть свободным, иначе игрок доходит до него с занятыми руками.
+        while _in_window(kept, n.beat) >= limit:
+            plain = [i for i, k in enumerate(kept)
+                     if k.type == "beat" and n.beat - k.beat < window - 1e-9]
+            if not plain:
+                break
+            kept.pop(plain[-1])
+        kept.append(n)
+
     return kept
 
 
@@ -261,13 +351,15 @@ def validate(chart: Chart) -> list[str]:
         if b - a < MIN_SHIELD_GAP - 1e-6:
             problems.append(f"доли {a}–{b}: щиты подряд, разрыв меньше {MIN_SHIELD_GAP}")
 
-    # 3. Плотность
-    limit = MAX_DENSITY.get(chart.difficulty, 4.0)
+    # 3. Плотность: не больше N нот в окне длиной DENSITY_WINDOW_SECONDS
+    limit = MAX_NOTES_PER_WINDOW.get(chart.difficulty, 8)
+    window_beats = DENSITY_WINDOW_SECONDS / spb
     for i, n in enumerate(notes):
-        window = [m for m in notes[i:] if m.beat - n.beat < 1.0 / spb]
+        window = [m for m in notes[i:] if m.beat - n.beat < window_beats]
         if len(window) > limit:
             problems.append(
-                f"доля {n.beat}: плотность {len(window)} нот/сек выше предела {limit}"
+                f"доля {n.beat}: {len(window)} нот за {DENSITY_WINDOW_SECONDS:.0f} сек "
+                f"выше предела {limit} для сложности '{chart.difficulty}'"
             )
             break
 

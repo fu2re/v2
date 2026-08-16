@@ -6,28 +6,44 @@ extends Node2D
 ## на ферме растишь фрукты, фруктами приручаешь монстров, с монстрами идёшь
 ## глубже в лес. Ни одно звено не работает в одиночку.
 
+## Сетка грядок. Размер клетки задан не «на глаз»: в неё должны поместиться
+## название фрукта, процент, оставшееся время и значок — при 226 пикселях
+## и кегле 24 самая длинная строка («Золотое яблоко») переносится на две
+## и не вылезает за край. При 200 вылезала, и слово «станцевать»
+## обрывалось на середине.
 const PLOT_COLS := 4
-const PLOT_SIZE := 200.0
-const PLOT_GAP := 24.0
-const GRID_TOP := 780.0
+const PLOT_SIZE := 226.0
+const PLOT_GAP := 20.0
+## Сетка лежит НА нарисованных грядках, а не над ними в воздухе.
+const GRID_TOP := 820.0
+const GRID_LEFT := 58.0
+
+## Раскладка живёт в Farm.tscn и правится в инспекторе (GDD §13.2.1).
+## Скрипт только связывает узлы с логикой.
+@onready var _status: Label = $Status
+@onready var _seeds_label: RichTextLabel = $SeedsLabel
+@onready var _grid: Control = $PlotGrid
+@onready var _seed_picker: VBoxContainer = $SeedPicker
+@onready var _picker_bg: ColorRect = $PickerBackdrop
+@onready var _guardian_label: Label = $GuardianLabel
 
 var _plot_buttons: Array[Button] = []
-var _status: Label = null
-var _seeds_label: Label = null
-var _grid: Control = null
-var _dance: CanvasLayer = null
-var _seed_picker: VBoxContainer = null
-var _picker_bg: ColorRect = null
-var _guardian_label: Label = null
 var _pending_plot := -1
 
 
 func _ready() -> void:
-	_build_ui()
+	# Навигация теперь во дворе усадьбы: отсюда есть только путь обратно.
+	# Раньше каждый экран знал про все остальные, и «назад» означало разное
+	# в зависимости от того, откуда пришёл
+	$BackButton.pressed.connect(_go_to_lobby)
 
-	_dance = preload("res://scenes/farm/PlantDance.tscn").instantiate()
-	add_child(_dance)
-	_dance.finished.connect(_on_dance_finished)
+	Jukebox.play_screen("farm")
+	UIUtil.set_screen_background($Scenery, "res://art/screen/screen_farm.png")
+
+	# Подложка гаснет вместе с панелью: без неё панель висит поверх
+	# живого экрана, кнопки под ней видно, но нажать нельзя
+	_seed_picker.visibility_changed.connect(
+		func(): _picker_bg.visible = _seed_picker.visible)
 
 	FarmState.plots_changed.connect(_refresh)
 	FarmState.seeds_changed.connect(_refresh)
@@ -42,13 +58,18 @@ func _process(_delta: float) -> void:
 
 func _refresh() -> void:
 	_sync_grid()
-	_seeds_label.text = "Серебро %d    Золото %d    Семян %d" % [
-		GameState.silver, ShopState.gold, _total_seeds(),
-	]
+	_seeds_label.text = UIUtil.purse_bbcode(GameState.silver, ShopState.gold,
+		"Семян %d" % _total_seeds())
 
-	var guardian := Registry.monster(GameState.guardian_id())
-	_guardian_label.text = "В лес пойдёт: %s" % guardian.display_name if guardian != null \
-		else "Гуардиан не выбран"
+	var guardian := GameState.guardian()
+	if guardian == null:
+		_guardian_label.text = "Гуардиан не выбран"
+	else:
+		var grade_mark := "" if guardian.grade == MonsterData.Rarity.COMMON \
+			else " · %s" % guardian.grade_name()
+		_guardian_label.text = "В лес пойдёт: %s%s (ур.%d)" % [
+			guardian.display_name(), grade_mark, guardian.level,
+		]
 
 
 func _total_seeds() -> int:
@@ -85,6 +106,9 @@ func _sync_grid() -> void:
 		var label := _plot_label(i)
 		if _plot_buttons[i].text != label:
 			_plot_buttons[i].text = label
+		var icon := _plot_icon(i)
+		if _plot_buttons[i].icon != icon:
+			_plot_buttons[i].icon = icon
 
 
 func _rebuild_grid() -> void:
@@ -99,31 +123,48 @@ func _rebuild_grid() -> void:
 		var col := i % PLOT_COLS
 		var row := i / PLOT_COLS
 		button.position = Vector2(
-			60.0 + col * (PLOT_SIZE + PLOT_GAP),
+			GRID_LEFT + col * (PLOT_SIZE + PLOT_GAP),
 			GRID_TOP + row * (PLOT_SIZE + PLOT_GAP),
 		)
 		button.size = Vector2(PLOT_SIZE, PLOT_SIZE)
-		button.add_theme_font_size_override("font_size", 26)
+		button.add_theme_font_size_override("font_size", 24)
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# Картинка фрукта над подписью: ребёнок 7 лет узнаёт грядку по ягоде
+		# быстрее, чем прочитает её название (GDD §2.3)
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.expand_icon = true
+		button.icon = _plot_icon(i)
 		button.text = _plot_label(i)
 		button.pressed.connect(_on_plot_pressed.bind(i))
 		_grid.add_child(button)
 		_plot_buttons.append(button)
 
 
+## Картинка в клетке. Пусто — картинки нет: пустая грядка и должна выглядеть
+## пустой, подставлять туда что-то значило бы соврать.
+func _plot_icon(index: int) -> Texture2D:
+	if FarmState.is_empty_plot(index):
+		return null
+	var fruit := Registry.fruit(FarmState.plots[index].seed_id)
+	return fruit.sprite() if fruit != null else null
+
+
+## Подпись в клетке. Коротко: клетка 226 пикселей, и всё, что длиннее двух
+## слов, переносится и вылезает за край. Название фрукта уже сказано
+## картинкой, поэтому в тексте остаётся только состояние.
 func _plot_label(index: int) -> String:
 	if FarmState.is_empty_plot(index):
-		return "Пусто\n\nПосадить"
-	var fruit := Registry.fruit(FarmState.plots[index].seed_id)
-	var name := fruit.display_name if fruit != null else "?"
+		return "Посадить"
 
 	if FarmState.is_ready(index):
-		return "%s\n\nСОБРАТЬ" % name
+		return "СОБРАТЬ"
 
 	var percent := int(round(FarmState.growth_ratio(index) * 100.0))
 	var left := _format_time(FarmState.seconds_left(index))
-	var dance_hint := "\n♪ станцевать" if FarmState.can_dance(index) else ""
-	return "%s\n%d%%\n%s%s" % [name, percent, left, dance_hint]
+	# Значок ноты вместо слова «станцевать»: слово не влезает, а нота
+	# уже означает танец на всех остальных экранах
+	return "%d%%\n%s" % [percent, left]
 
 
 func _format_time(seconds: float) -> String:
@@ -144,12 +185,6 @@ func _on_plot_pressed(index: int) -> void:
 
 	if FarmState.is_empty_plot(index):
 		_open_seed_picker(index)
-		return
-
-	if FarmState.can_dance(index):
-		var fruit := Registry.fruit(FarmState.plots[index].seed_id)
-		_pending_plot = index
-		_dance.start(fruit.display_name if fruit != null else "растения")
 		return
 
 	_status.text = "Уже растёт. Загляни позже — урожай не пропадёт."
@@ -200,108 +235,6 @@ func _close_seed_picker() -> void:
 	_pending_plot = -1
 
 
-func _on_dance_finished(level: DanceGrade.Level) -> void:
-	if _pending_plot >= 0:
-		FarmState.apply_dance(_pending_plot, level)
-		_status.text = "%s Растение потянулось вверх." % DanceGrade.level_name(level)
-	_pending_plot = -1
-	_refresh()
+func _go_to_lobby() -> void:
+	get_tree().change_scene_to_file(OnboardingState.LOBBY)
 
-
-func _go_to_forest() -> void:
-	if GameState.guardian_id().is_empty():
-		_status.text = "Некого взять в лес. Сначала подружись с кем-нибудь."
-		return
-	get_tree().change_scene_to_file("res://scenes/run/RunFeed.tscn")
-
-
-func _go_to_collection() -> void:
-	get_tree().change_scene_to_file("res://scenes/collection/Collection.tscn")
-
-
-func _go_to_shop() -> void:
-	get_tree().change_scene_to_file("res://scenes/shop/Shop.tscn")
-
-
-func _go_to_inventory() -> void:
-	get_tree().change_scene_to_file("res://scenes/inventory/Inventory.tscn")
-
-
-func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	bg.color = Color("446A31")
-	add_child(bg)
-
-	var title := Label.new()
-	title.position = Vector2(60, 100)
-	title.size = Vector2(960, 100)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 64)
-	title.add_theme_color_override("font_color", Color("DCC7A4"))
-	title.text = "Твой огород"
-	add_child(title)
-
-	_seeds_label = Label.new()
-	_seeds_label.position = Vector2(60, 210)
-	_seeds_label.size = Vector2(960, 60)
-	_seeds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_seeds_label.add_theme_font_size_override("font_size", 38)
-	_seeds_label.add_theme_color_override("font_color", Color("F0DEC0"))
-	add_child(_seeds_label)
-
-	_status = Label.new()
-	_status.position = Vector2(60, 290)
-	_status.size = Vector2(960, 140)
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.add_theme_font_size_override("font_size", 34)
-	_status.add_theme_color_override("font_color", Color("DCC7A4"))
-	add_child(_status)
-
-	# Три входа с фермы: друзья, лавка, лес
-	var nav := [
-		["Друзья", Vector2(60, 460), _go_to_collection],
-		["Сумка", Vector2(310, 460), _go_to_inventory],
-		["Лавка", Vector2(560, 460), _go_to_shop],
-		["В лес", Vector2(810, 460), _go_to_forest],
-	]
-	for entry: Array in nav:
-		var button := Button.new()
-		button.text = entry[0]
-		button.position = entry[1]
-		button.size = Vector2(210, 130)
-		button.add_theme_font_size_override("font_size", 42)
-		button.pressed.connect(entry[2])
-		add_child(button)
-
-	_guardian_label = Label.new()
-	_guardian_label.position = Vector2(60, 620)
-	_guardian_label.size = Vector2(960, 60)
-	_guardian_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_guardian_label.add_theme_font_size_override("font_size", 34)
-	_guardian_label.add_theme_color_override("font_color", Color("F0DEC0"))
-	add_child(_guardian_label)
-
-	_grid = Control.new()
-	_grid.size = Vector2(1080, 1000)
-	# Обёртка для кнопок грядок не должна ловить ввод сама.
-	# У Control по умолчанию mouse_filter = STOP, и пустой контейнер
-	# во весь экран молча съедал клики по кнопкам навигации под ним
-	_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_grid)
-
-	# Подложка под выбор семян: без неё панель висит поверх живого экрана,
-	# кнопки под ней видно, но они не нажимаются — читается как поломка
-	_picker_bg = UIUtil.make_backdrop(Color(0.14, 0.22, 0.12, 0.96))
-	_picker_bg.visible = false
-	add_child(_picker_bg)
-
-	_seed_picker = VBoxContainer.new()
-	_seed_picker.position = Vector2(90, 400)
-	_seed_picker.size = Vector2(900, 1100)
-	_seed_picker.add_theme_constant_override("separation", 20)
-	_seed_picker.visible = false
-	_seed_picker.visibility_changed.connect(
-		func(): _picker_bg.visible = _seed_picker.visible)
-	add_child(_seed_picker)

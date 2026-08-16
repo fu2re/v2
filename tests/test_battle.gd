@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Проверки боевой логики.
 ##
@@ -6,13 +6,10 @@ extends Node
 ## стоят внимания, но не прогресса, пока он держится. Здоровье трогается
 ## только когда буфер выбит полностью — иначе игра станет злой к детям.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
+	_test_crit_hits_four_times_harder()
+	_test_one_blow_never_ends_the_run()
+	_test_miss_reports_damage()
 	_test_shield_absorbs_before_health()
 	_test_shield_note_restores_shield()
 	_test_missed_shield_hurts_more()
@@ -21,6 +18,7 @@ func _ready() -> void:
 	_test_series_resets_after_attack()
 	_test_pause_breaks_series()
 	_test_gear_raises_attack_damage()
+	_test_fruit_buffs_raise_attack_damage()
 	_test_attack_quality_matters()
 	_test_genre_advantage()
 	_test_depth_scaling()
@@ -30,30 +28,44 @@ func _ready() -> void:
 	_test_rarity_scales_monster()
 	_test_experience_raises_damage()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
+
+## С полного здоровья ни один удар не заканчивает забег.
+##
+## Множители перемножаются: ×4 за крит и ×5 за легендарный грейд давали удар
+## на 300 при 172 здоровья — полностью прокачанный гуардиан умирал с ПЕРВОГО
+## пропуска, не успев понять, что случилось. Проверяется наблюдаемый результат
+## (жив и бой не кончен), а не сама доля: порог можно двигать, обещание — нет.
+func _test_one_blow_never_ends_the_run() -> void:
+	print("Один удар не кончает забег с полного здоровья")
+	# Именно С ПОЛНОГО: 9999 обрезается setup'ом до max_health. Со 100 тест
+	# мерил бы уже раненого гуардиана — обещание касается не его
+	for grade in range(MonsterData.Rarity.size()):
+		var s := _make("beat_serpent", "disco_sprout", 9999, 12, grade)
+		check_eq(s.health, s.max_health, "%s: старт с полного здоровья"
+			% MonsterData.rarity_name(grade))
+		s.take_strike(true)
+		check(s.health > 0, "%s: после крита с полного здоровья гуардиан жив"
+			% MonsterData.rarity_name(grade))
+		check(not s.is_over, "%s: бой продолжается" % MonsterData.rarity_name(grade))
+
+	# Но не бессмертие: криты подряд добивают. Иначе порог сделал бы пропуск
+	# крита бесплатным, и особая нота перестала бы что-то значить
+	var top := _make("beat_serpent", "disco_sprout", 9999, 12,
+		MonsterData.Rarity.LEGENDARY)
+	for i in 4:
+		top.take_strike(true)
+	check(top.health <= 0, "криты подряд на легендарном всё же добивают")
 
 
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
-
-
+## Бой между двумя экземплярами. Грейд противника — параметр: он и есть
+## главный множитель сложности встречи (GDD §6.3).
 func _make(monster_id := "synth_slime", guardian_id := "disco_sprout",
-		health := 100, depth := 0) -> BattleState:
+		health := 100, depth := 0, monster_grade := MonsterData.Rarity.COMMON) -> BattleState:
 	var s := BattleState.new()
-	s.setup(Registry.monster(monster_id), Registry.monster(guardian_id), health, depth)
+	s.setup(
+		MonsterInstance.create(monster_id, monster_grade),
+		GameState.tame(guardian_id, MonsterData.Rarity.COMMON),
+		health, depth)
 	return s
 
 
@@ -89,7 +101,10 @@ func _test_shield_absorbs_before_health() -> void:
 	var health_at_zero_shield := s.health
 	s.register_hit(Judge.Grade.MISS)
 	check(s.health < health_at_zero_shield, "без щита промахи бьют прямо по здоровью")
-	check_eq(health_at_zero_shield - s.health, BattleState.MISS_DAMAGE,
+	# Урон масштабируется злостью грейда (strike_scale), поэтому сверяем
+	# с ценой ПОСЛЕ множителя, а не с голой константой
+	var expected := maxi(int(round(BattleState.MISS_DAMAGE * s.strike_scale)), 1)
+	check_eq(health_at_zero_shield - s.health, expected,
 		"без щита промах стоит ровно свою цену")
 
 
@@ -205,7 +220,7 @@ func _test_gear_raises_attack_damage() -> void:
 	var bare_damage := bare.register_attack(Judge.Grade.PERFECT)
 
 	GameState.add_gear("thunder_pick")
-	GameState.equip("disco_sprout", "thunder_pick")
+	GameState.equip(GameState.tame("disco_sprout", MonsterData.Rarity.COMMON).key(), "thunder_pick")
 	var geared := _make()
 	for i in BattleState.MIN_SERIES_LENGTH:
 		geared.register_hit(Judge.Grade.PERFECT)
@@ -213,6 +228,39 @@ func _test_gear_raises_attack_damage() -> void:
 
 	check(geared_damage > bare_damage,
 		"собранные предметы бьют сильнее (%d против %d)" % [geared_damage, bare_damage])
+	GameState.reset()
+
+
+## Съеденный у костра фрукт — вложение: его баф обязан доехать до боя.
+## Проверяется НАБЛЮДАЕМЫЙ результат (урон атаки), а не поле run_buffs:
+## бафы уже копились и показывались в сумке, но бой их не читал вовсе.
+func _test_fruit_buffs_raise_attack_damage() -> void:
+	print("Бафы съеденных фруктов действуют в бою")
+	GameState.reset()
+	RunManager.run_buffs.clear()
+
+	var plain := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		plain.register_hit(Judge.Grade.PERFECT)
+	var plain_damage := plain.register_attack(Judge.Grade.PERFECT)
+
+	# Инжир (тир 2): удар +1.2 — ровно то, что обещает сумка
+	RunManager.add_buff({"power_bonus": 1.2})
+	var fed := _make()
+	for i in BattleState.MIN_SERIES_LENGTH:
+		fed.register_hit(Judge.Grade.PERFECT)
+	var fed_damage := fed.register_attack(Judge.Grade.PERFECT)
+
+	check(fed_damage > plain_damage,
+		"съеденный фрукт бьёт сильнее (%d против %d)" % [fed_damage, plain_damage])
+
+	# Окно: доля фрукта конвертируется в множитель снаряжения
+	RunManager.add_buff({"window_scale": 0.15})
+	var widened := _make()
+	check_close(widened.effective_window_scale(), 1.15,
+		"окно шире на долю из таблицы фруктов")
+
+	RunManager.run_buffs.clear()
 	GameState.reset()
 
 
@@ -259,8 +307,8 @@ func _test_depth_scaling() -> void:
 	var deep := _make("synth_slime", "disco_sprout", 100, 10)
 	check(deep.max_vibe > shallow.max_vibe, "на 10-й поляне монстр крепче")
 
-	# +12% за поляну: 100 * (1 + 0.12*10) = 220
-	var expected := int(round(shallow.max_vibe * (1.0 + BattleState.VIBE_DEPTH_SCALE * 10)))
+	# Доля за поляну живёт в progression.json → battle.vibe_depth_scale
+	var expected := int(round(shallow.max_vibe * (1.0 + Balance.vibe_depth_scale() * 10)))
 	check_eq(deep.max_vibe, expected, "масштаб ровно по формуле GDD")
 
 
@@ -325,8 +373,10 @@ func _test_snack() -> void:
 func _test_rarity_scales_monster() -> void:
 	print("Грейд делает монстра крепче и злее")
 	GameState.reset()
-	var common := _make("disco_sprout", "disco_sprout")
-	var epic := _make("beat_serpent", "disco_sprout")
+	# ОДИН И ТОТ ЖЕ вид в двух грейдах: грейд принадлежит экземпляру,
+	# и разница обязана появляться именно от него, а не от выбора вида
+	var common := _make("disco_sprout", "disco_sprout", 100, 0, MonsterData.Rarity.COMMON)
+	var epic := _make("disco_sprout", "disco_sprout", 100, 0, MonsterData.Rarity.EPIC)
 
 	check(epic.max_vibe > common.max_vibe,
 		"монстр выше грейдом крепче (%d против %d)" % [epic.max_vibe, common.max_vibe])
@@ -364,9 +414,49 @@ func _test_experience_raises_damage() -> void:
 	for i in 500:
 		GameState.add_battle_experience("synth_slime")
 	check(GameState.experience_multiplier("synth_slime")
-		<= 1.0 + GameState.XP_DAMAGE_CAP + 0.001, "прибавка упирается в потолок")
+		<= 1.0 + GameState.xp_damage_cap() + 0.001, "прибавка упирается в потолок")
 
 	# Опыт по одному виду не влияет на другой
 	check_eq(GameState.experience_multiplier("bass_bear"), 1.0,
 		"опыт не протекает на другие виды")
 	GameState.reset()
+
+
+## Крит монстра бьёт вчетверо больнее обычного удара (GDD §4.2.3).
+##
+## Раньше на этом месте стояла нота-зелье, и после упразднения зелий она
+## осталась нарисованной бутылочкой: игрок ждал лечения и получал по лбу.
+func _test_crit_hits_four_times_harder() -> void:
+	print("Крит бьёт вчетверо")
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("synth_slime", MonsterData.Rarity.COMMON),
+		null, 500, 0)
+	state.shield = 0
+
+	var normal := state.take_strike(false)
+	var crit := state.take_strike(true)
+	# Сравниваем ОТНОШЕНИЕ с допуском: множитель применяется до округления,
+	# и 23×4 не обязано в точности совпасть с round(60×1.5)
+	var ratio := float(crit) / maxf(normal, 1.0)
+	check(absf(ratio - BattleState.CRIT_MULTIPLIER) < 0.15,
+		"крит (%d) примерно вчетверо больше обычного (%d), отношение %.2f" % [
+			crit, normal, ratio])
+	check(crit > 0, "и он вообще что-то снимает")
+
+
+## Промах по герою обязан ВОЗВРАЩАТЬ урон: по этому числу рисуется цифра
+## над героем, и без него удары по себе не видно вовсе.
+func _test_miss_reports_damage() -> void:
+	print("Промах сообщает, сколько стоил")
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("synth_slime", MonsterData.Rarity.COMMON),
+		null, 500, 0)
+	state.shield = 0
+
+	# Минус означает «получил сам», плюс — «снял с монстра»
+	check(state.register_hit(Judge.Grade.MISS) < 0,
+		"обычный промах вернул урон по герою")
+	check(state.use_skill(Judge.Grade.MISS) < 0,
+		"промах по скиллу вернул урон по герою")
+	check(state.use_skill(Judge.Grade.PERFECT) == 0,
+		"удачный скилл героя не бьёт")

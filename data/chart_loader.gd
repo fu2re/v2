@@ -8,6 +8,46 @@ extends RefCounted
 
 const CHARTS_DIR := "res://charts"
 
+## Индекс каталога: "<трек>_<грейд>" -> полный путь к файлу.
+##
+## Нужен потому, что в имени файла теперь есть ещё и темп
+## (`disco_zarya_legendary_240.json`), и путь больше не собирается склейкой
+## строк. Индекс строится один раз при первом обращении: каталог на триста
+## файлов сканируется за миллисекунды, а альтернатива — держать таблицу
+## темпов ещё и в GDScript, где она немедленно разойдётся с генератором.
+static var _index: Dictionary = {}
+static var _indexed := false
+
+
+static func _build_index() -> void:
+	if _indexed:
+		return
+	_indexed = true
+	var dir := DirAccess.open(CHARTS_DIR)
+	if dir == null:
+		push_warning("Каталог чартов не найден: %s" % CHARTS_DIR)
+		return
+
+	for file_name in dir.get_files():
+		# В экспортированной сборке ресурсы лежат как .remap
+		var clean := file_name.trim_suffix(".remap")
+		if not clean.ends_with(".json"):
+			continue
+		var stem := clean.trim_suffix(".json")
+		var parts := stem.split("_")
+		# Хвост из темпа отбрасываем: ключ — это трек и грейд, а темп
+		# в имени существует для человека, который смотрит на папку.
+		if parts.size() >= 2 and parts[parts.size() - 1].is_valid_int():
+			stem = stem.substr(0, stem.length() - parts[parts.size() - 1].length() - 1)
+		_index[stem] = "%s/%s" % [CHARTS_DIR, clean]
+
+
+## Сбросить индекс. Нужен инструментам, которые пишут чарты на лету:
+## Chart Forge сохраняет файл и тут же перечитывает его.
+static func refresh() -> void:
+	_indexed = false
+	_index.clear()
+
 
 ## Загрузить чарт. Возвращает null и пишет ошибку, если файл битый —
 ## падать на разборе данных нельзя, чарт может прийти из тулы.
@@ -26,7 +66,24 @@ static func load_chart(path: String) -> ChartData:
 
 
 static func load_by_id(id: String, difficulty: String = "normal") -> ChartData:
-	return load_chart("%s/%s_%s.json" % [CHARTS_DIR, id, difficulty])
+	_build_index()
+	var key := "%s_%s" % [id, difficulty]
+	if not _index.has(key):
+		push_error("Чарт не найден: %s" % key)
+		return null
+	return load_chart(_index[key])
+
+
+## Все доступные грейды трека, по возрастанию сложности.
+## Пустой массив означает, что трека нет вовсе, — это ошибка данных,
+## а не «монстр без музыки»: бой без чарта не начнётся.
+static func grades_for(id: String) -> PackedStringArray:
+	_build_index()
+	var out := PackedStringArray()
+	for grade in ChartData.GRADE_ORDER:
+		if _index.has("%s_%s" % [id, grade]):
+			out.append(grade)
+	return out
 
 
 static func _from_dict(d: Dictionary, source: String) -> ChartData:

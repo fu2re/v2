@@ -7,4 +7,4 @@ script = ExtResource("1")
 id = "bass_plum"
 display_name = "Сливка"
 tier = 1
-sprite_path = "res://art/placeholder/fruit_bass_plum.png"
+sprite_path = "res://art/fruit/bass_plum.png"

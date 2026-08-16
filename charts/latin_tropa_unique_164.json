@@ -1,0 +1,338 @@
+{
+  "id": "latin_tropa",
+  "genre": "latin",
+  "bpm": 164.16,
+  "difficulty": "unique",
+  "duration": 30.701754385964914,
+  "audio": "res://music/latin_tropa_unique_164.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 5.0,
+      "type": "beat"
+    },
+    {
+      "beat": 6.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.0,
+      "type": "attack"
+    },
+    {
+      "beat": 9.0,
+      "type": "beat"
+    },
+    {
+      "beat": 10.0,
+      "type": "beat"
+    },
+    {
+      "beat": 11.0,
+      "type": "beat"
+    },
+    {
+      "beat": 12.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.0,
+      "type": "attack"
+    },
+    {
+      "beat": 14.0,
+      "type": "beat"
+    },
+    {
+      "beat": 14.5,
+      "type": "beat"
+    },
+    {
+      "beat": 15.0,
+      "type": "beat"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "attack"
+    },
+    {
+      "beat": 20.0,
+      "type": "beat"
+    },
+    {
+      "beat": 22.0,
+      "type": "beat"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "beat"
+    },
+    {
+      "beat": 26.0,
+      "type": "attack"
+    },
+    {
+      "beat": 28.0,
+      "type": "skill"
+    },
+    {
+      "beat": 30.0,
+      "type": "beat"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 36.0,
+      "type": "beat"
+    },
+    {
+      "beat": 36.5,
+      "type": "beat"
+    },
+    {
+      "beat": 37.0,
+      "type": "beat"
+    },
+    {
+      "beat": 37.5,
+      "type": "beat"
+    },
+    {
+      "beat": 38.0,
+      "type": "attack"
+    },
+    {
+      "beat": 38.5,
+      "type": "beat"
+    },
+    {
+      "beat": 39.0,
+      "type": "beat"
+    },
+    {
+      "beat": 42.0,
+      "type": "beat"
+    },
+    {
+      "beat": 43.0,
+      "type": "beat"
+    },
+    {
+      "beat": 43.5,
+      "type": "beat"
+    },
+    {
+      "beat": 44.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "attack"
+    },
+    {
+      "beat": 46.5,
+      "type": "beat"
+    },
+    {
+      "beat": 47.0,
+      "type": "beat"
+    },
+    {
+      "beat": 48.0,
+      "type": "shield"
+    },
+    {
+      "beat": 49.0,
+      "type": "beat"
+    },
+    {
+      "beat": 50.0,
+      "type": "attack"
+    },
+    {
+      "beat": 51.0,
+      "type": "heavy"
+    },
+    {
+      "beat": 52.0,
+      "type": "beat"
+    },
+    {
+      "beat": 52.5,
+      "type": "beat"
+    },
+    {
+      "beat": 53.0,
+      "type": "beat"
+    },
+    {
+      "beat": 53.5,
+      "type": "attack"
+    },
+    {
+      "beat": 54.5,
+      "type": "beat"
+    },
+    {
+      "beat": 55.5,
+      "type": "beat"
+    },
+    {
+      "beat": 57.0,
+      "type": "beat"
+    },
+    {
+      "beat": 58.0,
+      "type": "beat"
+    },
+    {
+      "beat": 59.0,
+      "type": "attack"
+    },
+    {
+      "beat": 60.0,
+      "type": "beat"
+    },
+    {
+      "beat": 61.0,
+      "type": "beat"
+    },
+    {
+      "beat": 62.0,
+      "type": "beat"
+    },
+    {
+      "beat": 62.5,
+      "type": "beat"
+    },
+    {
+      "beat": 63.0,
+      "type": "attack"
+    },
+    {
+      "beat": 64.0,
+      "type": "shield"
+    },
+    {
+      "beat": 66.0,
+      "type": "beat"
+    },
+    {
+      "beat": 68.0,
+      "type": "beat"
+    },
+    {
+      "beat": 68.5,
+      "type": "beat"
+    },
+    {
+      "beat": 69.0,
+      "type": "attack"
+    },
+    {
+      "beat": 69.5,
+      "type": "beat"
+    },
+    {
+      "beat": 70.0,
+      "type": "beat"
+    },
+    {
+      "beat": 70.5,
+      "type": "beat"
+    },
+    {
+      "beat": 71.5,
+      "type": "skill"
+    },
+    {
+      "beat": 74.0,
+      "type": "beat"
+    },
+    {
+      "beat": 75.0,
+      "type": "beat"
+    },
+    {
+      "beat": 76.0,
+      "type": "beat"
+    },
+    {
+      "beat": 77.0,
+      "type": "beat"
+    },
+    {
+      "beat": 78.0,
+      "type": "attack"
+    },
+    {
+      "beat": 78.5,
+      "type": "beat"
+    },
+    {
+      "beat": 79.0,
+      "type": "beat"
+    },
+    {
+      "beat": 80.0,
+      "type": "beat"
+    },
+    {
+      "beat": 82.0,
+      "type": "attack"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    },
+    {
+      "beat": 46.0,
+      "action": "windup"
+    },
+    {
+      "beat": 48.0,
+      "action": "strike"
+    },
+    {
+      "beat": 62.0,
+      "action": "windup"
+    },
+    {
+      "beat": 64.0,
+      "action": "strike"
+    }
+  ]
+}

@@ -106,6 +106,7 @@ static func monsters_of_rarity(rarity: MonsterData.Rarity) -> Array[MonsterData]
 	return out
 
 
+## Зелья, отсортированы по цене: дешёвое первым, как и снаряжение.
 static func cosmetic(id: String) -> CosmeticData:
 	ensure_loaded()
 	return _cosmetics.get(id)

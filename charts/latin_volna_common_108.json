@@ -1,0 +1,130 @@
+{
+  "id": "latin_volna",
+  "genre": "latin",
+  "bpm": 108.0,
+  "difficulty": "common",
+  "duration": 28.88888888888889,
+  "audio": "res://music/latin_volna_common_108.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.0,
+      "type": "beat"
+    },
+    {
+      "beat": 9.0,
+      "type": "beat"
+    },
+    {
+      "beat": 10.0,
+      "type": "attack"
+    },
+    {
+      "beat": 12.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.0,
+      "type": "beat"
+    },
+    {
+      "beat": 14.0,
+      "type": "beat"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "skill"
+    },
+    {
+      "beat": 20.0,
+      "type": "attack"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "beat"
+    },
+    {
+      "beat": 25.0,
+      "type": "beat"
+    },
+    {
+      "beat": 26.0,
+      "type": "attack"
+    },
+    {
+      "beat": 28.0,
+      "type": "beat"
+    },
+    {
+      "beat": 29.0,
+      "type": "beat"
+    },
+    {
+      "beat": 30.0,
+      "type": "heavy"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 34.0,
+      "type": "attack"
+    },
+    {
+      "beat": 36.0,
+      "type": "beat"
+    },
+    {
+      "beat": 40.0,
+      "type": "beat"
+    },
+    {
+      "beat": 42.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "skill"
+    },
+    {
+      "beat": 48.0,
+      "type": "beat"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    }
+  ]
+}

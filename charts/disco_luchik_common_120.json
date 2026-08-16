@@ -1,0 +1,178 @@
+{
+  "id": "disco_luchik",
+  "genre": "disco",
+  "bpm": 120.0,
+  "difficulty": "common",
+  "duration": 34.0,
+  "audio": "res://music/disco_luchik_common_120.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 6.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.0,
+      "type": "attack"
+    },
+    {
+      "beat": 9.0,
+      "type": "beat"
+    },
+    {
+      "beat": 10.0,
+      "type": "beat"
+    },
+    {
+      "beat": 12.0,
+      "type": "beat"
+    },
+    {
+      "beat": 14.0,
+      "type": "attack"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "beat"
+    },
+    {
+      "beat": 20.0,
+      "type": "beat"
+    },
+    {
+      "beat": 22.0,
+      "type": "attack"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "skill"
+    },
+    {
+      "beat": 25.0,
+      "type": "beat"
+    },
+    {
+      "beat": 26.0,
+      "type": "attack"
+    },
+    {
+      "beat": 28.0,
+      "type": "beat"
+    },
+    {
+      "beat": 30.0,
+      "type": "beat"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 34.0,
+      "type": "attack"
+    },
+    {
+      "beat": 36.0,
+      "type": "beat"
+    },
+    {
+      "beat": 38.0,
+      "type": "beat"
+    },
+    {
+      "beat": 39.0,
+      "type": "beat"
+    },
+    {
+      "beat": 40.0,
+      "type": "attack"
+    },
+    {
+      "beat": 41.0,
+      "type": "heavy"
+    },
+    {
+      "beat": 42.0,
+      "type": "beat"
+    },
+    {
+      "beat": 44.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "attack"
+    },
+    {
+      "beat": 48.0,
+      "type": "shield"
+    },
+    {
+      "beat": 50.0,
+      "type": "beat"
+    },
+    {
+      "beat": 52.0,
+      "type": "beat"
+    },
+    {
+      "beat": 56.0,
+      "type": "beat"
+    },
+    {
+      "beat": 58.0,
+      "type": "skill"
+    },
+    {
+      "beat": 60.0,
+      "type": "beat"
+    },
+    {
+      "beat": 64.0,
+      "type": "beat"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    },
+    {
+      "beat": 46.0,
+      "action": "windup"
+    },
+    {
+      "beat": 48.0,
+      "action": "strike"
+    }
+  ]
+}

@@ -1,0 +1,847 @@
+# Манифест графики BEATROOT.
+#
+# Здесь перечислено ВСЁ, что игра показывает на экране. Это источник правды
+# для пайплайна: `artgen batch` генерирует по этому файлу, `artgen gallery`
+# по нему же строит страницу ревью, а `artgen manifest --check` сверяет его
+# с `data/*.tres` — новый монстр без записи об арте виден сразу, а не через
+# месяц по розовому квадрату в бою.
+#
+# Правила промптов. Выведены из разбора первых 36 ассетов: 25 сработали
+# с первого раза, 11 потребовали от 2 до 7 попыток, и провалы кучкуются.
+#
+#   1. НАЗЫВАЙ ВЕЩЬ, А НЕ МАТЕРИАЛ. Начинай с существительного, которое модель
+#      знает, и только потом навешивай признаки. Все семь провальных попыток
+#      Топотуна — это «creature built of mossy river stones»: сущность не
+#      названа, и модель подставляет ближайшее знакомое. Заработало с первого
+#      раза, как только появилось «half bear and half fox».
+#      Так же слегли «circlet» (вышел бублик) и «jelly blob» (вышел колобок).
+#      Груша, инжир, сундук, мешочек — все названы прямо и взяты с первой попытки.
+#   2. ЗАДАВАЙ РАКУРС. Без него модель снимает предмет в перспективе, и на 64px
+#      пояс превращается в бурый овал. Ракурс задан в `style` вида — не дублируй.
+#   3. Цвета описываются словарём палитры проекта: охра, олива, терракота,
+#      тёплое золото. Просить «indigo» или «neon» бессмысленно — квантование
+#      всё равно уведёт цвет в землю, но по дороге испортит форму.
+#   4. Никакого насилия и угрозы (CLAUDE.md §4). Монстры дружелюбны даже когда
+#      мешают: аудитория 7+.
+#   5. Промпт описывает ЧТО нарисовать. КАК — задаётся шаблоном стиля в
+#      comfy.py и полем `style` вида ассета, а не переписывается в каждой строке.
+#   6. Милота не отменяет анатомию. «Максимально милый» без названных ушей,
+#      морды и хвоста растворяет их в шарике — проверено на пятой попытке
+#      Топотуна. Признаки зверя перечисляй поимённо.
+#
+# `generated = false` значит «генерации не отдаётся никогда» (GDD §11.3):
+# UI, ноты и индикаторы рисуются вручную, потому что от их читаемости зависит
+# честность боя. Они остаются в манифесте, чтобы галерея показывала полный
+# список графики игры, включая ещё не сделанное.
+
+
+# ──────────────────────────────── грейды ────────────────────────────────────
+#
+# Шесть грейдов из MonsterData.Rarity. Вид с грейдом раскрывается манифестом
+# в шесть ассетов: `bass_bear_common`, `bass_bear_uncommon` и так далее —
+# писать тридцать записей руками значит гарантированно их рассинхронить.
+#
+# **Это не эволюция.** Зверь остаётся тем же самым: та же морда, тот же силуэт,
+# та же библиотека танцев.
+#
+# Способ — перебор. Старший грейд рисуется тем же промптом, что и базовый,
+# многими сидами; годится тот кандидат, который вышел похожим на принятую
+# основу. Похожесть меряется автоматически (метрика `similarity`: совпадение
+# силуэта плюс совпадение раскладки по палитре), и кандидаты в контакт-листе
+# идут по ней сверху вниз — иначе перебирать восемь картинок на грейд глазами
+# бессмысленно.
+
+[grade.common]
+name = "Обычный"
+modifier = ""
+
+# ⚠ ЭТИ МОДИФИКАТОРЫ ОТКЛЮЧЕНЫ. Ниже — запись о том, что уже проверено, чтобы
+# не проверять это второй раз. Сейчас грейды берутся перебором: тот же промпт,
+# что у базового, много сидов, отбор по похожести на принятую основу.
+# Похожесть считает метрика `similarity`, кандидаты в листе идут по ней —
+# перебирать глазами сотню картинок иначе невозможно.
+#
+# Шесть опытов, все с одним исходом: старший грейд получается неотличимым
+# от базового либо перестаёт быть тем же зверем. Промежутка нет.
+#
+#   denoise 0.45 и 0.60 (FLUX)   — кандидат неотличим от основы
+#   SDXL на cfg 6.5, denoise 0.6 — сменилась манера, убранства не появилось
+#   txt2img с сидом основы       — другое существо, и хуже
+#   denoise 0.85                 — персонаж разрушен, лицо пропало
+#   0.68/0.73/0.78, модификатор  — зверь цел, оберега нет ни на одном
+#   в начале промпта
+#   грейд через фактуру, а не     — все пять ступеней визуально одинаковы
+#   через предметы
+#
+# Две независимые причины, обе структурные:
+#
+#   1. img2img при частичном denoise перерабатывает ФАКТУРУ, но не вносит
+#      в композицию НОВЫХ ПРЕДМЕТОВ: низкочастотную раскладку задаёт исходный
+#      латент. Оберег, сбруя, мантия — это задача редактирования, а не
+#      генерации; её решают inpaint по маске или IP-Adapter, то есть кастомные
+#      ноды, которых workflow намеренно не содержит.
+#   2. «Ярче и насыщеннее» невозможно по правилу палитры. Потолок насыщенности
+#      мира — 0.128, и любой цвет ассета квантуется в эти 45 цветов. То самое
+#      правило, что защищает читаемость ноты, стирает и разницу грейдов в цвете.
+#
+# Значит грейд должен выражаться тем, чем пайплайн управляет детерминированно:
+# накладками, нарисованными вручную по одной на силуэт и грейд, и меткой
+# редкости в интерфейсе (RARITY_COLORS уже есть в MonsterData). Решение за
+# человеком — см. отчёт.
+
+# Младшие две ступени — чистый перебор, тот же промпт. Разница между обычным
+# и необычным на картинке и не нужна: её несёт метка редкости в интерфейсе.
+[grade.uncommon]
+name = "Необычный"
+modifier = ""
+
+[grade.rare]
+name = "Редкий"
+modifier = ""
+
+# С уникального монстр обязан выглядеть сильнее. Здесь модификаторы работают,
+# в отличие от провалившейся попытки с img2img: генерация с чистого листа
+# рисует новые предметы свободно — сложности были у РЕДАКТИРОВАНИЯ готовой
+# картинки, а не у рисования.
+#
+# Цена известна и принята: старший грейд — это другой бросок того же зверя,
+# а не тот же кадр с добавленным убранством. Метрика похожести показывает,
+# насколько далеко ушло, и кандидаты сортируются по ней.
+# Формулировки НЕ называют частей тела. Первая версия просила наплечник —
+# а наплечник подразумевает плечи, и модель дорисовала змее лапы: из восьми
+# кандидатов четверо вышли ящерицами. Силуэт определяет библиотеку танцев
+# (GDD §11.2), и такая подмена ломает её молча.
+#
+# Поэтому убранство описывается тем, что можно надеть на что угодно: обвивы,
+# накидки, венцы. Монстры бывают змеями, желе и мотыльками.
+[grade.unique]
+name = "Уникальный"
+modifier = "adorned with a carved wooden charm and a woven sash wrapped around its body, stronger sturdier build, proud confident bearing"
+
+[grade.epic]
+name = "Эпический"
+modifier = "adorned with an elaborate ceremonial wrapping of carved wood and polished stone, layered patterned cloth draped over it, powerful massive build, commanding bearing"
+
+# Золото у легендарного обязательно. Ради этого в палитру мира добавлена
+# рампа `gold`: она проходит правило разделения с запасом (0.216 при пороге
+# 0.15), потому что все игровые цвета холодные, а золото тёплое. Без рампы
+# любое золото квантовалось бы в охру и читалось бы старой латунью.
+[grade.legendary]
+name = "Легендарный"
+modifier = "adorned with a magnificent solid gold crown, ornate golden jewellery and gleaming polished gold plating over its body, long embroidered mantle draped over it, majestic commanding bearing"
+
+
+# ─────────────────────────────── виды ассетов ───────────────────────────────
+
+# graded = true раскрывает каждого монстра в шесть ассетов по числу грейдов.
+[kind.monster]
+size = 96
+variants = 4
+gen_width = 1024
+gen_height = 1024
+cutout = true
+graded = true
+style = "expressive friendly face with large eyes, mid-dance pose, full body"
+
+[kind.hero]
+size = 96
+variants = 4
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "small human child character, expressive face, mid-dance pose, full body"
+
+[kind.fruit]
+size = 48
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "single ripe fruit, simple readable shape, soft highlight"
+
+# Снаряжение, косметика и реквизит — это ИКОНКИ, и просить их надо иконками.
+# Проверено на первом прогоне: без нажима на «плоско, спереди, без перспективы»
+# модель снимает пояс кольцом под углом, и на 64px он превращается в бурый овал.
+# Компактным предметам вроде жёлудя перспектива не мешает, ремню и плащу — губительна.
+
+[kind.gear]
+size = 64
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "single wearable item, worn handmade craft, flat orthographic icon, straight front view, no perspective, no foreshortening, thick readable silhouette"
+
+[kind.cosmetic]
+size = 64
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "single wearable item, cheerful festive craft, flat orthographic icon, straight front view, no perspective, no foreshortening, thick readable silhouette"
+
+[kind.prop]
+size = 64
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "single object, sturdy handmade craft, flat orthographic icon, straight front view, no perspective, thick readable silhouette"
+
+# Фон поляны — единственный вид, у которого фон НЕ вырезается: он и есть фон.
+# Портретный кадр под 1080×1920, деталь намеренно низкая (GDD §11.1): плотный
+# фон на телефоне превращается в кашу и спорит с нотами.
+# Решение по небу: небо не рисуем вообще. В палитре мира его нет, а добавить
+# светлую голубую рампу правило не даёт — пастельные ступени подходят к note_beat
+# на 0.139 при пороге 0.15. Поэтому композиция закрывает небо кроной. Это заодно
+# ровно то, чего требует GDD §11.1: фон боя упрощённый и силуэтный.
+[kind.glade]
+size = 480
+variants = 3
+gen_width = 832
+gen_height = 1216
+cutout = false
+style = "dense leaf canopy overhead closing off the sky, no open sky visible, forest depth fading into haze"
+
+# Тайл грядки — квадрат без вырезки, стыкуется сам с собой.
+# Бесшовности от обычного txt2img добиться нельзя: для неё нужна круговая
+# свёртка в сэмплере, то есть кастомная нода, а workflow намеренно собран
+# из базовых. Поэтому просим просто ровную текстуру сверху и знаем, что шов
+# придётся закрывать руками либо делать исключение в workflow.
+[kind.tile]
+size = 64
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = false
+style = "top-down ground texture, even flat lighting, no objects, texture fills the whole frame edge to edge"
+
+
+# ──────────────────────────────── монстры ───────────────────────────────────
+# Силуэт и стихия берутся из data/monsters/*.tres и должны совпадать: силуэт
+# определяет библиотеку танцев (GDD §11.2), стихия — цветовую рампу.
+
+[[asset]]
+id = "disco_sprout"
+kind = "monster"
+# «sprout child» модель читает как «девочка с цветами в волосах» — проверено.
+# Отсюда нажим на «растение, не человек»: героя-человечка игрок обязан отличать
+# от защитника с одного взгляда.
+subject = "small two-legged plant creature, its whole head is a single sunflower blossom, green stem body, broad leaves for arms, not a human, ochre and warm green tones"
+
+[[asset]]
+id = "bass_bear"
+kind = "monster"
+# Три попытки. Первая дала лисёнка в доспехе — камня не читалось. Вторая
+# камень дала, но зверь вышел тяжёлым и неприветливым: «сложен из валунов»,
+# «толстые каменные лапы» — это слова про твёрдость, они тянут от милоты.
+#
+# Третья заходит с другого конца: сначала детские пропорции (большая голова,
+# низко посаженные глаза, коротенькие лапки, круглый живот), и только потом
+# камень — и не валунами, а гладкой речной галькой. Стихия Камень сохраняется,
+# но перестаёт диктовать характер.
+# Шестая попытка, задание уточнено: прямоходящий медведе-лис.
+#
+# Пятая довела милоту до предела, но вместе с ней исчезли уши, морда и хвост —
+# получился безликий колобок, отличимый от других монстров только цветом.
+# Поэтому теперь звериные признаки названы поимённо: круглые уши от медведя,
+# лисья мордочка, пушистый хвост. Детские пропорции сохранены, но они больше
+# не съедают анатомию.
+#
+# Силуэт в data/monsters/bass_bear.tres переведён в BIPED под «прямоходящий»:
+# от силуэта зависит, какую библиотеку танцев монстр делит с остальными.
+subject = "adorable cub creature that is half bear and half fox, standing upright on two legs, big round fluffy bear ears, short pointed fox muzzle with a small dark nose, bushy fox tail, large sparkling eyes with bright highlights, rosy blushing cheeks, chubby round belly, short stubby arms, a few mossy grey pebbles set into its back like a small shell"
+
+[[asset]]
+id = "banjo_moth"
+kind = "monster"
+subject = "gentle moth creature with broad leaf-patterned wings dusted in golden pollen, big calm eyes, soft furry olive body"
+
+[[asset]]
+id = "synth_slime"
+kind = "monster"
+# Первая попытка дала четыре одинаковых бежевых колобка: ни искр, ни прозрачности,
+# стихия Искра не читалась совсем. И прозрачность, и искры вынесены в начало —
+# это главное, что отличает его от фрукта в мелком размере.
+# «jelly blob» — то же нарушение правила 1, что стоило Топотуну семи попыток:
+# blob это отсутствие формы, и модель дважды выдала бежевый колобок. Назван
+# конкретный предмет, который модель знает — желейный пудинг.
+subject = "small round wobbly jelly pudding come to life with a happy face, smooth glossy amber jelly like a dessert, tiny stubby arms, soft rounded body"
+
+[[asset]]
+id = "beat_serpent"
+kind = "monster"
+# Первая попытка: либо чистая змея без плетения, либо плетение с торчащими
+# во все стороны волокнами, которые в пикселе становятся грязью. Нужна
+# ровная оплётка по телу, а не растрёпанная.
+subject = "long serpent creature whose smooth body is tightly wrapped in braided vine and straw cord, neat even wrapping with no loose ends, body looping in a wide S curve, curious friendly face, olive and straw tones"
+
+
+# ───────────────────────────────── герой ────────────────────────────────────
+
+[[asset]]
+id = "hero_kid"
+kind = "hero"
+subject = "cheerful farm boy in patched overalls and a straw hat, clapping to a beat, warm earthy clothes"
+
+# Второй играбельный герой. Признаки названы поимённо по правилу 1: без них
+# модель рисует того же ребёнка, и два героя станут неразличимы.
+[[asset]]
+id = "hero_girl"
+kind = "hero"
+subject = "cheerful farm girl with two braided pigtails tied with cloth ribbons, patched dungarees over a striped shirt, wide straw hat pushed back, clapping to a beat, warm earthy clothes"
+
+
+# ──────────────────────────────── фрукты ────────────────────────────────────
+
+[[asset]]
+id = "drum_berry"
+kind = "fruit"
+subject = "cluster of three plump crunchy berries on a short stem with one small green leaf, deep red-brown skin"
+
+[[asset]]
+id = "echo_pear"
+kind = "fruit"
+subject = "single ripe pear, warm golden-green skin, one leaf on a short stem"
+
+[[asset]]
+id = "bass_plum"
+kind = "fruit"
+subject = "single round plum, dusty purple-brown skin with a soft powdery bloom"
+
+[[asset]]
+id = "loop_fig"
+kind = "fruit"
+subject = "single ripe fig split open, honey-amber flesh, warm brown skin"
+
+[[asset]]
+id = "chord_apple"
+kind = "fruit"
+subject = "single polished apple of pale gold, one curled leaf, faint warm glow"
+
+
+# ────────────────────────────── снаряжение ──────────────────────────────────
+# Отображаемые имена в .tres не совпадают с id — id остались от ранней версии.
+# Промпт следует ИМЕНИ, потому что игрок видит имя (`brass_bell` = «Тёплый плащ»).
+
+[[asset]]
+id = "soft_slippers"
+kind = "gear"
+subject = "simple braided rope belt, coiled, frayed ends"
+
+[[asset]]
+id = "spring_boots"
+kind = "gear"
+subject = "worn leather belt with a small brass buckle"
+
+[[asset]]
+id = "cloud_shoes"
+kind = "gear"
+subject = "traveller's leather belt hung with small pouches and a coil of cord"
+
+[[asset]]
+id = "tin_whistle"
+kind = "gear"
+subject = "patchwork cloak sewn from mismatched cloth squares, folded"
+
+[[asset]]
+id = "brass_bell"
+kind = "gear"
+subject = "thick warm woolen cloak with a soft fur collar, folded"
+
+[[asset]]
+id = "thunder_pick"
+kind = "gear"
+subject = "storm-grey travelling cloak with a swirling wind pattern along the hem, folded"
+
+[[asset]]
+id = "acorn_charm"
+kind = "gear"
+subject = "acorn cap worn as a small hat, polished brown shell"
+
+[[asset]]
+id = "river_stone"
+kind = "gear"
+subject = "small felt hat with a curved feather in the band"
+
+# Две попытки провалились одинаково: «circlet» модель понимает как кольцо, и
+# что сверху, что спереди получается бублик с пустой серединой, а не корона.
+# Слово «венок/обруч» убрано совсем — описываем зубцы, торчащие вверх.
+[[asset]]
+id = "heartwood_amulet"
+kind = "gear"
+subject = "crown made of upright oak leaves standing up like tall pointed spikes, leaves joined at the base by thin twigs, seen from the front"
+
+
+# ─────────────────────────────── косметика ──────────────────────────────────
+
+[[asset]]
+id = "polka_overalls"
+kind = "cosmetic"
+subject = "child's denim overalls with white polka dots, laid out flat"
+
+[[asset]]
+id = "disco_overalls"
+kind = "cosmetic"
+subject = "flared festive overalls with a wide collar and a warm metallic sheen, laid out flat"
+
+[[asset]]
+id = "starlight_cloak"
+kind = "cosmetic"
+subject = "deep twilight-brown cloak scattered with tiny warm golden falling stars, folded"
+
+[[asset]]
+id = "straw_hat"
+kind = "cosmetic"
+subject = "wide-brimmed straw sun hat with a woven cloth band"
+
+[[asset]]
+id = "sunflower_hat"
+kind = "cosmetic"
+subject = "large sunflower blossom worn as a hat, green leaf brim"
+
+[[asset]]
+id = "crown_of_beats"
+kind = "cosmetic"
+subject = "small golden crown whose points are shaped like little drums"
+
+[[asset]]
+id = "watering_can"
+kind = "cosmetic"
+subject = "small tin watering can with a cloth ribbon bow tied to the handle"
+
+# По данным это косметика (слот «вид грядки»), по рисовке — бесшовный тайл.
+# Поле `data` разводит эти две роли, иначе сверка с data/cosmetics ругается.
+[[asset]]
+id = "mossy_plot"
+kind = "tile"
+data = "cosmetic"
+subject = "tilled dark soil overgrown with soft green moss and tiny clover"
+
+# Эффекты нот и танцевальные движения — не спрайты. Первое рисуется вручную
+# по правилу читаемости, второе живёт анимацией на риге (GDD §11.2).
+[[asset]]
+id = "sparkle_notes"
+kind = "cosmetic"
+generated = false
+note = "Эффект нот. Рисуется вручную: от читаемости ноты зависит честность боя (GDD §11.3)"
+
+[[asset]]
+id = "aurora_notes"
+kind = "cosmetic"
+generated = false
+note = "Эффект нот. Рисуется вручную по той же причине"
+
+[[asset]]
+id = "spin_emote"
+kind = "cosmetic"
+generated = false
+note = "Танцевальное движение — анимация на риге, а не картинка (GDD §11.2)"
+
+[[asset]]
+id = "moonwalk_emote"
+kind = "cosmetic"
+generated = false
+note = "Танцевальное движение — анимация на риге, а не картинка"
+
+
+# ─────────────────────────────── поляны леса ────────────────────────────────
+# Четыре типа из data/glade.gd. Фон боя дополнительно притемняется в рантайме
+# на 30% (GDD §11.1.1) — здесь он рисуется нормальным.
+
+[[asset]]
+id = "glade_battle"
+kind = "glade"
+subject = "sunlit forest clearing seen from a low angle, soft grass, distant tree trunks in haze"
+
+[[asset]]
+id = "glade_wild_bush"
+kind = "glade"
+subject = "shaded thicket of heavy berry bushes, dappled light, dense leaves"
+
+[[asset]]
+id = "glade_encounter"
+kind = "glade"
+# Одна поляна на все встречи: торговец, куст с гостинцами и бабушка.
+# Обочина с навесом читается как «здесь кто-то есть» для всех троих,
+# а кто именно — говорит карточка, и рисовать три фона незачем.
+subject = "forest roadside with a striped cloth awning and stacked crates, warm afternoon light"
+
+[[asset]]
+id = "glade_campfire"
+kind = "glade"
+subject = "evening forest camp, warm firelight glow on the ground, logs arranged in a ring"
+
+
+# ─────────────────────── разнообразие фонов леса ────────────────────────────
+#
+# Двадцать фонов под ленту забега. Бой — 65% полян (GDD §8.2), и с одним фоном
+# лес читается как один и тот же коридор. Поэтому это двадцать РАЗНЫХ сцен,
+# а не двадцать бросков одного промпта: разнообразие несёт содержание кадра,
+# а не случайность сида.
+#
+# Различаются по трём осям сразу: порода леса, рельеф и подлесок, свет.
+# Общее для всех — крона смыкается над кадром (в палитре нет неба, решение
+# по нему принято для полян), нижняя треть свободна под геймплей.
+
+[kind.forest]
+size = 480
+variants = 3
+gen_width = 832
+gen_height = 1216
+cutout = false
+style = "dense leaf canopy overhead closing off the sky, no open sky visible, open uncluttered ground across the lower third, forest depth fading into haze"
+
+[[asset]]
+id = "forest_01"
+kind = "forest"
+subject = "a stand of tall straight pine trunks on flat needle-covered ground, shafts of warm light between them"
+
+[[asset]]
+id = "forest_02"
+kind = "forest"
+subject = "a birch grove with pale slender trunks and low green undergrowth"
+
+[[asset]]
+id = "forest_03"
+kind = "forest"
+subject = "a mossy forest floor strewn with round boulders under old oaks"
+
+[[asset]]
+id = "forest_04"
+kind = "forest"
+subject = "a shallow stream crossing a forest hollow over smooth pebbles"
+
+[[asset]]
+id = "forest_05"
+kind = "forest"
+subject = "a huge fallen log covered in moss lying across a forest glade"
+
+[[asset]]
+id = "forest_06"
+kind = "forest"
+subject = "a bed of tall ferns filling the forest floor between dark trunks"
+
+[[asset]]
+id = "forest_07"
+kind = "forest"
+subject = "a cluster of large mushrooms growing at the foot of an old tree"
+
+[[asset]]
+id = "forest_08"
+kind = "forest"
+subject = "a thick morning mist between trees, ground fading into white"
+
+[[asset]]
+id = "forest_09"
+kind = "forest"
+subject = "a forest slope with exposed tree roots stepping down like stairs"
+
+[[asset]]
+id = "forest_10"
+kind = "forest"
+subject = "an autumn forest with orange and ochre leaves thick on the ground"
+
+[[asset]]
+id = "forest_11"
+kind = "forest"
+subject = "a narrow ravine between mossy rock walls with trees leaning over it"
+
+[[asset]]
+id = "forest_12"
+kind = "forest"
+subject = "a dense thicket of young saplings crowding a narrow gap"
+
+[[asset]]
+id = "forest_13"
+kind = "forest"
+subject = "an ancient oak with a wide gnarled trunk dominating a small clearing"
+
+[[asset]]
+id = "forest_14"
+kind = "forest"
+subject = "a forest edge where trees open onto a meadow of tall dry grass"
+
+[[asset]]
+id = "forest_15"
+kind = "forest"
+subject = "a swampy forest floor with dark still water between hummocks"
+
+[[asset]]
+id = "forest_16"
+kind = "forest"
+subject = "a hillside of dark spruce with a bare earth path winding through"
+
+[[asset]]
+id = "forest_17"
+kind = "forest"
+subject = "a forest after rain with wet trunks and puddles on the earth"
+
+[[asset]]
+id = "forest_18"
+kind = "forest"
+subject = "a grove of trees tangled with hanging vines and creepers"
+
+[[asset]]
+id = "forest_19"
+kind = "forest"
+subject = "a windfall of storm-broken trunks piled at odd angles"
+
+[[asset]]
+id = "forest_20"
+kind = "forest"
+subject = "an evening forest lit low and warm from one side, long shadows on the ground"
+
+
+# ──────────────────────────── лобби: усадьба ────────────────────────────────
+#
+# Лобби устроено как городской экран в третьих «Героях»: нарисованный двор,
+# а на нём отдельными постройками стоят места, куда можно пойти. Постройка —
+# вырезанный спрайт, а не часть фона, ровно поэтому: её надо подсвечивать
+# при наведении, показывать поверх неё значки и заменять по мере развития,
+# а вплавленную в фон постройку не тронешь.
+#
+# Каждая постройка ведёт в существующий экран игры:
+#   грядки    -> scenes/farm/Farm.tscn
+#   дом       -> scenes/collection/Collection.tscn
+#   амбар     -> scenes/inventory/Inventory.tscn
+#   лес       -> scenes/run/RunFeed.tscn
+#
+# Лавка (scenes/shop) в списке не значится намеренно: её не просили. Когда
+# понадобится — это ещё одна постройка и один промпт.
+
+[kind.building]
+size = 128
+variants = 4
+gen_width = 1024
+gen_height = 1024
+cutout = true
+# «no ground» намеренно: постройка встаёт на нарисованную землю двора, и её
+# собственное светлое пятно земли ложится поверх чужой почвы заметной заплатой.
+# Проверено на первой сборке двора.
+style = "single small structure seen straight from the front, cut off cleanly at its base with no ground patch and no shadow beneath it, no people, no surrounding scenery, thick readable silhouette"
+
+[[asset]]
+id = "building_garden"
+kind = "building"
+subject = "a small vegetable garden with three neat raised beds of dark earth, young green sprouts in rows, a low wooden fence around it"
+
+[[asset]]
+id = "building_guardians"
+kind = "building"
+subject = "a cosy round wooden hut with a thick mossy thatched roof and a wide open doorway, warm light inside"
+
+[[asset]]
+id = "building_storehouse"
+kind = "building"
+subject = "a small wooden barn with tall double doors, stacked crates and sacks beside it"
+
+[[asset]]
+id = "building_merchant"
+kind = "building"
+subject = "a small market stall with a striped awning, wooden counter and shelves of jars and seed bags"
+
+# Лес — тоже «постройка» лобби: точка, в которую уходят. Отдельной странички
+# у него нет, потому что лес и есть лента забега (scenes/run/RunFeed.tscn).
+[[asset]]
+id = "building_forest"
+kind = "building"
+subject = "a dense wall of tall forest trees with a narrow earthen path leading between them into the shade"
+
+
+# ───────────────────────── странички мест усадьбы ───────────────────────────
+# По страничке на каждое место. Фон, а не спрайт: это экран целиком.
+
+[kind.screen]
+size = 480
+variants = 3
+gen_width = 832
+gen_height = 1216
+cutout = false
+style = "simplified background, low detail, soft hazy depth, warm daylight"
+
+# Двор усадьбы. Середина кадра намеренно пустая: на неё встают постройки.
+[[asset]]
+id = "screen_lobby"
+kind = "screen"
+subject = "a wide grassy homestead clearing ringed by distant forest, open flat empty ground across the middle of the frame"
+
+[[asset]]
+id = "screen_farm"
+kind = "screen"
+subject = "rows of tilled garden beds with young sprouts, a low wooden fence and a watering can, forest edge behind"
+
+[[asset]]
+id = "screen_guardians"
+kind = "screen"
+subject = "the warm interior of a big round wooden hut, straw bedding, low benches and hanging herbs"
+
+[[asset]]
+id = "screen_inventory"
+kind = "screen"
+subject = "the interior of a wooden storehouse, shelves with jars, stacked sacks and crates, dusty warm light"
+
+[[asset]]
+id = "screen_merchant"
+kind = "screen"
+subject = "a market stall counter seen from the buyer side, shelves of clay jars, seed bags and folded cloth behind it"
+
+
+# ──────────────────────── иконка приложения и валюты ────────────────────────
+#
+# Иконка — бренд, и палитра мира ей не нужна: она живёт в витрине магазина
+# рядом с чужими иконками, а не рядом с нотами. Отсюда quantize = false, как
+# было у эмблемы. Кадр квадратный и сплошной, без вырезки: иконка приложения
+# и есть плашка целиком.
+#
+# Лицом взят Топотун, а не свёкла: свёклу ты убрал из заставки, а медвежонок
+# уже отобран как самый милый и узнаётся мордой даже в 48 пикселей витрины.
+# cutout = true, хотя иконка и не спрайт. Причина: шаблон промпта выводится
+# из этого признака, и при cutout = false иконка получила шаблон ФОНА —
+# «пустое место, никаких персонажей, фон во весь кадр», а следом морду
+# медвежонка. Модель выполнила первое и приклеила второе поверх пустыни.
+#
+# Иконка — третий случай, которого в бинарном делении «фон или спрайт» нет:
+# объект со СВОЕЙ плашкой. Решается как заставка и двор — вырезаем объект,
+# а плашку собираем кодом (`artgen icon`). Композиция вообще не дело генерации.
+[kind.icon]
+size = 256
+variants = 6
+gen_width = 1024
+gen_height = 1024
+cutout = true
+quantize = true
+beet = true
+style = "bold simple shapes, thick readable silhouette, straight front view, subject fills the frame"
+
+# Свёкла в палитре мира выйдет тёмно-бордовой, а не сочно-малиновой: потолок
+# насыщенности мира 0.128. Читаемость в витрине вытягивается не цветом,
+# а СИЛУЭТОМ — тёмный корнеплод на светлой плашке. Отсюда и нажим на
+# «толстый узнаваемый силуэт» в стиле вида, и светлая плашка в icon.py.
+[[asset]]
+id = "app_icon"
+kind = "icon"
+subject = "a plump round beetroot with a bushy top of broad leaves and a long tapering root, deep dark red root, rich green leaves"
+
+# Монеты — иконки интерфейса, но объекты, и модель их рисует уверенно.
+# Квантование остаётся: они показываются рядом с нотами. Золотая рампа
+# разрешена флагом — без неё золото ушло бы в охру и от серебра не отличалось.
+[kind.currency]
+size = 64
+variants = 4
+gen_width = 1024
+gen_height = 1024
+cutout = true
+gold = true
+style = "single coin seen straight from the front, flat orthographic icon, no perspective, thick raised rim, bold readable shape"
+
+[[asset]]
+id = "coin_gold"
+kind = "currency"
+subject = "a thick round gold coin of gleaming polished gold, a simple leaf stamped in relief in the middle"
+
+# Серебро отличается не только цветом: у него другая форма чекана. На 32px
+# в интерфейсе цвет теряется первым, и по одному цвету валюты не различить.
+[[asset]]
+id = "coin_silver"
+kind = "currency"
+subject = "a thick round silver coin of pale grey polished metal, a simple six-pointed star stamped in relief in the middle"
+
+
+# ─────────────────────────────── заставка ───────────────────────────────────
+# Заставка — это фон и название, больше ничего.
+#
+# Разведена на две части намеренно. Фон — предмет, модель его рисует уверенно.
+# Надпись BEATROOT генерации не отдаётся никогда: диффузия не умеет буквы,
+# и это то же правило, по которому вручную рисуются ноты и интерфейс
+# (GDD §11.3). Собирается заставка отдельным шагом — `artgen splash`.
+
+[kind.splash]
+size = 480
+variants = 4
+gen_width = 832
+gen_height = 1216
+cutout = false
+style = "wide open composition with empty space in the upper third for a title, warm morning light through the canopy"
+
+[[asset]]
+id = "splash_bg"
+kind = "splash"
+subject = "sunlit forest clearing with a low wooden stage of packed earth in the middle, tall trees framing both sides"
+
+[[asset]]
+id = "logo_wordmark"
+kind = "prop"
+generated = false
+note = "Надпись BEATROOT. Генерации не отдаётся: диффузия не умеет буквы. Либо ручные литеры, либо шрифт с коммерческой лицензией (OFL) — решение с записью в ASSETS.md"
+
+
+# ───────────────────────────────── реквизит ─────────────────────────────────
+
+[[asset]]
+id = "prop_chest"
+kind = "prop"
+subject = "small wooden treasure chest with iron bands, lid closed, worn planks"
+
+[[asset]]
+id = "prop_seed_pouch"
+kind = "prop"
+subject = "small cloth pouch tied with cord, spilling a few seeds"
+
+[[asset]]
+id = "prop_farm_plot"
+kind = "tile"
+subject = "freshly tilled garden soil in neat furrows, scattered small stones"
+
+
+# ───────────────────────── рисуется вручную всегда ──────────────────────────
+# GDD §11.3. Перечислено здесь, чтобы галерея показывала полный состав
+# графики игры, а не только сгенерированную часть.
+
+[[asset]]
+id = "ui_note_beat"
+kind = "prop"
+generated = false
+note = "Обычная нота. Игровая палитра, ручная отрисовка"
+
+[[asset]]
+id = "ui_note_shield"
+kind = "prop"
+generated = false
+note = "Щит. Ручная отрисовка"
+
+[[asset]]
+id = "ui_note_skill"
+kind = "prop"
+generated = false
+note = "Нота скилла. Ручная отрисовка"
+
+[[asset]]
+id = "ui_note_snack"
+kind = "prop"
+generated = false
+note = "Перекус. Ручная отрисовка"
+
+[[asset]]
+id = "ui_windup"
+kind = "prop"
+generated = false
+note = "Индикатор замаха монстра. Ручная отрисовка"
+
+[[asset]]
+id = "ui_judge_line"
+kind = "prop"
+generated = false
+note = "Линия суда. Ручная отрисовка"
+
+[[asset]]
+id = "ui_bar_groove"
+kind = "prop"
+generated = false
+note = "Шкала Ритма. Ручная отрисовка"
+
+[[asset]]
+id = "ui_bar_vibe"
+kind = "prop"
+generated = false
+note = "Шкала Настроя. Ручная отрисовка"

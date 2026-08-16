@@ -54,11 +54,11 @@
     },
     {
       "beat": 17.5,
-      "type": "attack"
+      "type": "skill"
     },
     {
       "beat": 18.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 20.0,
@@ -78,7 +78,7 @@
     },
     {
       "beat": 24.0,
-      "type": "skill"
+      "type": "beat"
     },
     {
       "beat": 25.5,
@@ -94,7 +94,7 @@
     },
     {
       "beat": 29.0,
-      "type": "beat"
+      "type": "heavy"
     },
     {
       "beat": 30.0,

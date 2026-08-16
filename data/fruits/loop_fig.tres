@@ -7,4 +7,4 @@ script = ExtResource("1")
 id = "loop_fig"
 display_name = "Медовый инжир"
 tier = 2
-sprite_path = "res://art/placeholder/fruit_loop_fig.png"
+sprite_path = "res://art/fruit/loop_fig.png"

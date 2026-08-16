@@ -1,50 +1,23 @@
-extends Node
+extends TestHarness
 
 ## Проверки фермы.
 ##
 ## Два обещания под охраной: урожай не портится никогда (GDD §2), и перевод
 ## системных часов не ломает экономику (открытый вопрос GDD §15.4).
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
 	FarmState.reset()
 
 	_test_planting()
 	_test_growth_over_time()
 	_test_harvest_never_rots()
-	_test_dance_speeds_growth()
-	_test_dance_sets_quality()
-	_test_dance_once_per_cycle()
+	_test_tier_sets_quality()
+	_test_no_tier_is_pointless()
 	_test_clock_tampering()
 	_test_offline_cap()
 	_test_plot_purchase()
 	_test_save_roundtrip()
-	_test_dance_grade_has_no_failure()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _fresh() -> void:
@@ -108,57 +81,24 @@ func _test_harvest_never_rots() -> void:
 	check_eq(FarmState.harvest(0), "", "с пустой грядки собрать нельзя")
 
 
-func _test_dance_speeds_growth() -> void:
-	print("Танец ускоряет рост")
-	var needed := {}
-	for level in [0, 1, 2, 3]:
-		_fresh()
-		FarmState.plant(0, "drum_berry")
-		if level > 0:
-			check(FarmState.apply_dance(0, level), "танец уровня %d принят" % level)
-		needed[level] = FarmState.plots[0].needed
-
-	check(needed[1] < needed[0], "слабый танец уже ускоряет")
-	check(needed[2] < needed[1], "хороший танец быстрее слабого")
-	check(needed[3] < needed[2], "идеальный быстрее хорошего")
-
-	# -40% на идеальном (GDD §7.2)
-	var expected: float = needed[0] * (1.0 - FarmState.DANCE_REDUCTION[3])
-	check(absf(needed[3] - expected) < 1.0, "идеальный танец даёт ровно -40%")
-
-
-func _test_dance_sets_quality() -> void:
-	print("Танец задаёт качество урожая")
-	check_eq(FarmState.quality_for_dance(0), FruitData.Quality.PLAIN, "без танца — обычный")
-	check_eq(FarmState.quality_for_dance(1), FruitData.Quality.PLAIN, "слабо — обычный")
-	check_eq(FarmState.quality_for_dance(2), FruitData.Quality.JUICY, "хорошо — сочный")
-	check_eq(FarmState.quality_for_dance(3), FruitData.Quality.PERFECT, "идеально — идеальный")
+## Качество урожая задаёт СОРТ семечка.
+##
+## Мини-игру танца убрали, и качество переехало на то, что у фрукта уже было.
+## Проверяем не таблицу саму по себе, а НАБЛЮДАЕМЫЙ результат: что собранный
+## плод действительно лёг в сумку нужным качеством.
+func _test_tier_sets_quality() -> void:
+	print("Качество урожая задаёт сорт семечка")
+	check_eq(FarmState.quality_for_tier(0), FruitData.Quality.PLAIN, "нулевой сорт — обычный")
+	check_eq(FarmState.quality_for_tier(1), FruitData.Quality.JUICY, "первый сорт — сочный")
+	check_eq(FarmState.quality_for_tier(3), FruitData.Quality.PERFECT, "третий сорт — идеальный")
 
 	_fresh()
 	FarmState.plant(0, "drum_berry")
-	FarmState.apply_dance(0, 3)
 	FarmState.debug_rewind(700.0)
 	FarmState.tick()
 	FarmState.harvest(0)
-	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PERFECT), 1,
-		"идеальный танец дал идеальный фрукт")
-
-
-func _test_dance_once_per_cycle() -> void:
-	print("Танец один раз за цикл")
-	_fresh()
-	FarmState.plant(0, "drum_berry")
-	check(FarmState.can_dance(0), "танцевать можно")
-	check(FarmState.apply_dance(0, 2), "первый танец принят")
-	check(not FarmState.can_dance(0), "второй раз нельзя")
-	check(not FarmState.apply_dance(0, 3), "повторный танец отклонён — это ритуал, не гринд")
-
-	# После сбора и новой посадки танцевать снова можно
-	FarmState.debug_rewind(700.0)
-	FarmState.tick()
-	FarmState.harvest(0)
-	FarmState.plant(0, "drum_berry")
-	check(FarmState.can_dance(0), "новый цикл — новый танец")
+	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PLAIN), 1,
+		"дешёвое семечко дало обычный плод")
 
 
 func _test_clock_tampering() -> void:
@@ -214,7 +154,6 @@ func _test_save_roundtrip() -> void:
 	print("Сейв фермы")
 	_fresh()
 	FarmState.plant(0, "drum_berry")
-	FarmState.apply_dance(0, 2)
 	FarmState.debug_rewind(200.0)
 	FarmState.tick()
 	var ratio := FarmState.growth_ratio(0)
@@ -226,39 +165,46 @@ func _test_save_roundtrip() -> void:
 	FarmState.from_dict(snapshot)
 	check(not FarmState.is_empty_plot(0), "посадка восстановилась")
 	check(absf(FarmState.growth_ratio(0) - ratio) < 0.05, "прогресс роста восстановился")
-	check_eq(FarmState.plots[0].dance_level, 2, "результат танца восстановился")
 	check(FarmState.known_seeds.has("drum_berry"), "открытые семена восстановились")
 
 
-func _test_dance_grade_has_no_failure() -> void:
-	print("Танец: провала не существует")
-	const NOTES := 8
 
-	# Полный промах по всем нотам всё равно даёт уровень выше нуля.
-	# Это и есть обещание «попытка обязана что-то дать» (GDD §7.2)
-	check_eq(DanceGrade.level_for(0, 0, NOTES), DanceGrade.Level.WEAK,
-		"ноль попаданий — всё равно не провал")
-	check(DanceGrade.level_for(0, 0, NOTES) != DanceGrade.Level.SKIPPED,
-		"станцевать плохо лучше, чем не танцевать")
+## Ни один тир семечка не должен быть бессмысленным.
+##
+## Проверка появилась после разбора: качеств было три, а тиров четыре,
+## и редкий инжир давал РОВНО столько же дружбы, сколько необычная сливка,
+## при вчетверо большем времени роста и вдвое большей цене. Такой предмет
+## не сажают никогда, и заметить это по коду нельзя — только посчитав.
+func _test_no_tier_is_pointless() -> void:
+	print("Каждый тир семечка чем-то лучше предыдущего")
+	_fresh()
 
-	check_eq(DanceGrade.level_for(8, 0, NOTES), DanceGrade.Level.PERFECT, "все идеально")
-	check_eq(DanceGrade.level_for(7, 1, NOTES), DanceGrade.Level.PERFECT, "почти все идеально")
-	check_eq(DanceGrade.level_for(4, 2, NOTES), DanceGrade.Level.GOOD, "половина идеально — хорошо")
-	check_eq(DanceGrade.level_for(1, 1, NOTES), DanceGrade.Level.WEAK, "мало попаданий — слабо")
+	var species := Registry.all_monsters()[0]
+	var favorite: String = species.favorite_fruit_id
+	var favorite_fruit := Registry.fruit(favorite)
+	check(favorite_fruit != null, "любимый фрукт вида найден")
+	if favorite_fruit == null:
+		return
 
-	# SKIPPED возможен только когда нот не было вообще
-	check_eq(DanceGrade.level_for(0, 0, 0), DanceGrade.Level.SKIPPED,
-		"ноль нот — танца не было")
-
-	# Уровень не падает при росте попаданий
 	var previous := -1
-	for perfect in range(0, NOTES + 1):
-		var level: int = DanceGrade.level_for(perfect, 0, NOTES)
-		check(level >= previous, "с ростом точности уровень не падает (%d попаданий)" % perfect)
-		previous = level
+	var previous_time := -1
+	for tier in range(4):
+		var value := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+			* FruitData.tier_friendship_scale(tier)))
+		var seconds := Balance.fruit_grow_seconds(tier)
 
-	# Каждый уровень танца соответствует своему качеству фрукта
-	check_eq(FarmState.quality_for_dance(DanceGrade.Level.PERFECT),
-		FruitData.Quality.PERFECT, "идеальный танец — идеальный фрукт")
-	check_eq(FarmState.quality_for_dance(DanceGrade.Level.GOOD),
-		FruitData.Quality.JUICY, "хороший танец — сочный фрукт")
+		check(value > previous,
+			"тир %d даёт %d дружбы — не больше предыдущего (%d)" % [
+				tier, value, previous])
+		check(seconds > previous_time,
+			"тир %d растёт %d сек — не дольше предыдущего" % [tier, seconds])
+		previous = value
+		previous_time = seconds
+
+	# Верхний плод обязан быть событием, а не прибавкой: за восемь часов
+	# ожидания игрок должен получить целого друга, иначе ждать незачем
+	var top := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+		* FruitData.tier_friendship_scale(3)))
+	check(top >= Balance.friendship_threshold(MonsterData.Rarity.COMMON),
+		"верхний плод (%d) не закрывает обычную шкалу (%d) — ночь потрачена зря" % [
+			top, Balance.friendship_threshold(MonsterData.Rarity.COMMON)])

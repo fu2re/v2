@@ -10,16 +10,41 @@ signal battle_finished(won: bool, state: BattleState)
 const JUDGE_Y := 1480.0
 const SPAWN_Y := 420.0
 const LANE_X := 540.0
+## Насколько нота съезжает от центра к своей кнопке. Смещение маленькое
+## намеренно: обе дорожки остаются одним потоком чтения, но глаз заранее
+## видит, какой рукой брать (GDD §4.1).
+const LANE_OFFSET := 150.0
+
+## Два нажатия ближе этого времени считаются одним.
+##
+## На телефоне включена эмуляция мыши из касания, и один палец приходит
+## дважды: как касание и как синтетический клик. Без этого порога одна нота
+## судилась бы двумя событиями, а комбо скакало бы вдвое. Человек физически
+## не жмёт одну кнопку чаще.
+const TAP_DEDUP_SECONDS := 0.02
 ## За сколько долей до попадания нота появляется — «скорость скролла».
 const APPROACH_BEATS := 2.0
 ## Насколько заранее монстр начинает замах (GDD: не меньше 2 долей).
 const WINDUP_LEAD := 2.0
-const SNACK_RESTORE := 15
+## Лечение приходит из предмета, а не из константы боя: сколько вернёт
+## глоток, записано в самом зелье (GDD §4.2.3).
 
-@export var chart_id: String = "demo_disco"
+## Линия серии. Оба цвета намеренно СВЕТЛЕЕ фона боя: тёмно-серый
+## на тёмно-зелёном не читался, и линии как будто не было вовсе.
+const SERIES_CLEAN_COLOR := Color("7FF3FF")
+const SERIES_BROKEN_COLOR := Color("C9C4B8")
+const SERIES_LINE_WIDTH := 16.0
+
+## Пусто — трек подбирается по монстру и грейду (ChartSelect).
+## Заполнено — играется именно этот чарт: так делают обучение и отладка сцены.
+@export var chart_id: String = ""
 @export var difficulty: String = "normal"
 @export var monster_id: String = "synth_slime"
-@export var guardian_id: String = "disco_sprout"
+## Грейд встреченного экземпляра: он задаёт и статы, и спрайт, и темп трека.
+@export var monster_grade: int = MonsterData.Rarity.COMMON
+## Ключ экземпляра-гуардиана. Пустая строка — бой без защитника
+## (интро, §15.5): игрок танцует один.
+@export var guardian_key: String = ""
 @export var starting_health: int = 100
 @export var starting_shield: int = -1
 @export var depth: int = 0
@@ -28,27 +53,42 @@ const SNACK_RESTORE := 15
 var chart: ChartData = null
 var state := BattleState.new()
 
-var _pool: NotePool = null
-var _hud: BattleHUD = null
+## Сцена боя лежит в DanceBattle.tscn и правится в инспекторе (GDD §13.2.1).
+## Позиции монстра, героя, защитника и линии удара — там, а не здесь.
+@onready var _pool: NotePool = $NotePool
+@onready var _hud: BattleHUD = $BattleHUD
+@onready var _monster_sprite: Sprite2D = $MonsterSprite
+@onready var _knocked_out: Node2D = $MonsterSprite/KnockedOut
+@onready var _outcome_label: Label = $OutcomeLabel
+@onready var _hero: Dancer = $Hero
+@onready var _guardian_dancer: Dancer = $GuardianDancer
+## Линия, соединяющая ноты одной серии. Без неё непонятно, где связка
+## началась и почему звезда в её конце вдруг серая.
+@onready var _series_line: Node2D = $SeriesLine
+
 var _active: Array[Note] = []
 var _next_index: int = 0
 var _next_pattern_index: int = 0
-var _monster_sprite: Sprite2D = null
-var _knocked_out: Node2D = null
-var _outcome_label: Label = null
-var _hero: Dancer = null
-var _guardian_dancer: Dancer = null
-## Линия, соединяющая ноты одной серии. Без неё непонятно, где связка
-## началась и почему звезда в её конце вдруг серая.
-var _series_line: Node2D = null
+
+## Защита от двойного суждения одного касания (см. TAP_DEDUP_SECONDS).
+var _last_lane: int = -1
+var _last_tap_time: float = 0.0
+
+## Тренер обучения, если он включён. Ему нужно знать, какую кнопку
+## показывать, а это известно только здесь — по ближайшей ноте.
+var _coach: Node = null
+
+## Слой для вылетающих цифр урона: выше HUD, иначе удары по герою
+## рисуются под шкалами и не видны вовсе.
+var _damage_layer: CanvasLayer = null
 
 
 func _ready() -> void:
-	_pool = NotePool.new()
-	add_child(_pool)
-	_hud = BattleHUD.new()
-	add_child(_hud)
-	_build_stage()
+	# Рисование остаётся в коде: узел в сцене задаёт ГДЕ, а _draw — ЧТО.
+	# Ноты и линия серии перерисовываются десятки раз в секунду,
+	# и отдельные узлы под каждый штрих тут дороже (GDD §13.2.1)
+	_series_line.draw.connect(_draw_series_line)
+	_knocked_out.draw.connect(_draw_knocked_out)
 
 	Conductor.beat.connect(_on_beat)
 	Conductor.finished.connect(_on_track_finished)
@@ -60,7 +100,15 @@ func _ready() -> void:
 
 
 func start() -> void:
-	var loaded := ChartLoader.load_by_id(chart_id, difficulty)
+	# Трек выбирается по стихии, мотиву и грейду встреченного монстра
+	# (GDD §10.1.1). Явно заданный chart_id перекрывает выбор — это нужно
+	# обучению и отладке сцены, где трек фиксирован намеренно
+	var loaded: ChartData = null
+	if chart_id.is_empty():
+		loaded = ChartSelect.load_for(Registry.monster(monster_id), monster_grade)
+	else:
+		loaded = ChartLoader.load_by_id(chart_id, difficulty)
+
 	if loaded == null:
 		push_error("Не удалось загрузить чарт %s [%s]" % [chart_id, difficulty])
 		return
@@ -75,11 +123,14 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 	if chart == null:
 		return
 
-	var monster := Registry.monster(monster_id)
-	var guardian := Registry.monster(guardian_id)
-	if monster == null or guardian == null:
-		push_error("Не найден монстр '%s' или гуардиан '%s'" % [monster_id, guardian_id])
+	if Registry.monster(monster_id) == null:
+		push_error("Не найден монстр '%s'" % monster_id)
 		return
+
+	# Противник — экземпляр встречи: грейд роллится на поляне, а не берётся
+	# у вида. Гуардиана может не быть вовсе — в интро игрок танцует один
+	var monster := MonsterInstance.create(monster_id, monster_grade)
+	var guardian := GameState.instance(guardian_key)
 
 	state.setup(monster, guardian, starting_health, depth, starting_shield)
 	# Обучение занижает Настрой, чтобы первый бой заведомо кончился победой
@@ -90,8 +141,16 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 	_hud.set_monster(monster)
 	if _monster_sprite != null:
 		_monster_sprite.texture = monster.sprite()
-	_hero.setup(load("res://art/placeholder/hero.png") as Texture2D)
-	_guardian_dancer.setup(guardian.sprite(), GameState.equipped.get(guardian.id, {}))
+	# Герой того пола, который выбрал игрок (GDD §15.5)
+	_hero.setup(GameState.hero_sprite())
+
+	# Без гуардиана рядом с героем никого нет: скрываем, а не рисуем пустоту
+	if guardian == null:
+		_guardian_dancer.visible = false
+	else:
+		_guardian_dancer.visible = true
+		_guardian_dancer.setup(guardian.sprite(), GameState.equipped_slots(guardian.key()))
+
 
 	_pool.release_all()
 	_active.clear()
@@ -99,6 +158,7 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 	_next_pattern_index = 0
 
 	Conductor.play(chart)
+
 
 
 func _process(_delta: float) -> void:
@@ -115,7 +175,9 @@ func _spawn_due_notes() -> void:
 	while _next_index < chart.note_count() and chart.note_beats[_next_index] <= horizon:
 		var note := _pool.acquire(chart.note_beats[_next_index], chart.note_types[_next_index])
 		if note != null:
-			note.position = Vector2(LANE_X, SPAWN_Y)
+			# Нота съезжает к своей кнопке: особые левее центра, обычные правее
+			var shift := LANE_OFFSET if note.lane == NoteRules.Lane.NORMAL else -LANE_OFFSET
+			note.position = Vector2(LANE_X + shift, SPAWN_Y)
 			_active.append(note)
 		_next_index += 1
 
@@ -147,6 +209,21 @@ func _update_positions() -> void:
 				note.queue_redraw()
 
 	_series_line.queue_redraw()
+	_point_coach_at_next_note()
+
+
+## Тренер показывает ту кнопку, по которой идёт ближайшая нота.
+func _point_coach_at_next_note() -> void:
+	if _coach == null:
+		return
+	var nearest: Note = null
+	for note in _active:
+		if note.is_judged:
+			continue
+		if nearest == null or note.beat < nearest.beat:
+			nearest = note
+	if nearest != null:
+		_coach.demo_lane = nearest.lane
 
 
 func _expire_missed() -> void:
@@ -154,7 +231,7 @@ func _expire_missed() -> void:
 	var i := 0
 	while i < _active.size():
 		var note: Note = _active[i]
-		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW * state.window_scale:
+		if not note.is_judged and t - chart.beat_to_time(note.beat) > Judge.LATE_WINDOW * state.effective_window_scale(Conductor.song_beat):
 			_miss(note)
 			# Пропуск может закончить бой, а _end_battle очищает список нот.
 			# Без этой проверки цикл продолжал работать с индексом в уже
@@ -171,12 +248,25 @@ func _expire_missed() -> void:
 func _miss(note: Note) -> void:
 	match note.type:
 		ChartData.NoteType.SHIELD:
-			state.take_strike()
+			_popup_damage(state.take_strike(false), _hero.position, false)
+			_shake_screen()
+		ChartData.NoteType.HEAVY:
+			# Крит: вчетверо больнее обычного удара
+			_popup_damage(state.take_strike(true), _hero.position, false, true)
+			_shake_screen()
 			_shake_screen()
 		ChartData.NoteType.ATTACK:
 			state.register_attack(Judge.Grade.MISS)
+		ChartData.NoteType.SKILL:
+			# Промах по скиллу бьёт вдвое больнее обычного: особая нота
+			# требует особого внимания
+			_popup_damage(absi(state.use_skill(Judge.Grade.MISS)),
+				_hero.position, false)
 		_:
-			state.register_hit(Judge.Grade.MISS)
+			# Обычный промах тоже стоит здоровья, и цифра над героем
+			# показывает сколько именно
+			_popup_damage(absi(state.register_hit(Judge.Grade.MISS)),
+				_hero.position, false)
 	note_judged.emit(Judge.Grade.MISS, Judge.LATE_WINDOW)
 
 
@@ -208,45 +298,112 @@ func _retire(index: int) -> void:
 	_active.remove_at(index)
 
 
-func _input(event: InputEvent) -> void:
-	if not event.is_action_pressed("tap"):
-		return
+## Ввод ловим в _unhandled_input, а НЕ в _input: до боя ввод обязан пройти
+## через интерфейс, иначе тап по кнопке дублируется игровым действием.
+func _unhandled_input(event: InputEvent) -> void:
 	if not Conductor.is_playing or chart == null or state.is_over:
 		return
-	_judge_tap()
+
+	var lane := -1
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			lane = _lane_at(touch.position.x)
+	elif event is InputEventMouseButton:
+		var click := event as InputEventMouseButton
+		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+			lane = _lane_at(click.position.x)
+	elif event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and not key.echo:
+			match key.keycode:
+				# Пробел оставлен синонимом правой кнопки: без него ломается
+				# привычка десктопной проверки игры
+				KEY_RIGHT, KEY_SPACE:
+					lane = NoteRules.Lane.NORMAL
+				KEY_LEFT:
+					lane = NoteRules.Lane.SPECIAL
+
+	if lane < 0:
+		return
+
+	# Одно касание приходит и тачем, и синтетическим кликом — судим один раз
+	var now := Time.get_ticks_msec() / 1000.0
+	if lane == _last_lane and now - _last_tap_time < TAP_DEDUP_SECONDS:
+		return
+	_last_lane = lane
+	_last_tap_time = now
+
+	get_viewport().set_input_as_handled()
+	_judge_tap(lane)
 
 
-func _judge_tap() -> void:
+## Какая половина экрана нажата.
+##
+## Считаем в координатах ВЬЮПОРТА, а не сцены: `_shake_screen` двигает корень
+## Node2D, и граница, посчитанная в локальных координатах, уезжала бы вместе
+## с тряской — попадания начали бы уходить не в ту дорожку ровно в тот момент,
+## когда экран трясётся.
+func _lane_at(screen_x: float) -> int:
+	var middle := get_viewport().get_visible_rect().size.x * 0.5
+	return NoteRules.Lane.NORMAL if screen_x >= middle else NoteRules.Lane.SPECIAL
+
+
+func _judge_tap(lane: int) -> void:
 	# Свежее время: кэш Conductor отстаёт на кадр, это треть окна Perfect
 	var t := Conductor.now()
+	# Окна с учётом порыва Ветра, если он сейчас действует (GDD §4.2.4)
+	var window := state.effective_window_scale(Conductor.song_beat)
 
 	var best: Note = null
 	var best_delta := 0.0
 	for note in _active:
 		if note.is_judged:
 			continue
+		# Нота отзывается только на свою кнопку: щит нельзя взять обычным
+		# битом, и это главное, ради чего кнопки две
+		if not NoteRules.accepts(note.type, lane):
+			continue
 		var delta := t - chart.beat_to_time(note.beat)
-		if not Judge.in_range(delta, state.window_scale):
+		if not Judge.in_range(delta, window):
 			continue
 		if best == null or absf(delta) < absf(best_delta):
 			best = note
 			best_delta = delta
 
 	if best == null:
-		return  # тап в пустоту не наказывается: игра для детей
+		# Тап мимо рвёт серию, а начиная с четвёртого подряд ещё и стоит
+		# здоровья: рваной серии оказалось мало — она отнимала у игрока
+		# его собственный урон, но не мешала долбить кнопку и брать каждый
+		# бит даром. Цифра над героем показывает, что это уже не бесплатно
+		var stray := state.register_stray_tap()
+		if stray != 0:
+			_popup_damage(absi(stray), _hero.position, false)
+		return
 
 	best.is_judged = true
-	var grade := Judge.grade(best_delta, state.window_scale)
+	var grade := Judge.grade(best_delta, window)
 
 	match best.type:
 		ChartData.NoteType.SHIELD:
 			state.block_strike()
-		ChartData.NoteType.SNACK:
-			state.register_hit(grade)
-			state.restore_health(SNACK_RESTORE)
+		ChartData.NoteType.SKILL:
+			# Доля передаётся снаружи: порыв Ветра живёт четыре такта,
+			# а BattleState о музыкальном времени ничего не знает
+			state.use_skill(grade, Conductor.song_beat, chart.beats_per_bar)
+			_hero.nod()
+			_guardian_dancer.nod()
+		ChartData.NoteType.HEAVY:
+			# Тяжёлая атака монстра. Блокируется той же особой кнопкой,
+			# что и обычная, но пропущенная бьёт втрое больнее — раньше
+			# на этом месте стояла нота-зелье, и зелий в игре больше нет
+			state.block_strike()
+			_hero.nod()
+			_guardian_dancer.nod()
 		ChartData.NoteType.ATTACK:
 			var dealt := state.register_attack(grade)
 			_flash_attack(dealt > 0)
+			_popup_damage(dealt, _monster_sprite.position, true)
 			_hero.attack(dealt > 0)
 			_guardian_dancer.attack(dealt > 0)
 		_:
@@ -336,65 +493,18 @@ func _show_outcome(won: bool) -> void:
 
 ## Крестики вместо глаз. Рисуются поверх спрайта, потому что плейсхолдеры
 ## одинаковых глаз не имеют, а знак «монстр наплясался» нужен уже сейчас.
-func _build_knocked_out() -> void:
-	_knocked_out = Node2D.new()
-	_knocked_out.visible = false
-	_knocked_out.z_index = 5
-	_knocked_out.position = Vector2(LANE_X, 300)
-	_knocked_out.draw.connect(func():
-		for side in [-1.0, 1.0]:
-			var c := Vector2(side * 34.0, -18.0)
-			var r := 18.0
-			_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 7.0)
-			_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 7.0))
-	add_child(_knocked_out)
+##
+## Узел — РЕБЁНОК спрайта, а не сосед. Пока он был соседом с собственной
+## позицией, монстр падал и поворачивался, а крестики оставались висеть
+## в воздухе на прежнем месте — ровно то, что видно на живом экране.
+## Координаты поэтому локальные и мелкие: спрайт масштабирован вчетверо.
+func _draw_knocked_out() -> void:
+	for side in [-1.0, 1.0]:
+		var c := Vector2(side * 8.5, -4.5)
+		var r := 4.5
+		_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 1.8)
+		_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 1.8)
 
-
-func _build_stage() -> void:
-	var bg := ColorRect.new()
-	bg.size = Vector2(1080, 1920)
-	# Фон боя притемнён, иначе земляная палитра спорит с нотами (GDD §11.1.1)
-	bg.color = Color("33512A").darkened(0.30)
-	bg.z_index = -10
-	add_child(bg)
-
-	var line := Line2D.new()
-	line.add_point(Vector2(60, JUDGE_Y))
-	line.add_point(Vector2(1020, JUDGE_Y))
-	line.width = 6.0
-	line.default_color = Color("1ED8FF")
-	add_child(line)
-
-	_monster_sprite = Sprite2D.new()
-	_monster_sprite.scale = Vector2(4, 4)
-	_monster_sprite.position = Vector2(LANE_X, 300)
-	add_child(_monster_sprite)
-	# Герой и защитник внизу: игрок видит, что танцует не один,
-	# и что снаряжение на защитнике действительно надето
-	_hero = Dancer.new()
-	_hero.position = Vector2(LANE_X - 250.0, 1560.0)
-	add_child(_hero)
-
-	_guardian_dancer = Dancer.new()
-	_guardian_dancer.position = Vector2(LANE_X + 250.0, 1560.0)
-	add_child(_guardian_dancer)
-
-	_series_line = Node2D.new()
-	_series_line.z_index = -1
-	_series_line.draw.connect(_draw_series_line)
-	add_child(_series_line)
-
-	_build_knocked_out()
-
-	_outcome_label = Label.new()
-	_outcome_label.position = Vector2(60, 560)
-	_outcome_label.size = Vector2(960, 120)
-	_outcome_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_outcome_label.add_theme_font_size_override("font_size", 72)
-	_outcome_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_outcome_label.add_theme_constant_override("outline_size", 12)
-	_outcome_label.visible = false
-	add_child(_outcome_label)
 
 
 ## Соединить ноты текущей серии линией.
@@ -407,19 +517,31 @@ func _draw_series_line() -> void:
 
 	var points := PackedVector2Array()
 	for note in _active:
-		if note.is_judged or note.type == ChartData.NoteType.SHIELD:
+		if note.is_judged:
 			continue
-		points.append(note.position)
+		# Щит ВХОДИТ в серию: block_strike наращивает её длину, значит
+		# и линия обязана его соединять. Раньше он пропускался, и картинка
+		# расходилась с логикой — связка на экране рвалась там, где в игре
+		# продолжалась.
+		#
+		# Точки берём по центру дорожек, а не по самим нотам: иначе линия
+		# скакала бы влево-вправо между обычными и особыми. Связка — это
+		# непрерывность ВО ВРЕМЕНИ, и стержень показывает именно её
+		points.append(Vector2(LANE_X, note.position.y))
 		# Атака завершает серию — дальше идёт уже другая связка
 		if note.type == ChartData.NoteType.ATTACK:
 			break
 
 	if points.size() < 2:
 		return
-	var colour := Color("00E5FF") if state.series_clean else Color("6B6862")
-	# Линия толстая и почти непрозрачная: тонкая полупрозрачная просто
-	# не читалась на фоне, и правило серии оставалось невидимым
-	_series_line.draw_polyline(points, Color(colour.r, colour.g, colour.b, 0.85), 14.0, true)
+
+	# Оба цвета СВЕТЛЕЕ фона.
+	#
+	# Серый #6B6862 на тёмно-зелёном фоне боя не читался вовсе, и игрок
+	# трижды сообщал, что линии нет. «Серия испорчена» — это информация,
+	# а не украшение: она обязана оставаться видимой.
+	var colour := SERIES_CLEAN_COLOR if state.series_clean else SERIES_BROKEN_COLOR
+	_series_line.draw_polyline(points, colour, SERIES_LINE_WIDTH, true)
 
 
 ## Включить наглядного тренера поверх боя.
@@ -431,9 +553,67 @@ func enable_coach() -> Node:
 	var coach := preload("res://scenes/onboarding/CoachOverlay.tscn").instantiate()
 	coach.judge_y = JUDGE_Y
 	coach.lane_x = LANE_X
+	coach.lane_offset = LANE_OFFSET
 	add_child(coach)
+	_coach = coach
 	note_judged.connect(func(grade: int, _d: float):
 		if grade != Judge.Grade.MISS:
 			coach.note_hit())
 	battle_finished.connect(func(_won: bool, _s: BattleState): coach.finish())
 	return coach
+
+
+## Вылетающая цифра урона.
+##
+## До неё бой был честным, но немым: шкала Настроя ползла, а насколько именно
+## помог конкретный удар, игрок не знал. Число, вылетевшее из монстра, связывает
+## нажатие с результатом мгновенно — и по нему же видно, что тяжёлая атака
+## монстра бьёт втрое больнее обычной.
+##
+## Цвета разные и не случайные: свой урон читается в цвете попадания,
+## чужой — в цвете тревоги, том же, которым мигает замах (§11.1.1).
+## Вылетающая цифра урона.
+##
+## Живёт на СВОЁМ слое поверх HUD. Пока цифры были обычными узлами сцены,
+## удары по герою рисовались под шкалами и подсказками дорожек — то есть
+## не рисовались вовсе: HUD лежит на слое выше и накрывал их целиком.
+##
+## Размеры крупные намеренно: прошлые 56 пунктов терялись на пёстром лесу,
+## и цифру приходилось искать. Крит вдвое больше обычного и красный —
+## вчетверо больший урон обязан и выглядеть вчетверо страшнее.
+func _popup_damage(amount: int, at: Vector2, to_monster: bool, crit := false) -> void:
+	if amount <= 0:
+		return
+	if _damage_layer == null:
+		_damage_layer = CanvasLayer.new()
+		# Выше HUD (10), ниже угощения (50)
+		_damage_layer.layer = 20
+		add_child(_damage_layer)
+
+	var label := Label.new()
+	label.text = "-%d" % amount
+	var size := 150 if crit else (100 if to_monster else 88)
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color",
+		Color("FF3B5C") if crit else (Color("FFD24D") if to_monster else Color("FF8A9E")))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	label.add_theme_constant_override("outline_size", 16)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size = Vector2(500, 180)
+	# Слегка вразброс: два числа подряд в одной точке слипаются в кашу
+	label.position = at + Vector2(-250.0 + randf_range(-50.0, 50.0), -120.0)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_damage_layer.add_child(label)
+
+	# Крит ещё и вспыхивает: рывок вверх заметнее плавного всплытия
+	if crit:
+		label.scale = Vector2(0.6, 0.6)
+		label.pivot_offset = label.size * 0.5
+		var pop := create_tween()
+		pop.tween_property(label, "scale", Vector2(1.25, 1.25), 0.12)
+		pop.tween_property(label, "scale", Vector2.ONE, 0.1)
+
+	var tween := create_tween()
+	tween.tween_property(label, "position:y", label.position.y - 190.0, 0.85)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.85)
+	tween.tween_callback(label.queue_free)

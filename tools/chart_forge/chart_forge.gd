@@ -9,6 +9,8 @@ extends Node2D
 
 const LANE_X := 300.0
 const LANE_WIDTH := 700.0
+## Разнос дорожек, как в бою: особые ноты левее центра, обычные правее.
+const LANE_OFFSET := 90.0
 const TIMELINE_TOP := 300.0
 const TIMELINE_BOTTOM := 1560.0
 ## Сколько долей помещается в окно таймлайна.
@@ -18,14 +20,18 @@ const TYPE_COLORS := {
 	ChartData.NoteType.BEAT: Color("00E5FF"),
 	ChartData.NoteType.SKILL: Color("FF6BDE"),
 	ChartData.NoteType.SHIELD: Color("2E9BFF"),
-	ChartData.NoteType.SNACK: Color("B87AFF"),
+	ChartData.NoteType.HEAVY: Color("B87AFF"),
+	# Цвет тот же, что у звезды в бою: редактор обязан показывать
+	# ноту так, как её увидит игрок
+	ChartData.NoteType.ATTACK: Color("FFD24D"),
 }
 
 const TYPE_NAMES := {
 	ChartData.NoteType.BEAT: "Бит",
 	ChartData.NoteType.SKILL: "Скилл",
 	ChartData.NoteType.SHIELD: "Щит",
-	ChartData.NoteType.SNACK: "Перекус",
+	ChartData.NoteType.HEAVY: "Перекус",
+	ChartData.NoteType.ATTACK: "Удар",
 }
 
 @export var chart_id: String = "demo_disco"
@@ -120,13 +126,22 @@ func _draw_timeline() -> void:
 			"замах" if is_windup else "УДАР", HORIZONTAL_ALIGNMENT_LEFT, -1, 24,
 			Color("FF5C7A") if is_windup else Color("FFD24D"))
 
+	# Разделитель дорожек: слева особые ноты, справа обычные — ровно как
+	# в бою. Разметка должна вестись в той же картине, которую увидит игрок,
+	# иначе редактор врёт о том, чем окажется чарт
+	var centre := LANE_X + LANE_WIDTH * 0.5
+	_canvas.draw_line(Vector2(centre, TIMELINE_TOP), Vector2(centre, TIMELINE_BOTTOM),
+		Color(1, 1, 1, 0.12), 3.0)
+
 	# Ноты
 	for i in chart.note_count():
 		var y := _beat_to_y(chart.note_beats[i])
 		if y < TIMELINE_TOP - 30 or y > TIMELINE_BOTTOM + 30:
 			continue
 		var type: int = chart.note_types[i]
-		_canvas.draw_circle(Vector2(LANE_X + LANE_WIDTH * 0.5, y), 26.0, TYPE_COLORS[type])
+		var shift := LANE_OFFSET if NoteRules.primary_lane(type) == NoteRules.Lane.NORMAL \
+			else -LANE_OFFSET
+		_canvas.draw_circle(Vector2(centre + shift, y), 26.0, TYPE_COLORS[type])
 
 	# Проблемы отмечаются прямо на таймлайне: список замечаний внизу читают,
 	# а красную метку на такте видят сразу

@@ -1,4 +1,4 @@
-extends Node
+extends TestHarness
 
 ## Проверки магазина.
 ##
@@ -7,12 +7,7 @@ extends Node
 ## в сторы или запретят в отдельных странах. Поэтому проверяем инварианты,
 ## а не поведение отдельных кнопок.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	ShopState.reset()
 	ShopState.set_seed(1337)
 
@@ -26,25 +21,6 @@ func _ready() -> void:
 	_test_daily_limit()
 	_test_no_purchase_without_funds()
 	_test_save_roundtrip()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 ## Правило 4 из GDD §12.3: ни один предмет за реальные деньги не влияет

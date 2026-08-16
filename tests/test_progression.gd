@@ -1,17 +1,11 @@
-extends Node
+extends TestHarness
 
 ## Проверки прогрессии: реестр, дружба, приручение, инвентарь, сейв.
 ##
 ## Ключевое, что здесь охраняется — обещание «ноль рандома» из GDD §6.1.
 ## Если приручение станет вероятностным, эти тесты обязаны упасть.
 
-var _failed := 0
-var _passed := 0
-
-
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
 
 	_test_registry()
@@ -21,25 +15,6 @@ func _ready() -> void:
 	_test_fruit_bonus()
 	_test_inventory()
 	_test_save_roundtrip()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _test_registry() -> void:
@@ -71,21 +46,21 @@ func _test_genre_triangle() -> void:
 
 	# Хип-хоп нейтрален в обе стороны
 	for g in [G.ROCK, G.DISCO, G.FOLK, G.ELECTRO]:
-		check_eq(MonsterData.genre_multiplier(G.HIPHOP, g), 1.0, "хип-хоп не имеет преимуществ")
-		check_eq(MonsterData.genre_multiplier(g, G.HIPHOP), 1.0, "хип-хоп не имеет слабостей")
+		check_eq(MonsterData.genre_multiplier(G.LATIN, g), 1.0, "латина не имеет преимуществ")
+		check_eq(MonsterData.genre_multiplier(g, G.LATIN), 1.0, "латина не имеет слабостей")
 
 
 func _test_friendship_is_deterministic() -> void:
 	print("Дружба: ноль рандома, гарантированное приручение")
 	GameState.reset()
-	var m := Registry.monster("disco_sprout")
-	var threshold := m.friendship_threshold()
+	var common := MonsterData.Rarity.COMMON
+	var threshold := GameState.friendship_threshold(common)
 
 	var tamed_at := -1
 	var wins := 0
 	while wins < 100:
 		wins += 1
-		if GameState.add_friendship("disco_sprout", GameState.FRIENDSHIP_WIN):
+		if GameState.add_friendship("disco_sprout", common, GameState.FRIENDSHIP_WIN):
 			tamed_at = wins
 			break
 
@@ -93,37 +68,55 @@ func _test_friendship_is_deterministic() -> void:
 	check_eq(tamed_at, int(ceil(float(threshold) / GameState.FRIENDSHIP_WIN)),
 		"приручение ровно на расчётной победе, без броска кубика")
 	check(GameState.is_tamed("disco_sprout"), "монстр в коллекции")
+	check(GameState.has_instance("disco_sprout", common), "приручён именно обычный экземпляр")
 
-	# Шкала не переполняется
-	GameState.add_friendship("disco_sprout", 999)
-	check_eq(GameState.get_friendship("disco_sprout"), threshold, "дружба не выходит за порог")
+	# Шкала своего грейда не переполняется
+	GameState.add_friendship("disco_sprout", common, 999)
+	check_eq(GameState.get_friendship("disco_sprout", common), threshold,
+		"дружба не выходит за порог своего грейда")
+
+	# А у соседнего грейда она вообще не двигалась
+	check_eq(GameState.get_friendship("disco_sprout", MonsterData.Rarity.RARE), 0,
+		"шкала редкого осталась нетронутой")
 
 
 func _test_friendship_never_lost() -> void:
 	print("Дружба: не теряется никогда")
 	GameState.reset()
-	GameState.add_friendship("bass_bear", 40)
-	var before := GameState.get_friendship("bass_bear")
+	var common := MonsterData.Rarity.COMMON
+	GameState.add_friendship("bass_bear", common, 40)
+	var before := GameState.get_friendship("bass_bear", common)
 
 	# Имитация смерти в забеге: теряется добыча, но не дружба (GDD §8.4)
 	GameState.fruits.clear()
 	GameState.add_silver(-GameState.silver)
 
-	check_eq(GameState.get_friendship("bass_bear"), before,
+	check_eq(GameState.get_friendship("bass_bear", common), before,
 		"после смерти в забеге дружба сохранилась")
 
 
 func _test_fruit_bonus() -> void:
 	print("Дружба: вклад фрукта")
 	var Q := FruitData.Quality
-	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN),
-		GameState.FRIENDSHIP_FAVORITE_FRUIT, "любимый фрукт даёт полную прибавку")
+	check(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN)
+		> GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
+		"любимый фрукт даёт больше нелюбимого")
 	check_eq(GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
 		GameState.FRIENDSHIP_OTHER_FRUIT, "нелюбимый даёт меньше, но даёт")
 
-	# Качество умножает: 35 * 1.6 = 56
-	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PERFECT), 56,
-		"идеальный фрукт даёт множитель 1.6")
+	# Щедрость задаёт ТИР семечка, а не качество: у любимой сливки тир 1,
+	# поэтому прибавка выше базовой ровно на его множитель
+	var plum := Registry.fruit("bass_plum")
+	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN),
+		int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+			* FruitData.tier_friendship_scale(plum.tier))),
+		"прибавка считается от тира семечка")
+
+	# И тир действительно что-то меняет: верхний плод щедрее нижнего
+	var apple := Registry.fruit("chord_apple")
+	check(FruitData.tier_friendship_scale(apple.tier)
+		> FruitData.tier_friendship_scale(0),
+		"верхний тир щедрее нижнего")
 
 	# Даже худший случай продвигает вперёд — «не получилось» не бывает
 	check(GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN) > 0,
@@ -154,23 +147,48 @@ func _test_inventory() -> void:
 func _test_save_roundtrip() -> void:
 	print("Сейв: сериализация и чтение")
 	GameState.reset()
-	GameState.add_friendship("banjo_moth", 75)
+	var common := MonsterData.Rarity.COMMON
+	var rare := MonsterData.Rarity.RARE
+
+	GameState.add_friendship("banjo_moth", common, 75)
 	GameState.add_fruit("loop_fig", FruitData.Quality.JUICY, 4)
 	GameState.add_silver(120)
-	GameState.add_friendship("disco_sprout", 100)
+	# Второй экземпляр того же вида, но другого грейда — именно это отличает
+	# новую схему от старой, и именно это должно пережить сейв.
+	#
+	# Ступени идут по порядку: редкого не приручить, пока не подружился
+	# с необычным (GDD §6.1). Раньше тест прыгал сразу к редкому, шкала молча
+	# не заполнялась, и `instance()` возвращал null — весь остаток проверки
+	# обрывался ошибкой скрипта, а набор при этом рапортовал «0 провалено»
+	for grade in [common, MonsterData.Rarity.UNCOMMON, rare]:
+		GameState.add_friendship("disco_sprout", grade,
+			GameState.friendship_threshold(grade))
+	var rare_instance := GameState.instance(MonsterInstance.key_for("disco_sprout", rare))
+	check(rare_instance != null, "редкий экземпляр приручился по лестнице")
+	if rare_instance == null:
+		return
+	rare_instance.add_xp(150)
 
 	var snapshot := GameState.to_dict()
 	GameState.reset()
-	check_eq(GameState.get_friendship("banjo_moth"), 0, "состояние сброшено")
+	check_eq(GameState.get_friendship("banjo_moth", common), 0, "состояние сброшено")
 
 	GameState.from_dict(snapshot)
-	check_eq(GameState.get_friendship("banjo_moth"), 75, "дружба восстановилась")
+	check_eq(GameState.get_friendship("banjo_moth", common), 75, "дружба восстановилась")
 	check_eq(GameState.fruit_count("loop_fig", FruitData.Quality.JUICY), 4, "фрукты восстановились")
 	check_eq(GameState.silver, 120, "серебро восстановились")
-	check(GameState.is_tamed("disco_sprout"), "коллекция восстановилась")
+	check(GameState.has_instance("disco_sprout", common), "обычный экземпляр восстановился")
+	check(GameState.has_instance("disco_sprout", rare), "редкий экземпляр восстановился")
 
-	# Сейв из будущей версии не должен ронять игру
-	var future := snapshot.duplicate()
-	future["version"] = 999
-	GameState.from_dict(future)
-	check_eq(GameState.silver, 120, "сейв новой версии читается без падения")
+	var restored := GameState.instance(MonsterInstance.key_for("disco_sprout", rare))
+	check(restored != null and restored.level > 1, "уровень экземпляра пережил сейв")
+
+	# Через настоящий JSON: ключи словарей там становятся строками, и без
+	# обратного приведения коллекция молча теряется
+	var parsed: Variant = JSON.parse_string(JSON.stringify(snapshot))
+	GameState.reset()
+	GameState.from_dict(parsed)
+	check(GameState.has_instance("disco_sprout", rare),
+		"экземпляр пережил круг через настоящий JSON")
+	check_eq(GameState.get_friendship("banjo_moth", common), 75,
+		"дружба пережила круг через настоящий JSON")

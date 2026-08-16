@@ -1,46 +1,45 @@
-extends Node
+extends TestHarness
 
 ## Проверки снаряжения.
 ##
 ## Под охраной обещание из GDD §9.2 и §12.1: снаряжение живёт на гуардиане
 ## и покупается за игровую валюту. Ничего, что влияет на бой, не должно
 ## существовать в контуре реальных денег.
+##
+## Экипировка ключуется ЭКЗЕМПЛЯРОМ (GDD §6.3): обычный и редкий Ростик носят
+## разное, и это главное, что здесь проверяется после переезда модели.
 
-var _failed := 0
-var _passed := 0
+const COMMON := MonsterData.Rarity.COMMON
+const SPROUT := "disco_sprout:0"
+const BEAR := "bass_bear:0"
 
 
-func _ready() -> void:
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
 	GameState.reset()
+	_sprout()
 
 	_test_registry()
 	_test_equip_unequip()
 	_test_bonuses_stack()
 	_test_gear_affects_battle()
 	_test_shield_never_free()
-	_test_gear_is_per_monster()
+	_test_gear_is_per_instance()
 	_test_guardian_selection()
 	_test_save_roundtrip()
 
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
+
+## Экземпляры, на которых ставятся опыты. Экипировать можно только того,
+## кто действительно в коллекции, — иначе снаряжение уходило бы в никуда.
+func _sprout() -> MonsterInstance:
+	return GameState.tame("disco_sprout", COMMON)
 
 
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
+func _bear() -> MonsterInstance:
+	return GameState.tame("bass_bear", COMMON)
 
 
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
+func _slime() -> MonsterInstance:
+	return MonsterInstance.create("synth_slime", COMMON)
 
 
 func _test_registry() -> void:
@@ -61,44 +60,46 @@ func _test_registry() -> void:
 func _test_equip_unequip() -> void:
 	print("Надеть и снять")
 	GameState.reset()
+	_sprout()
 	GameState.add_gear("soft_slippers")
 	check_eq(GameState.gear_count("soft_slippers"), 1, "предмет в сундуке")
 
-	check(GameState.equip("disco_sprout", "soft_slippers"), "надето")
+	check(GameState.equip(SPROUT, "soft_slippers"), "надето")
 	check_eq(GameState.gear_count("soft_slippers"), 0, "из сундука ушло")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null, "слот занят")
+	check(GameState.equipped_gear(SPROUT, GearData.Slot.BELT) != null, "слот занят")
 
-	check(not GameState.equip("disco_sprout", "soft_slippers"), "второй раз то же самое нельзя")
+	check(not GameState.equip(SPROUT, "soft_slippers"), "второй раз то же самое нельзя")
 
-	check(GameState.unequip("disco_sprout", GearData.Slot.BELT), "снято")
+	check(GameState.unequip(SPROUT, GearData.Slot.BELT), "снято")
 	check_eq(GameState.gear_count("soft_slippers"), 1, "вернулось в сундук — экипировка обратима")
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) == null, "слот пуст")
-	check(not GameState.unequip("disco_sprout", GearData.Slot.BELT), "снимать нечего")
+	check(GameState.equipped_gear(SPROUT, GearData.Slot.BELT) == null, "слот пуст")
+	check(not GameState.unequip(SPROUT, GearData.Slot.BELT), "снимать нечего")
 
 	# Замена в занятом слоте возвращает предыдущее в сундук
 	GameState.add_gear("spring_boots")
-	GameState.equip("disco_sprout", "soft_slippers")
-	GameState.equip("disco_sprout", "spring_boots")
+	GameState.equip(SPROUT, "soft_slippers")
+	GameState.equip(SPROUT, "spring_boots")
 	check_eq(GameState.gear_count("soft_slippers"), 1, "вытесненное вернулось в сундук")
-	check_eq(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT).id, "spring_boots",
+	check_eq(GameState.equipped_gear(SPROUT, GearData.Slot.BELT).id, "spring_boots",
 		"в слоте новое")
 
 
 func _test_bonuses_stack() -> void:
 	print("Суммирование эффектов")
 	GameState.reset()
-	var clean := GameState.gear_bonuses("disco_sprout")
+	_sprout()
+	var clean := GameState.gear_bonuses(SPROUT)
 	check_eq(clean.window_scale, 1.0, "без снаряжения окна обычные")
 	check_eq(clean.health_bonus, 0, "без снаряжения здоровье обычное")
 
 	GameState.add_gear("spring_boots")
 	GameState.add_gear("brass_bell")
 	GameState.add_gear("river_stone")
-	GameState.equip("disco_sprout", "spring_boots")
-	GameState.equip("disco_sprout", "brass_bell")
-	GameState.equip("disco_sprout", "river_stone")
+	GameState.equip(SPROUT, "spring_boots")
+	GameState.equip(SPROUT, "brass_bell")
+	GameState.equip(SPROUT, "river_stone")
 
-	var full := GameState.gear_bonuses("disco_sprout")
+	var full := GameState.gear_bonuses(SPROUT)
 	check(full.window_scale > 1.0, "обувь расширила окна")
 	check(full.power_bonus > 0.0, "аксессуар усилил удар")
 	check(full.health_bonus > 0, "амулет добавил здоровья")
@@ -108,26 +109,27 @@ func _test_bonuses_stack() -> void:
 func _test_gear_affects_battle() -> void:
 	print("Снаряжение доходит до боя")
 	GameState.reset()
+	_sprout()
 	var bare := BattleState.new()
-	bare.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
+	bare.setup(_slime(), _sprout(), 100)
 	var bare_damage := _clean_attack(bare)
 	var bare_health := bare.max_health
 
 	GameState.add_gear("thunder_pick")
 	GameState.add_gear("river_stone")
-	GameState.equip("disco_sprout", "thunder_pick")
-	GameState.equip("disco_sprout", "river_stone")
+	GameState.equip(SPROUT, "thunder_pick")
+	GameState.equip(SPROUT, "river_stone")
 
 	var geared := BattleState.new()
-	geared.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
+	geared.setup(_slime(), _sprout(), 100)
 	check(_clean_attack(geared) > bare_damage, "аксессуар усилил удар в бою")
 	check(geared.max_health > bare_health, "амулет поднял максимум здоровья")
 
 	# Обувь расширяет окна: то, что было Good, становится Perfect
 	GameState.add_gear("cloud_shoes")
-	GameState.equip("disco_sprout", "cloud_shoes")
+	GameState.equip(SPROUT, "cloud_shoes")
 	var shod := BattleState.new()
-	shod.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
+	shod.setup(_slime(), _sprout(), 100)
 	check(shod.window_scale > 1.0, "окна расширены")
 	check_eq(Judge.grade(0.070, shod.window_scale), Judge.Grade.PERFECT,
 		"с обувью попадание в 70 мс стало идеальным")
@@ -137,20 +139,33 @@ func _test_gear_affects_battle() -> void:
 func _test_shield_never_free() -> void:
 	print("Щит нельзя обнулить снаряжением")
 	GameState.reset()
-	GameState.add_gear("heartwood_amulet")
-	GameState.equip("disco_sprout", "heartwood_amulet")
+	_sprout()
 
-	var s := BattleState.new()
-	s.setup(Registry.monster("synth_slime"), Registry.monster("disco_sprout"), 100)
-
+	# Сначала тот же удар БЕЗ амулета. Сравнивать надо с ним, а не с голой
+	# константой: урон умножается ещё и на шкалу грейда, и стоило поднять её
+	# обычному монстру, как исправный амулет «перестал» смягчать — тест мерил
+	# не снаряжение, а лестницу грейдов
+	#
 	# Урон меряем суммарно: он гасится щитом раньше здоровья, и смотреть
 	# только на здоровье значит не увидеть удар вовсе
+	var bare := BattleState.new()
+	bare.setup(_slime(), _sprout(), 100)
+	var bare_before := bare.shield + bare.health
+	bare.take_strike()
+	var bare_damage := bare_before - (bare.shield + bare.health)
+
+	GameState.add_gear("heartwood_amulet")
+	GameState.equip(SPROUT, "heartwood_amulet")
+
+	var s := BattleState.new()
+	s.setup(_slime(), _sprout(), 100)
 	var before := s.shield + s.health
 	s.take_strike()
 	var damage := before - (s.shield + s.health)
 
 	check(damage > 0, "пропущенный щит всё равно бьёт — механика обязана остаться")
-	check(damage < BattleState.STRIKE_DAMAGE, "но амулет смягчил удар")
+	check(damage < bare_damage,
+		"но амулет смягчил удар (%d против %d без него)" % [damage, bare_damage])
 
 	# Даже при абсурдном снижении урон не уходит в ноль
 	s.shield_reduction = 5.0
@@ -159,44 +174,65 @@ func _test_shield_never_free() -> void:
 	check(mid - (s.shield + s.health) >= 1, "урон не обнуляется ни при каком снаряжении")
 
 
-func _test_gear_is_per_monster() -> void:
-	print("Снаряжение привязано к существу, а не к игроку")
+## Снаряжение принадлежит ЭКЗЕМПЛЯРУ.
+##
+## Проверяется на двух экземплярах ОДНОГО вида: это и есть новый смысл
+## правила. Ключуй дружбу или экипировку видом — и редкий Ростик молча
+## наденет пояс обычного.
+func _test_gear_is_per_instance() -> void:
+	print("Снаряжение привязано к экземпляру, а не к виду")
 	GameState.reset()
+	_sprout()
+	var rare := GameState.tame("disco_sprout", MonsterData.Rarity.RARE)
+
 	GameState.add_gear("spring_boots")
-	GameState.equip("disco_sprout", "spring_boots")
+	GameState.equip(SPROUT, "spring_boots")
 
-	check(GameState.equipped_gear("disco_sprout", GearData.Slot.BELT) != null,
-		"на первом надето")
-	check(GameState.equipped_gear("bass_bear", GearData.Slot.BELT) == null,
-		"на втором пусто — смена гуардиана должна быть решением, а не сменой скина")
+	check(GameState.equipped_gear(SPROUT, GearData.Slot.BELT) != null,
+		"на обычном надето")
+	check(GameState.equipped_gear(rare.key(), GearData.Slot.BELT) == null,
+		"на редком того же вида пусто — это разные существа")
+	check_eq(GameState.gear_bonuses(rare.key()).window_scale, 1.0,
+		"бонусы не протекают между грейдами одного вида")
 
-	var other := GameState.gear_bonuses("bass_bear")
-	check_eq(other.window_scale, 1.0, "чужие бонусы не протекают")
+	# И между разными видами тоже
+	_bear()
+	check(GameState.equipped_gear(BEAR, GearData.Slot.BELT) == null,
+		"на другом виде пусто — смена гуардиана должна быть решением, а не сменой скина")
+	check_eq(GameState.gear_bonuses(BEAR).window_scale, 1.0, "чужие бонусы не протекают")
 
 
 func _test_guardian_selection() -> void:
 	print("Выбор гуардиана")
 	GameState.reset()
-	check_eq(GameState.guardian_id(), "", "без коллекции гуардиана нет")
+	check(GameState.guardian() == null, "без коллекции гуардиана нет")
+	check_eq(GameState.guardian_key(), "", "ключ пуст")
 
-	GameState.add_friendship("disco_sprout", 100)
-	check_eq(GameState.guardian_id(), "disco_sprout", "первый приручённый берётся по умолчанию")
+	var sprout := _sprout()
+	check_eq(GameState.guardian_key(), sprout.key(),
+		"первый приручённый берётся по умолчанию")
 
-	check(not GameState.set_guardian("beat_serpent"), "неприручённого выбрать нельзя")
+	check(not GameState.set_guardian("beat_serpent:0"), "неприручённого выбрать нельзя")
 
-	GameState.add_friendship("bass_bear", 999)
-	check(GameState.set_guardian("bass_bear"), "приручённого выбрать можно")
-	check_eq(GameState.guardian_id(), "bass_bear", "выбор применился")
+	var bear := _bear()
+	check(GameState.set_guardian(bear.key()), "приручённого выбрать можно")
+	check_eq(GameState.guardian_key(), bear.key(), "выбор применился")
+
+	# Разные грейды одного вида — разные кандидаты в гуардианы
+	var rare_sprout := GameState.tame("disco_sprout", MonsterData.Rarity.RARE)
+	check(GameState.set_guardian(rare_sprout.key()), "редкий экземпляр тоже можно взять")
+	check_eq(GameState.guardian_key(), rare_sprout.key(),
+		"в лес идёт именно редкий, а не обычный того же вида")
 
 
 func _test_save_roundtrip() -> void:
 	print("Сейв снаряжения")
 	GameState.reset()
-	GameState.add_friendship("disco_sprout", 999)
-	GameState.set_guardian("disco_sprout")
+	var sprout := _sprout()
+	GameState.set_guardian(sprout.key())
 	GameState.add_gear("cloud_shoes")
 	GameState.add_gear("brass_bell", 2)
-	GameState.equip("disco_sprout", "cloud_shoes")
+	GameState.equip(SPROUT, "cloud_shoes")
 
 	# JSON превращает целые ключи слотов в строки — прогоняем через настоящую
 	# сериализацию, иначе экипировка молча перестала бы находиться
@@ -207,12 +243,12 @@ func _test_save_roundtrip() -> void:
 	GameState.from_dict(restored)
 
 	check_eq(GameState.gear_count("brass_bell"), 2, "сундук восстановился")
-	var boots := GameState.equipped_gear("disco_sprout", GearData.Slot.BELT)
+	var boots := GameState.equipped_gear(SPROUT, GearData.Slot.BELT)
 	check(boots != null, "надетое нашлось после JSON-цикла")
 	if boots != null:
 		check_eq(boots.id, "cloud_shoes", "именно тот предмет")
-	check_eq(GameState.guardian_id(), "disco_sprout", "выбранный гуардиан восстановился")
-	check(GameState.gear_bonuses("disco_sprout").window_scale > 1.0, "бонусы снова считаются")
+	check_eq(GameState.guardian_key(), SPROUT, "выбранный гуардиан восстановился")
+	check(GameState.gear_bonuses(SPROUT).window_scale > 1.0, "бонусы снова считаются")
 
 
 ## Провести чистую серию и ударить. Обычные биты урона не наносят,

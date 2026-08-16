@@ -1,6 +1,56 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scenes/inventory/inventory.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/inventory/inventory.gd" id="1_py74r"]
 
-[node name="Inventory" type="Node2D"]
-script = ExtResource("1")
+[node name="Inventory" type="Node2D" unique_id=419635068]
+script = ExtResource("1_py74r")
+
+[node name="Background" type="ColorRect" parent="." unique_id=668315183]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0.22745098, 0.16470589, 0.10980392, 1)
+
+[node name="Scenery" type="Sprite2D" parent="." unique_id=668315184]
+visible = false
+texture_filter = 1
+position = Vector2(540, 960)
+
+[node name="Title" type="Label" parent="." unique_id=759761012]
+offset_left = 60.0
+offset_top = 60.0
+offset_right = 1020.0
+offset_bottom = 140.0
+theme_override_font_sizes/font_size = 58
+theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
+text = "Инвентарь"
+horizontal_alignment = 1
+
+[node name="Wallet" type="RichTextLabel" parent="." unique_id=877512172]
+offset_left = 60.0
+offset_top = 150.0
+offset_right = 1020.0
+offset_bottom = 214.0
+theme_override_font_sizes/normal_font_size = 34
+theme_override_colors/default_color = Color(1, 0.8235294, 0.3019608, 1)
+bbcode_enabled = true
+fit_content = false
+scroll_active = false
+
+[node name="ListScroll" type="ScrollContainer" parent="." unique_id=240589297]
+offset_left = 60.0
+offset_top = 230.0
+offset_right = 1020.0
+offset_bottom = 1700.0
+
+[node name="List" type="VBoxContainer" parent="ListScroll" unique_id=48283130]
+custom_minimum_size = Vector2(960, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BackButton" type="Button" parent="." unique_id=255752827]
+offset_left = 60.0
+offset_top = 1740.0
+offset_right = 1020.0
+offset_bottom = 1870.0
+theme_override_font_sizes/font_size = 40
+text = "← Во двор"

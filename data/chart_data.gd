@@ -12,15 +12,22 @@ extends Resource
 ## ATTACK — единственный источник урона по Настрою. Обычные биты его
 ## не наносят: они собирают серию, а бьёт только атака в её конце,
 ## и только если серия прошла без промахов (GDD §4.3).
-enum NoteType { BEAT, SKILL, SHIELD, SNACK, ATTACK }
+enum NoteType { BEAT, SKILL, SHIELD, HEAVY, ATTACK }
 
 const TYPE_NAMES := {
 	"beat": NoteType.BEAT,
 	"skill": NoteType.SKILL,
 	"shield": NoteType.SHIELD,
-	"snack": NoteType.SNACK,
+	"heavy": NoteType.HEAVY,
 	"attack": NoteType.ATTACK,
 }
+
+## Сложность боевого трека — это грейд монстра, и порядок здесь совпадает
+## с MonsterData.Rarity. Чем реже монстр, тем быстрее и плотнее его трек.
+##
+## Строки, а не enum: то же значение лежит в JSON-чарте и в имени файла,
+## и лишнее преобразование туда-обратно только добавляло бы места для ошибки.
+const GRADE_ORDER := ["common", "uncommon", "rare", "unique", "epic", "legendary"]
 
 @export var id: String = ""
 @export var genre: String = ""

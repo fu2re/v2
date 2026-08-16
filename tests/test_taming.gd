@@ -1,18 +1,20 @@
-extends Node
+extends TestHarness
 
 ## Проверки приручения.
 ##
 ## Эти тесты стоят на страже обещания «ребёнок никогда не услышит
 ## "не получилось"» (GDD §6.1). Любой исход встречи обязан двигать шкалу
 ## вперёд или хотя бы не откатывать её назад.
+##
+## Дружба копится отдельно на каждую пару «вид + грейд», поэтому во всех
+## проверках грейд указывается явно — молчаливого «грейда вида» больше нет.
 
-var _failed := 0
-var _passed := 0
+const COMMON := MonsterData.Rarity.COMMON
 
 
-func _ready() -> void:
-	# Не трогаем реальный сейв игрока: тесты гоняют настоящие подсистемы
-	SaveManager.enter_test_mode()
+func run_tests() -> void:
+	_test_locked_step_takes_nothing()
+	_test_tamed_takes_no_more_friendship()
 	GameState.reset()
 
 	_test_win_always_counts()
@@ -20,34 +22,16 @@ func _ready() -> void:
 	_test_no_fruit_still_progresses()
 	_test_wrong_fruit_still_progresses()
 	_test_favorite_fruit_is_faster()
-	_test_rarity_changes_length_not_chance()
+	_test_grade_changes_length_not_chance()
+	_test_grade_scales_are_independent()
 	_test_progress_never_goes_backwards()
-
-	print("\n%d пройдено, %d провалено" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s" % description)
-
-
-func check_eq(actual: Variant, expected: Variant, description: String) -> void:
-	if actual == expected:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("  ПРОВАЛ: %s (получено %s, ожидалось %s)" % [description, actual, expected])
 
 
 func _test_win_always_counts() -> void:
 	print("Победа засчитывается до всякого угощения")
 	GameState.reset()
-	GameState.add_friendship("synth_slime", GameState.FRIENDSHIP_WIN)
-	check_eq(GameState.get_friendship("synth_slime"), GameState.FRIENDSHIP_WIN,
+	GameState.add_friendship("synth_slime", COMMON, GameState.FRIENDSHIP_WIN)
+	check_eq(GameState.get_friendship("synth_slime", COMMON), GameState.FRIENDSHIP_WIN,
 		"дружба выросла от одной победы")
 
 
@@ -62,9 +46,9 @@ func _test_no_fruit_still_progresses() -> void:
 	GameState.reset()
 	check_eq(GameState.fruits.size(), 0, "сумка пуста")
 
-	var before := GameState.get_friendship("banjo_moth")
-	GameState.add_friendship("banjo_moth", GameState.FRIENDSHIP_WIN)
-	check(GameState.get_friendship("banjo_moth") > before,
+	var before := GameState.get_friendship("banjo_moth", COMMON)
+	GameState.add_friendship("banjo_moth", COMMON, GameState.FRIENDSHIP_WIN)
+	check(GameState.get_friendship("banjo_moth", COMMON) > before,
 		"пустая сумка не отменяет прогресс — это и есть защита от фрустрации")
 
 
@@ -96,16 +80,16 @@ func _test_favorite_fruit_is_faster() -> void:
 
 	# Взрослый оптимизирует: с любимым фруктом встреч нужно заметно меньше
 	GameState.reset()
-	var threshold := Registry.monster("bass_bear").friendship_threshold()
+	var threshold := GameState.friendship_threshold(COMMON)
 	var meetings_lazy := 0
-	while GameState.get_friendship("bass_bear") < threshold:
-		GameState.add_friendship("bass_bear", GameState.FRIENDSHIP_WIN)
+	while GameState.get_friendship("bass_bear", COMMON) < threshold:
+		GameState.add_friendship("bass_bear", COMMON, GameState.FRIENDSHIP_WIN)
 		meetings_lazy += 1
 
 	GameState.reset()
 	var meetings_smart := 0
-	while GameState.get_friendship("bass_bear") < threshold:
-		GameState.add_friendship("bass_bear", GameState.FRIENDSHIP_WIN + favorite)
+	while GameState.get_friendship("bass_bear", COMMON) < threshold:
+		GameState.add_friendship("bass_bear", COMMON, GameState.FRIENDSHIP_WIN + favorite)
 		meetings_smart += 1
 
 	check(meetings_smart < meetings_lazy,
@@ -113,28 +97,71 @@ func _test_favorite_fruit_is_faster() -> void:
 			% [meetings_smart, meetings_lazy])
 
 
-func _test_rarity_changes_length_not_chance() -> void:
-	print("Редкость меняет длину пути, но не шанс")
-	for rarity in [MonsterData.Rarity.COMMON, MonsterData.Rarity.UNCOMMON,
-			MonsterData.Rarity.RARE, MonsterData.Rarity.EPIC,
-			MonsterData.Rarity.LEGENDARY]:
-		var monsters := Registry.monsters_of_rarity(rarity)
-		if monsters.is_empty():
-			continue
-		var m: MonsterData = monsters[0]
-
-		GameState.reset()
+## Грейд удлиняет дорогу, но не превращает её в лотерею: заполнил шкалу —
+## забрал гарантированно, сколько бы встреч ни потребовалось.
+func _test_grade_changes_length_not_chance() -> void:
+	print("Грейд меняет длину пути, но не шанс")
+	var previous_meetings := 0
+	# Идём по лестнице снизу вверх и НЕ сбрасываем прогресс: перепрыгнуть
+	# ступень нельзя (§6.1), поэтому каждый следующий грейд открывается
+	# приручением предыдущего
+	GameState.reset()
+	for grade in MonsterData.RARITY_NAMES.size():
 		var meetings := 0
 		var tamed := false
 		while meetings < 1000 and not tamed:
 			meetings += 1
-			tamed = GameState.add_friendship(m.id, GameState.FRIENDSHIP_WIN)
+			tamed = GameState.add_friendship("disco_sprout", grade, GameState.FRIENDSHIP_WIN)
 
-		var expected := int(ceil(float(m.friendship_threshold()) / GameState.FRIENDSHIP_WIN))
+		var expected := int(ceil(float(GameState.friendship_threshold(grade))
+			/ GameState.FRIENDSHIP_WIN))
 		check_eq(meetings, expected,
-			"%s (%s): ровно %d встреч, без разброса"
-				% [m.id, MonsterData.rarity_name(rarity), expected])
-		check(tamed, "%s приручается гарантированно" % m.id)
+			"%s: ровно %d встреч, без разброса"
+				% [MonsterData.rarity_name(grade), expected])
+		check(tamed, "%s приручается гарантированно" % MonsterData.rarity_name(grade))
+		check(meetings > previous_meetings,
+			"%s требует больше встреч, чем предыдущий грейд" % MonsterData.rarity_name(grade))
+		previous_meetings = meetings
+
+		# Приручается ИМЕННО тот экземпляр, с которым дружили
+		check(GameState.has_instance("disco_sprout", grade),
+			"в коллекции появился экземпляр нужного грейда")
+
+
+## Главная проверка новой модели: шкалы грейдов не сообщаются между собой.
+##
+## Ошибку легко сделать, ключуя дружбу видом по привычке, и заметить её
+## в игре трудно — она выглядит как «редкий приручился подозрительно быстро».
+func _test_grade_scales_are_independent() -> void:
+	print("Шкалы разных грейдов независимы")
+	GameState.reset()
+
+	# Полностью приручаем обычного
+	var common_threshold := GameState.friendship_threshold(COMMON)
+	GameState.add_friendship("synth_slime", COMMON, common_threshold)
+	check(GameState.has_instance("synth_slime", COMMON), "обычный приручён")
+
+	# Редкий при этом остаётся нетронутым
+	var rare := MonsterData.Rarity.RARE
+	check_eq(GameState.get_friendship("synth_slime", rare), 0,
+		"дружба с обычным не начислилась редкому")
+	check(not GameState.has_instance("synth_slime", rare), "редкий не приручился заодно")
+
+	# И наоборот: прогресс редкого не трогает обычного.
+	#
+	# Сначала открываем ступень: в закрытую дружба теперь не копится вовсе,
+	# и без необычного проверка мерила бы не независимость шкал, а запрет
+	GameState.tame("synth_slime", MonsterData.Rarity.UNCOMMON)
+	GameState.add_friendship("synth_slime", rare, 50)
+	check_eq(GameState.get_friendship("synth_slime", COMMON), common_threshold,
+		"шкала обычного осталась на месте")
+	check_eq(GameState.get_friendship("synth_slime", rare), 50,
+		"шкала редкого выросла ровно на своё")
+
+	# Вид считается приручённым, но не в каждом грейде
+	check(GameState.is_tamed("synth_slime"), "вид числится знакомым")
+	check(GameState.is_tamed_at_least("synth_slime", COMMON), "обычный превзойдён")
+	check(not GameState.is_tamed_at_least("synth_slime", rare), "редкий ещё нет")
 
 
 func _test_progress_never_goes_backwards() -> void:
@@ -142,7 +169,52 @@ func _test_progress_never_goes_backwards() -> void:
 	GameState.reset()
 	var previous := 0
 	for i in 30:
-		GameState.add_friendship("beat_serpent", GameState.FRIENDSHIP_WIN)
-		var current := GameState.get_friendship("beat_serpent")
+		GameState.add_friendship("beat_serpent", COMMON, GameState.FRIENDSHIP_WIN)
+		var current := GameState.get_friendship("beat_serpent", COMMON)
 		check(current >= previous, "шаг %d: шкала не уменьшилась" % i)
 		previous = current
+
+
+## Дружба не копится туда, где приручать пока нельзя.
+##
+## Раньше копилась «про запас»: шкала росла, фрукты тратились, а приручение
+## всё равно не наступало, пока не пройдена ступень ниже. Двигать полоску,
+## с которой ничего нельзя сделать, — то же самое, что выбрасывать фрукты.
+func _test_locked_step_takes_nothing() -> void:
+	print("В закрытую ступень дружба не копится")
+	GameState.reset()
+
+	var rare := MonsterData.Rarity.RARE
+	check(not GameState.can_tame("disco_sprout", rare), "редкая ступень закрыта")
+
+	var before := GameState.get_friendship("disco_sprout", rare)
+	check(not GameState.add_friendship("disco_sprout", rare, 500),
+		"вклад в закрытую ступень отклонён")
+	check_eq(GameState.get_friendship("disco_sprout", rare), before,
+		"шкала закрытой ступени не двинулась")
+	check(not GameState.has_instance("disco_sprout", rare),
+		"и приручения, конечно, не случилось")
+
+	# Открылась ступень — вклад снова принимается
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.tame("disco_sprout", MonsterData.Rarity.UNCOMMON)
+	check(GameState.can_tame("disco_sprout", rare), "ступень открылась")
+	GameState.add_friendship("disco_sprout", rare, 10)
+	check(GameState.get_friendship("disco_sprout", rare) > before,
+		"по открытой ступени дружба пошла")
+
+
+## С тем, кто уже в коллекции, дружиться заново не с кем.
+##
+## Иначе после боя с приручённым открывалось угощение: фрукты списывались,
+## шкала росла, и всё это не значило ничего.
+func _test_tamed_takes_no_more_friendship() -> void:
+	print("Приручённому дружба больше не начисляется")
+	GameState.reset()
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+
+	var before := GameState.get_friendship("disco_sprout", MonsterData.Rarity.COMMON)
+	check(not GameState.add_friendship("disco_sprout", MonsterData.Rarity.COMMON, 50),
+		"вклад приручённому отклонён")
+	check_eq(GameState.get_friendship("disco_sprout", MonsterData.Rarity.COMMON), before,
+		"шкала приручённого не двинулась")

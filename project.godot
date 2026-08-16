@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 AudioBus="*res://autoload/audio_bus.gd"
+Jukebox="*res://autoload/jukebox.gd"
 Conductor="*res://autoload/conductor.gd"
 GameState="*res://autoload/game_state.gd"
 FarmState="*res://autoload/farm_state.gd"
@@ -34,6 +35,10 @@ window/size/viewport_height=1920
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
+
+[gui]
+
+theme/custom="res://art/ui/beatroot_theme.tres"
 
 [input]
 

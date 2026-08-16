@@ -1,0 +1,270 @@
+{
+  "id": "latin_veter",
+  "genre": "latin",
+  "bpm": 124.19999999999999,
+  "difficulty": "uncommon",
+  "duration": 32.850241545893724,
+  "audio": "res://music/latin_veter_uncommon_124.ogg",
+  "beats_per_bar": 4,
+  "offset": 0.0,
+  "notes": [
+    {
+      "beat": 4.0,
+      "type": "beat"
+    },
+    {
+      "beat": 5.0,
+      "type": "beat"
+    },
+    {
+      "beat": 6.0,
+      "type": "beat"
+    },
+    {
+      "beat": 7.0,
+      "type": "attack"
+    },
+    {
+      "beat": 8.0,
+      "type": "beat"
+    },
+    {
+      "beat": 8.5,
+      "type": "beat"
+    },
+    {
+      "beat": 9.5,
+      "type": "beat"
+    },
+    {
+      "beat": 11.0,
+      "type": "attack"
+    },
+    {
+      "beat": 12.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.0,
+      "type": "beat"
+    },
+    {
+      "beat": 13.5,
+      "type": "beat"
+    },
+    {
+      "beat": 14.0,
+      "type": "attack"
+    },
+    {
+      "beat": 16.0,
+      "type": "shield"
+    },
+    {
+      "beat": 18.0,
+      "type": "beat"
+    },
+    {
+      "beat": 19.0,
+      "type": "beat"
+    },
+    {
+      "beat": 20.0,
+      "type": "attack"
+    },
+    {
+      "beat": 20.5,
+      "type": "beat"
+    },
+    {
+      "beat": 21.0,
+      "type": "beat"
+    },
+    {
+      "beat": 23.0,
+      "type": "beat"
+    },
+    {
+      "beat": 24.0,
+      "type": "skill"
+    },
+    {
+      "beat": 24.5,
+      "type": "attack"
+    },
+    {
+      "beat": 25.0,
+      "type": "beat"
+    },
+    {
+      "beat": 25.5,
+      "type": "beat"
+    },
+    {
+      "beat": 28.0,
+      "type": "beat"
+    },
+    {
+      "beat": 29.0,
+      "type": "beat"
+    },
+    {
+      "beat": 29.5,
+      "type": "beat"
+    },
+    {
+      "beat": 30.0,
+      "type": "attack"
+    },
+    {
+      "beat": 32.0,
+      "type": "shield"
+    },
+    {
+      "beat": 33.0,
+      "type": "beat"
+    },
+    {
+      "beat": 34.0,
+      "type": "beat"
+    },
+    {
+      "beat": 35.0,
+      "type": "attack"
+    },
+    {
+      "beat": 36.0,
+      "type": "beat"
+    },
+    {
+      "beat": 37.0,
+      "type": "beat"
+    },
+    {
+      "beat": 38.0,
+      "type": "beat"
+    },
+    {
+      "beat": 40.0,
+      "type": "attack"
+    },
+    {
+      "beat": 41.0,
+      "type": "heavy"
+    },
+    {
+      "beat": 42.0,
+      "type": "beat"
+    },
+    {
+      "beat": 44.0,
+      "type": "beat"
+    },
+    {
+      "beat": 46.0,
+      "type": "attack"
+    },
+    {
+      "beat": 47.0,
+      "type": "beat"
+    },
+    {
+      "beat": 48.0,
+      "type": "shield"
+    },
+    {
+      "beat": 49.5,
+      "type": "beat"
+    },
+    {
+      "beat": 52.0,
+      "type": "beat"
+    },
+    {
+      "beat": 52.5,
+      "type": "beat"
+    },
+    {
+      "beat": 53.0,
+      "type": "beat"
+    },
+    {
+      "beat": 53.5,
+      "type": "attack"
+    },
+    {
+      "beat": 54.0,
+      "type": "beat"
+    },
+    {
+      "beat": 56.5,
+      "type": "beat"
+    },
+    {
+      "beat": 57.0,
+      "type": "beat"
+    },
+    {
+      "beat": 57.5,
+      "type": "beat"
+    },
+    {
+      "beat": 58.0,
+      "type": "skill"
+    },
+    {
+      "beat": 59.0,
+      "type": "attack"
+    },
+    {
+      "beat": 61.0,
+      "type": "beat"
+    },
+    {
+      "beat": 61.5,
+      "type": "beat"
+    },
+    {
+      "beat": 62.0,
+      "type": "beat"
+    },
+    {
+      "beat": 63.0,
+      "type": "attack"
+    },
+    {
+      "beat": 64.0,
+      "type": "beat"
+    },
+    {
+      "beat": 66.0,
+      "type": "beat"
+    }
+  ],
+  "monster_pattern": [
+    {
+      "beat": 14.0,
+      "action": "windup"
+    },
+    {
+      "beat": 16.0,
+      "action": "strike"
+    },
+    {
+      "beat": 30.0,
+      "action": "windup"
+    },
+    {
+      "beat": 32.0,
+      "action": "strike"
+    },
+    {
+      "beat": 46.0,
+      "action": "windup"
+    },
+    {
+      "beat": 48.0,
+      "action": "strike"
+    }
+  ]
+}

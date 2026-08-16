@@ -18,6 +18,12 @@ const MARGIN := 40.0
 
 const FRAME_THICKNESS := 46.0
 
+## Зоны тапа: правая половина — обычный бит, левая — особый (GDD §4.1).
+const LANE_HINT_TOP := 1500.0
+const LANE_HINT_HEIGHT := 130.0
+const NORMAL_LANE_COLOR := Color("00E5FF")
+const SPECIAL_LANE_COLOR := Color("FF6BDE")
+
 var _vibe_fill: ColorRect = null
 var _health_fill: ColorRect = null
 var _shield_fill: ColorRect = null
@@ -44,6 +50,8 @@ func _ready() -> void:
 	_monster_label.add_theme_font_size_override("font_size", 40)
 	_vibe_label = _add_caption(Vector2(MARGIN, 62.0), "", VIBE_COLOR)
 
+	_build_lane_hints()
+
 	# Щит над здоровьем: урон съедает его первым, и порядок сверху вниз
 	# повторяет порядок, в котором они теряются.
 	# У каждой полоски своя подпись С ЧИСЛОМ — без неё тёмная подложка
@@ -68,6 +76,53 @@ func _ready() -> void:
 	add_child(_combo_label)
 
 	_build_warning_frame()
+
+
+## Две полосы внизу: правая — обычный бит, левая — особый.
+##
+## Живут в HUD, а не в сцене боя, намеренно: CanvasLayer не наследует
+## трансформ родителя, поэтому подсказки стоят на месте, когда экран
+## трясётся от пропущенного удара. Зона тапа не должна прыгать.
+func _build_lane_hints() -> void:
+	var half := 1080.0 * 0.5
+	var pairs := [
+		[NoteRules.Lane.SPECIAL, 0.0, SPECIAL_LANE_COLOR],
+		[NoteRules.Lane.NORMAL, half, NORMAL_LANE_COLOR],
+	]
+
+	for pair: Array in pairs:
+		var lane: int = pair[0]
+		var left: float = pair[1]
+		var colour: Color = pair[2]
+
+		var zone := ColorRect.new()
+		zone.position = Vector2(left, LANE_HINT_TOP)
+		zone.size = Vector2(half, LANE_HINT_HEIGHT)
+		# Едва заметная заливка: подсказка, а не украшение. Ноты обязаны
+		# оставаться самым ярким на экране (GDD §11.1.1)
+		zone.color = Color(colour.r, colour.g, colour.b, 0.10)
+		zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(zone)
+
+		var caption := _add_caption(
+			Vector2(left + 40.0, LANE_HINT_TOP + 30.0),
+			NoteRules.lane_name(lane), colour)
+		caption.add_theme_font_size_override("font_size", 34)
+		caption.size.x = half - 80.0
+		# Подписи разведены к КРАЯМ экрана, а не по центрам половин: ровно
+		# в этих центрах стоят герой и гуардиан, и надпись ложилась им
+		# поперёк туловища. Середина низа принадлежит танцорам
+		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT \
+			if lane == NoteRules.Lane.SPECIAL else HORIZONTAL_ALIGNMENT_RIGHT
+
+	# Разделитель посередине: граница половин должна быть видна глазом,
+	# иначе игрок узнаёт о ней только по незасчитанному попаданию
+	var divider := ColorRect.new()
+	divider.position = Vector2(half - 3.0, LANE_HINT_TOP)
+	divider.size = Vector2(6.0, LANE_HINT_HEIGHT)
+	divider.color = Color(1, 1, 1, 0.25)
+	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(divider)
 
 
 func _make_bar(pos: Vector2, width: float, color: Color) -> ColorRect:
@@ -101,15 +156,14 @@ func _add_caption(pos: Vector2, text: String, colour: Color) -> Label:
 ##
 ## Слово «Обычный» не пишем — оно ничего не сообщает и лишь занимает место.
 ## Грейд должен бросаться в глаза именно тогда, когда он есть.
-func set_monster(monster: MonsterData) -> void:
+func set_monster(monster: MonsterInstance) -> void:
 	if monster == null:
 		return
 	var suffix := ""
-	if monster.rarity > MonsterData.Rarity.COMMON:
-		suffix = " · " + MonsterData.rarity_name(monster.rarity)
-	_monster_label.text = monster.display_name + suffix
-	_monster_label.add_theme_color_override("font_color",
-		MonsterData.rarity_color(monster.rarity))
+	if monster.grade > MonsterData.Rarity.COMMON:
+		suffix = " · " + monster.grade_name()
+	_monster_label.text = monster.display_name() + suffix
+	_monster_label.add_theme_color_override("font_color", monster.grade_color())
 
 
 func bind(state: BattleState) -> void:
@@ -199,3 +253,5 @@ func flash_hit() -> void:
 		tween.tween_property(part, "color", Color(1.0, 0.82, 0.30, 0.9), 0.05)
 		tween.tween_property(part, "color", Color(WINDUP_COLOR.r, WINDUP_COLOR.g,
 			WINDUP_COLOR.b, 0.0), 0.25)
+
+

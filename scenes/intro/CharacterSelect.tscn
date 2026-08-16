@@ -1,0 +1,51 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/intro/character_select.gd" id="1"]
+
+[node name="CharacterSelect" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0.14117648, 0.22352941, 0.12156863, 1)
+
+[node name="Scenery" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(540, 960)
+
+[node name="BoyCard" type="Panel" parent="."]
+offset_left = 62.0
+offset_top = 520.0
+offset_right = 522.0
+offset_bottom = 1400.0
+mouse_filter = 2
+
+[node name="GirlCard" type="Panel" parent="."]
+offset_left = 558.0
+offset_top = 520.0
+offset_right = 1018.0
+offset_bottom = 1400.0
+mouse_filter = 2
+
+[node name="BoyArt" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(292, 990)
+scale = Vector2(7, 7)
+
+[node name="GirlArt" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(788, 990)
+scale = Vector2(7, 7)
+
+[node name="BoyButton" type="Button" parent="."]
+offset_left = 62.0
+offset_top = 520.0
+offset_right = 522.0
+offset_bottom = 1400.0
+
+[node name="GirlButton" type="Button" parent="."]
+offset_left = 558.0
+offset_top = 520.0
+offset_right = 1018.0
+offset_bottom = 1400.0
