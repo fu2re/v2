@@ -20,22 +20,12 @@
 
   "glade_types": {
     "description": "Шанс типа поляны при каждом свайпе (GDD §8.2). v0.4: торговец и событие объединены в тип «Встреча».",
-    "weights_percent": {
-      "battle": 65,
-      "wild_bush": 12,
-      "campfire": 8,
-      "encounter": 15
-    }
+    "weights_percent": { "battle": 65, "wild_bush": 12, "campfire": 8, "encounter": 15 }
   },
 
   "encounter_types": {
     "description": "Виды встреч внутри поляны «Встреча» (GDD §8.2.1, v0.4). Доля загадки до её реализации уходит торговцу.",
-    "weights_percent": {
-      "merchant": 45,
-      "loot_bush": 35,
-      "granny": 20,
-      "riddle": 0
-    }
+    "weights_percent": { "merchant": 45, "loot_bush": 35, "granny": 20, "riddle": 0 }
   },
 
   "loot_bush": {
@@ -54,13 +44,9 @@
   "granny": {
     "description": "Бабка (GDD §8.2.1, v0.4): просит серебро, дар добровольный. Отказ ничем не наказывается.",
     "ask_amount": "случайно от ask_min_fraction до ask_max_fraction от серебра игрока, округление вверх, минимум 1; НИКОГДА больше, чем есть у игрока; если серебра нет — бабка просто машет рукой",
-    "ask_min_fraction": 0.10,
-    "ask_max_fraction": 0.40,
-    "gift_weights_percent": {
-      "seed_tier_up": 62,
-      "silver_handful": 30,
-      "gear_mid_tier": 8
-    },
+    "ask_min_fraction": 0.1,
+    "ask_max_fraction": 0.4,
+    "gift_weights_percent": { "seed_tier_up": 62, "silver_handful": 30, "gear_mid_tier": 8 },
     "gift_notes": {
       "seed_tier_up": "семя на тир выше лучшего известного игроку (потолок — максимальный тир)",
       "gear_mid_tier": "случайный предмет из средней трети по цене (см. victory_chest.tiers.mid)"
@@ -70,14 +56,7 @@
 
   "monster_rarity_by_depth": {
     "description": "Веса грейда ЭКЗЕМПЛЯРА на боевой поляне (GDD §6.3, v0.4: грейд роллится на встречу, не закреплён за видом). Главная ось сложности: сама сложность боя — свойство грейда (темп ремикса + ×Статы). Вторая, плавная ось — рост Настроя с глубиной (+5%/поляна, progression.json → battle); плотность нот и сила удара от глубины не зависят (GDD §8.3).",
-    "base_weights": {
-      "common": 90.0,
-      "uncommon": 9.0,
-      "rare": 1.0,
-      "unique": 0.0,
-      "epic": 0.0,
-      "legendary": 0.0
-    },
+    "base_weights": { "common": 90.0, "uncommon": 9.0, "rare": 1.0, "unique": 0.0, "epic": 0.0, "legendary": 0.0 },
     "unlock_depth": {
       "common": 0,
       "uncommon": 0,
@@ -126,12 +105,12 @@
       "legendary": 60
     },
     "odds_percent_by_monster_rarity": {
-      "common":    { "cheap": 70, "mid": 25, "expensive": 5 },
-      "uncommon":  { "cheap": 55, "mid": 33, "expensive": 12 },
-      "rare":      { "cheap": 40, "mid": 38, "expensive": 22 },
-      "unique":    { "cheap": 25, "mid": 42, "expensive": 33 },
-      "epic":      { "cheap": 15, "mid": 40, "expensive": 45 },
-      "legendary": { "cheap": 5,  "mid": 35, "expensive": 60 }
+      "common": { "cheap": 70, "mid": 25, "expensive": 5 },
+      "uncommon": { "cheap": 55, "mid": 33, "expensive": 12 },
+      "rare": { "cheap": 40, "mid": 38, "expensive": 22 },
+      "unique": { "cheap": 25, "mid": 42, "expensive": 33 },
+      "epic": { "cheap": 15, "mid": 40, "expensive": 45 },
+      "legendary": { "cheap": 5, "mid": 35, "expensive": 60 }
     }
   },
 

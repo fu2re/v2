@@ -61,11 +61,7 @@
     "shield_reduction": "Пропущенная атака бьёт слабее на эту долю",
     "power_bonus": "Прибавка к урону по Настрою",
     "window_scale": "Окно попадания шире на эту долю",
-    "max_total": {
-      "shield_reduction": 0.4,
-      "power_bonus": 6.0,
-      "window_scale": 0.5
-    }
+    "max_total": { "shield_reduction": 0.4, "power_bonus": 6.0, "window_scale": 0.5 }
   },
 
   "quality_labels": {
