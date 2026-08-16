@@ -42,7 +42,7 @@ func _refresh() -> void:
 			"x%d · зреет %s" % [
 				FarmState.seed_count(fruit_id),
 				_format_time(float(fruit.grow_seconds())) if fruit != null else "?",
-			])
+			], TEXT_COLOR, fruit)
 
 	_add_section("Фрукты", "Ими угощают монстров после победы")
 	var any_fruit := false
@@ -54,7 +54,7 @@ func _refresh() -> void:
 				continue
 			any_fruit = true
 			_add_row("%s (%s)" % [fruit.display_name, FruitData.quality_name(quality)],
-				"x%d" % count)
+				"x%d" % count, TEXT_COLOR, fruit)
 	if not any_fruit:
 		_add_row("Пусто — вырасти что-нибудь на грядке", "", DIM_COLOR)
 
@@ -67,7 +67,7 @@ func _refresh() -> void:
 		if item == null:
 			continue
 		_add_row("%s (%s)" % [item.display_name, GearData.slot_name(item.slot)],
-			"x%d · %s" % [GameState.gear_count(gear_id), item.effect_text()])
+			"x%d · %s" % [GameState.gear_count(gear_id), item.effect_text()], TEXT_COLOR, item)
 
 	# Зелья пьются в бою по ноте-зелью, а не отсюда: сумка их только считает
 	_add_section("Зелья", "Пьются в бою — по ноте-фляжке, особой кнопкой")
@@ -77,7 +77,7 @@ func _refresh() -> void:
 		if count <= 0:
 			continue
 		any_potion = true
-		_add_row(potion.display_name, "x%d · %s" % [count, potion.effect_text()])
+		_add_row(potion.display_name, "x%d · %s" % [count, potion.effect_text()], TEXT_COLOR, potion)
 	if not any_potion:
 		_add_row("Пусто — купи у торговца в лесу", "", DIM_COLOR)
 
@@ -105,12 +105,50 @@ func _add_section(title: String, hint: String) -> void:
 	_list.add_child(sub)
 
 
-func _add_row(name: String, detail: String, colour := TEXT_COLOR) -> void:
-	var row := Label.new()
-	row.text = "  %s%s" % [name, ("     " + detail) if not detail.is_empty() else ""]
-	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	row.add_theme_font_size_override("font_size", 30)
-	row.add_theme_color_override("font_color", colour)
+## Строка сумки: картинка, название, подробность.
+##
+## Раньше всё это было одной подписью со склеенным текстом, и длинная строка
+## («Шапочка из жёлудя (Головной убор)  x1 · Здоровье +20, защита +5%»)
+## переносилась посреди фразы, разрывая её на две неровные половины.
+## Разложенное по колонкам не переносится вовсе, а картинка избавляет
+## ребёнка от чтения там, где хватает узнавания.
+func _add_row(name: String, detail: String, colour := TEXT_COLOR,
+		item: Resource = null) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	# Контейнер не ловит ввод: пустая обёртка поверх экрана молча съедала бы
+	# нажатия по тому, что под ней (CLAUDE.md)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(88, 88)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture = UIUtil.item_icon(item)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var title := Label.new()
+	title.text = name
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_color_override("font_color", colour)
+	column.add_child(title)
+
+	if not detail.is_empty():
+		var sub := Label.new()
+		sub.text = detail
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub.add_theme_font_size_override("font_size", 26)
+		sub.add_theme_color_override("font_color", DIM_COLOR)
+		column.add_child(sub)
+
+	row.add_child(column)
 	_list.add_child(row)
 
 

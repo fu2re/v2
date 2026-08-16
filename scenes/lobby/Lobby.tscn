@@ -51,37 +51,37 @@ mouse_filter = 2
 
 [node name="GardenArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(290, 760)
-scale = Vector2(2.6, 2.6)
+position = Vector2(198, 1330)
+scale = Vector2(2.0, 2.0)
 texture = ExtResource("3")
 
 [node name="GuardiansArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(790, 760)
-scale = Vector2(2.6, 2.6)
+position = Vector2(540, 1330)
+scale = Vector2(2.0, 2.0)
 texture = ExtResource("4")
 
 [node name="ForestArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(540, 1470)
-scale = Vector2(2.4, 2.4)
+position = Vector2(750, 1690)
+scale = Vector2(2.2, 2.2)
 texture = ExtResource("5")
 
 [node name="StorehouseArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(250, 1140)
-scale = Vector2(2.6, 2.6)
+position = Vector2(882, 1330)
+scale = Vector2(2.0, 2.0)
 
 [node name="MerchantArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(830, 1140)
-scale = Vector2(2.6, 2.6)
+position = Vector2(330, 1690)
+scale = Vector2(2.2, 2.2)
 
 [node name="GuardianLabel" type="Label" parent="."]
 offset_left = 60.0
-offset_top = 1700.0
+offset_top = 290.0
 offset_right = 1020.0
-offset_bottom = 1770.0
+offset_bottom = 360.0
 theme_override_font_sizes/font_size = 36
 theme_override_colors/font_color = Color(0.9411765, 0.87058824, 0.7529412, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.12, 0.07, 1)
@@ -90,11 +90,11 @@ horizontal_alignment = 1
 
 [node name="Status" type="Label" parent="."]
 offset_left = 60.0
-offset_top = 1780.0
+offset_top = 370.0
 offset_right = 1020.0
-offset_bottom = 1880.0
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(0.11764706, 0.84705883, 1, 1)
+offset_bottom = 470.0
+theme_override_font_sizes/font_size = 34
+theme_override_colors/font_color = Color(0.9490196, 0.8156863, 0.41568628, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.12, 0.07, 1)
 theme_override_constants/outline_size = 10
 horizontal_alignment = 1

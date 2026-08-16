@@ -64,6 +64,8 @@ func _refresh() -> void:
 func _make_row(item: CosmeticData) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
+	# Обёртка не ловит ввод: иначе она перехватывает клики по кнопке внутри
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var title := Label.new()
 	title.add_theme_font_size_override("font_size", 34)
@@ -72,8 +74,11 @@ func _make_row(item: CosmeticData) -> Control:
 	box.add_child(title)
 
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(0, 90)
+	button.custom_minimum_size = Vector2(0, 110)
 	button.add_theme_font_size_override("font_size", 30)
+	# Картинка наряда на самой кнопке: подпись сверху говорит, что это,
+	# а кнопка — сколько стоит; вместе они читаются как одна карточка
+	UIUtil.decorate_row(button, item)
 
 	if ShopState.is_owned(item.id):
 		var worn := ShopState.equipped_in(item.slot)

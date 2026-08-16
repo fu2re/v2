@@ -20,17 +20,23 @@ var _monster: MonsterInstance = null
 var _perfect_run := false
 var _gained := 0
 
-var _title: Label = null
-var _detail: Label = null
-var _bar_fill: ColorRect = null
+## Раскладка живёт в TamingScreen.tscn и правится в инспекторе (GDD §13.2.1).
+## Раньше эти шесть узлов создавались в `_build()`, и в редакторе экран,
+## который игрок видит после КАЖДОЙ победы, выглядел пустым узлом.
+@onready var _title: Label = $Title
+@onready var _detail: Label = $Detail
+@onready var _bar_fill: ColorRect = $BarFill
+@onready var _track: ColorRect = $Track
+@onready var _buttons: VBoxContainer = $Buttons
+
+## Ширина шкалы берётся у дорожки, а не задаётся числом: подвинул дорожку
+## в инспекторе — заполнение поехало следом, без правки кода.
 var _bar_width := 0.0
-var _buttons: VBoxContainer = null
 var _done := false
 
 
 func _ready() -> void:
-	layer = 50
-	_build()
+	_bar_width = _track.size.x
 
 
 ## Показать экран. perfect_run — S-ранг, ни промаха, ни пропущенной атаки.
@@ -171,50 +177,3 @@ func _add_button(text: String, callback: Callable) -> void:
 	button.add_theme_font_size_override("font_size", 40)
 	button.pressed.connect(callback)
 	_buttons.add_child(button)
-
-
-func _build() -> void:
-	visible = false
-
-	var panel := ColorRect.new()
-	panel.size = Vector2(1080, 1920)
-	panel.color = Color(PANEL_COLOR.r, PANEL_COLOR.g, PANEL_COLOR.b, 0.96)
-	add_child(panel)
-
-	_title = Label.new()
-	_title.position = Vector2(60, 220)
-	_title.size = Vector2(960, 140)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_title.add_theme_font_size_override("font_size", 68)
-	_title.add_theme_color_override("font_color", TEXT_COLOR)
-	add_child(_title)
-
-	_bar_width = 900.0
-	var track := ColorRect.new()
-	track.position = Vector2(90, 430)
-	track.size = Vector2(_bar_width, 44)
-	track.color = Color(0, 0, 0, 0.45)
-	add_child(track)
-
-	_bar_fill = ColorRect.new()
-	_bar_fill.position = track.position
-	_bar_fill.size = Vector2(0, 44)
-	_bar_fill.color = PROGRESS_COLOR
-	add_child(_bar_fill)
-
-	_detail = Label.new()
-	_detail.position = Vector2(90, 520)
-	_detail.size = Vector2(900, 300)
-	_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail.add_theme_font_size_override("font_size", 42)
-	_detail.add_theme_color_override("font_color", TEXT_COLOR)
-	add_child(_detail)
-
-	_buttons = VBoxContainer.new()
-	_buttons.position = Vector2(90, 880)
-	_buttons.custom_minimum_size = Vector2(900, 0)
-	_buttons.size = Vector2(900, 800)
-	_buttons.add_theme_constant_override("separation", 24)
-	add_child(_buttons)

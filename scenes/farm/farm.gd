@@ -6,10 +6,17 @@ extends Node2D
 ## на ферме растишь фрукты, фруктами приручаешь монстров, с монстрами идёшь
 ## глубже в лес. Ни одно звено не работает в одиночку.
 
+## Сетка грядок. Размер клетки задан не «на глаз»: в неё должны поместиться
+## название фрукта, процент, оставшееся время и значок — при 226 пикселях
+## и кегле 24 самая длинная строка («Золотое яблоко») переносится на две
+## и не вылезает за край. При 200 вылезала, и слово «станцевать»
+## обрывалось на середине.
 const PLOT_COLS := 4
-const PLOT_SIZE := 200.0
-const PLOT_GAP := 24.0
-const GRID_TOP := 780.0
+const PLOT_SIZE := 226.0
+const PLOT_GAP := 20.0
+## Сетка лежит НА нарисованных грядках, а не над ними в воздухе.
+const GRID_TOP := 820.0
+const GRID_LEFT := 58.0
 
 ## Раскладка живёт в Farm.tscn и правится в инспекторе (GDD §13.2.1).
 ## Скрипт только связывает узлы с логикой.
@@ -105,6 +112,9 @@ func _sync_grid() -> void:
 		var label := _plot_label(i)
 		if _plot_buttons[i].text != label:
 			_plot_buttons[i].text = label
+		var icon := _plot_icon(i)
+		if _plot_buttons[i].icon != icon:
+			_plot_buttons[i].icon = icon
 
 
 func _rebuild_grid() -> void:
@@ -119,31 +129,49 @@ func _rebuild_grid() -> void:
 		var col := i % PLOT_COLS
 		var row := i / PLOT_COLS
 		button.position = Vector2(
-			60.0 + col * (PLOT_SIZE + PLOT_GAP),
+			GRID_LEFT + col * (PLOT_SIZE + PLOT_GAP),
 			GRID_TOP + row * (PLOT_SIZE + PLOT_GAP),
 		)
 		button.size = Vector2(PLOT_SIZE, PLOT_SIZE)
-		button.add_theme_font_size_override("font_size", 26)
+		button.add_theme_font_size_override("font_size", 24)
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# Картинка фрукта над подписью: ребёнок 7 лет узнаёт грядку по ягоде
+		# быстрее, чем прочитает её название (GDD §2.3)
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.expand_icon = true
+		button.icon = _plot_icon(i)
 		button.text = _plot_label(i)
 		button.pressed.connect(_on_plot_pressed.bind(i))
 		_grid.add_child(button)
 		_plot_buttons.append(button)
 
 
+## Картинка в клетке. Пусто — картинки нет: пустая грядка и должна выглядеть
+## пустой, подставлять туда что-то значило бы соврать.
+func _plot_icon(index: int) -> Texture2D:
+	if FarmState.is_empty_plot(index):
+		return null
+	var fruit := Registry.fruit(FarmState.plots[index].seed_id)
+	return fruit.sprite() if fruit != null else null
+
+
+## Подпись в клетке. Коротко: клетка 226 пикселей, и всё, что длиннее двух
+## слов, переносится и вылезает за край. Название фрукта уже сказано
+## картинкой, поэтому в тексте остаётся только состояние.
 func _plot_label(index: int) -> String:
 	if FarmState.is_empty_plot(index):
-		return "Пусто\n\nПосадить"
-	var fruit := Registry.fruit(FarmState.plots[index].seed_id)
-	var name := fruit.display_name if fruit != null else "?"
+		return "Посадить"
 
 	if FarmState.is_ready(index):
-		return "%s\n\nСОБРАТЬ" % name
+		return "СОБРАТЬ"
 
 	var percent := int(round(FarmState.growth_ratio(index) * 100.0))
 	var left := _format_time(FarmState.seconds_left(index))
-	var dance_hint := "\n♪ станцевать" if FarmState.can_dance(index) else ""
-	return "%s\n%d%%\n%s%s" % [name, percent, left, dance_hint]
+	# Значок ноты вместо слова «станцевать»: слово не влезает, а нота
+	# уже означает танец на всех остальных экранах
+	var dance_hint := "  ♪" if FarmState.can_dance(index) else ""
+	return "%d%%\n%s%s" % [percent, left, dance_hint]
 
 
 func _format_time(seconds: float) -> String:

@@ -23,6 +23,7 @@ DATA_DIRS: dict[str, str] = {
     "fruit": "data/fruits",
     "gear": "data/gear",
     "cosmetic": "data/cosmetics",
+    "potion": "data/potions",
 }
 
 _TRES_ID = re.compile(r'^id\s*=\s*"([^"]+)"', re.MULTILINE)

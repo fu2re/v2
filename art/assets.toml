@@ -172,6 +172,27 @@ gen_height = 1024
 cutout = true
 style = "single wearable item, worn handmade craft, flat orthographic icon, straight front view, no perspective, no foreshortening, thick readable silhouette"
 
+# Зелья. Отдельный вид, а не gear: их не носят, а выпивают, и на экране
+# они всегда стоят рядом друг с другом — общий силуэт склянки важнее,
+# чем сходство с остальным снаряжением.
+[kind.potion]
+size = 64
+variants = 3
+gen_width = 1024
+gen_height = 1024
+cutout = true
+style = "single small drink container, handmade rustic vessel, flat orthographic icon, straight front view, no perspective, thick readable silhouette"
+
+[[asset]]
+id = "berry_cordial"
+kind = "potion"
+subject = "small corked glass bottle of dark red berry drink, cloth tie around the neck"
+
+[[asset]]
+id = "honey_brew"
+kind = "potion"
+subject = "squat clay jar of golden honey drink, wooden stopper, dripping seal"
+
 [kind.cosmetic]
 size = 64
 variants = 3

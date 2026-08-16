@@ -76,16 +76,16 @@ layout_mode = 0
 offset_left = 240.0
 offset_top = 1120.0
 offset_right = 840.0
-offset_bottom = 1158.0
-color = Color(0, 0, 0, 0.45)
+offset_bottom = 1166.0
+color = Color(0.086, 0.067, 0.051, 0.8)
 
 [node name="FriendshipFill" type="ColorRect" parent="Card" unique_id=1541280903]
 layout_mode = 0
 offset_left = 240.0
 offset_top = 1120.0
 offset_right = 840.0
-offset_bottom = 1158.0
-color = Color(1, 0.34117648, 0.76862746, 1)
+offset_bottom = 1166.0
+color = Color(0.9490196, 0.8156863, 0.41568628, 1)
 
 [node name="FriendshipLabel" type="Label" parent="Card" unique_id=1541280904]
 layout_mode = 0
@@ -115,7 +115,7 @@ offset_left = 60.0
 offset_top = 1546.0
 offset_right = 1020.0
 offset_bottom = 1666.0
-theme_override_colors/font_color = Color(0.11764706, 0.84705883, 1, 1)
+theme_override_colors/font_color = Color(0.9490196, 0.8156863, 0.41568628, 1)
 theme_override_font_sizes/font_size = 38
 horizontal_alignment = 1
 autowrap_mode = 3
@@ -126,7 +126,7 @@ offset_left = 90.0
 offset_top = 1740.0
 offset_right = 990.0
 offset_bottom = 1774.0
-color = Color(0, 0, 0, 0.45)
+color = Color(0.086, 0.067, 0.051, 0.8)
 
 [node name="HealthFill" type="ColorRect" parent="Card" unique_id=1819625572]
 layout_mode = 0
@@ -134,7 +134,7 @@ offset_left = 90.0
 offset_top = 1740.0
 offset_right = 990.0
 offset_bottom = 1774.0
-color = Color(0.11764706, 0.84705883, 1, 1)
+color = Color(0.5921569, 0.76862746, 0.4156863, 1)
 
 [node name="PanelBackdrop" type="ColorRect" parent="." unique_id=370203205]
 visible = false

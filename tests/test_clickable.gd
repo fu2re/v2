@@ -108,6 +108,13 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 	for button in buttons:
 		if order.find(button) < modal_index:
 			continue
+		# Кнопка, укатившаяся за край прокрутки, кликов не получает и от Godot:
+		# ScrollContainer режет и рисование, и ввод. Такая кнопка не выглядит
+		# нажимаемой, а значит и к этому классу багов не относится — её просто
+		# надо домотать. Без этой оговорки тест ругался на каждый длинный
+		# список, стоило добавить в него пару строк
+		if _clipped_away(button):
+			continue
 		checked += 1
 		var point := button.get_global_rect().get_center()
 		var winner := _topmost_at(order, point)
@@ -124,6 +131,21 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 	for i in 2:
 		await get_tree().process_frame
 	Conductor.stop()
+
+
+## Скрыта ли кнопка обрезкой родителя-прокрутки.
+##
+## Проверяется ЦЕНТР: наполовину выехавшая кнопка остаётся нажимаемой
+## и по-прежнему обязана быть доступной, а вот уехавшая целиком — нет.
+func _clipped_away(button: Button) -> bool:
+	var point := button.get_global_rect().get_center()
+	var parent := button.get_parent()
+	while parent != null:
+		if parent is Control and (parent is ScrollContainer or parent.clip_contents):
+			if not (parent as Control).get_global_rect().has_point(point):
+				return true
+		parent = parent.get_parent()
+	return false
 
 
 ## Индекс последней подложки, перекрывающей экран целиком.

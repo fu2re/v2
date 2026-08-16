@@ -20,11 +20,18 @@ const TARGETS := {
 	"res://scenes/shop/shop.gd": "res://scenes/shop/Shop.tscn",
 	"res://scenes/inventory/inventory.gd": "res://scenes/inventory/Inventory.tscn",
 	"res://scenes/battle/dance_battle.gd": "res://scenes/battle/DanceBattle.tscn",
+	# Второй заход: экраны, оставшиеся собранными в коде. В редакторе они
+	# выглядели пустыми узлами, и подвинуть в них было нечего — а экран
+	# приручения игрок видит после каждой победы
+	"res://scenes/battle/taming_screen.gd": "res://scenes/battle/TamingScreen.tscn",
+	"res://scenes/calibration/calibration.gd": "res://scenes/calibration/Calibration.tscn",
+	"res://scenes/farm/plant_dance.gd": "res://scenes/farm/PlantDance.tscn",
 }
 
 ## Метод сборки. У сцены боя это не интерфейс, а сцена целиком.
 const BUILDERS := {
 	"res://scenes/battle/dance_battle.gd": "_build_stage",
+	"res://scenes/battle/taming_screen.gd": "_build",
 }
 
 

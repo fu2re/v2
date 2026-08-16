@@ -31,3 +31,6 @@ Thumbs.db
 
 # Claude Code — локальные переопределения
 .claude/settings.local.json
+
+# Снимки экранов для ревью — расходный материал, а не ассет
+art/review/screens/

@@ -38,9 +38,29 @@ const SLOT_HINTS := {
 ## Цена у торговца в семечках.
 @export var price: int = 40
 
+## Картинка предмета. Ребёнок 7 лет узнаёт вещь по виду быстрее, чем
+## прочитает её название, поэтому список без картинок для него —
+## сплошная стена букв (GDD §2.3).
+@export var sprite_path: String = ""
+
+var _sprite: Texture2D = null
+
 
 static func slot_name(s: Slot) -> String:
 	return SLOT_NAMES.get(s, "?")
+
+
+## Картинка предмета. Путь по умолчанию собирается из id: девять файлов
+## уже лежат в `art/gear/` под своими именами, и прописывать их руками
+## в девяти .tres значило бы девять шансов опечататься.
+func sprite() -> Texture2D:
+	if _sprite != null:
+		return _sprite
+	var path := sprite_path if not sprite_path.is_empty() \
+		else "res://art/gear/%s.png" % id
+	if ResourceLoader.exists(path):
+		_sprite = load(path) as Texture2D
+	return _sprite
 
 
 static func slot_hint(s: Slot) -> String:

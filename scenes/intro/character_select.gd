@@ -18,7 +18,13 @@ const GIRL := "girl"
 
 
 func _ready() -> void:
-	# Кнопки прозрачные: нажимается сам персонаж, а не прямоугольник рядом
+	# Экран стоит в лесу, как и всё интро: плоская заливка читалась
+	# как незагрузившийся экран, а не как выбор
+	UIUtil.set_screen_background($Scenery, ForestScenery.next_path(), 0.4)
+
+	# Кнопки прозрачные: нажимается сам персонаж, а не прямоугольник рядом.
+	# Рамку рисует Panel под ними — без неё было непонятно, что фигуры
+	# вообще можно трогать
 	for button in [_boy_button, _girl_button]:
 		button.flat = true
 		button.text = ""
@@ -45,8 +51,8 @@ func _sprite_for(gender: String) -> Texture2D:
 func _breathe(sprite: Sprite2D, delay: float) -> void:
 	var tween := create_tween().set_loops()
 	tween.tween_interval(delay)
-	tween.tween_property(sprite, "scale", Vector2(4.2, 4.2), 0.7)
-	tween.tween_property(sprite, "scale", Vector2(4.0, 4.0), 0.7)
+	tween.tween_property(sprite, "scale", Vector2(7.3, 7.3), 0.7)
+	tween.tween_property(sprite, "scale", Vector2(7.0, 7.0), 0.7)
 
 
 func _choose(gender: String) -> void:

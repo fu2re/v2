@@ -59,7 +59,7 @@ autowrap_mode = 3
 offset_left = 60.0
 offset_top = 560.0
 offset_right = 1020.0
-offset_bottom = 1740.0
+offset_bottom = 1700.0
 
 [node name="List" type="VBoxContainer" parent="ListScroll" unique_id=454577312]
 custom_minimum_size = Vector2(960, 0)
@@ -68,7 +68,7 @@ theme_override_constants/separation = 18
 
 [node name="BackButton" type="Button" parent="." unique_id=12686744]
 offset_left = 60.0
-offset_top = 1770.0
+offset_top = 1740.0
 offset_right = 1020.0
 offset_bottom = 1870.0
 theme_override_font_sizes/font_size = 40

@@ -72,6 +72,7 @@ func _make_row(item: Resource) -> Control:
 	button.add_theme_font_size_override("font_size", 32)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.text = "%s — %d серебра\n%s" % [title, price, detail]
+	UIUtil.decorate_row(button, item)
 	button.pressed.connect(_buy.bind(item))
 	# Цена перепроверяется при каждом обновлении кошелька, поэтому имя узла
 	# несёт цену: так строку не приходится пересобирать ради одной блокировки

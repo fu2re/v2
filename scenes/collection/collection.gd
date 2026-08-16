@@ -11,7 +11,7 @@ extends Node2D
 ## каждого вида нельзя — это стена из полосок; показываем приручённых
 ## и по одной строке «на подходе» для того грейда, к которому игрок ближе всего.
 
-const CARD_HEIGHT := 240.0
+const CARD_HEIGHT := 290.0
 
 ## Раскладка живёт в Collection.tscn и правится в инспекторе (GDD §13.2.1).
 @onready var _list: VBoxContainer = $ListScroll/List
@@ -99,7 +99,7 @@ func _make_friend_card(friend: MonsterInstance) -> Control:
 
 	var take := Button.new()
 	take.text = "Взять в лес"
-	take.custom_minimum_size = Vector2(300, 76)
+	take.custom_minimum_size = Vector2(300, 116)
 	take.add_theme_font_size_override("font_size", 32)
 	take.disabled = GameState.guardian_key() == friend.key()
 	take.pressed.connect(func(): GameState.set_guardian(friend.key()))
@@ -107,7 +107,7 @@ func _make_friend_card(friend: MonsterInstance) -> Control:
 
 	var gear := Button.new()
 	gear.text = "Снаряжение"
-	gear.custom_minimum_size = Vector2(300, 76)
+	gear.custom_minimum_size = Vector2(300, 116)
 	gear.add_theme_font_size_override("font_size", 32)
 	gear.pressed.connect(_open_gear.bind(friend.key()))
 	row.add_child(gear)
@@ -116,7 +116,7 @@ func _make_friend_card(friend: MonsterInstance) -> Control:
 	# угощать нечем: предлагать нажать то, что не сработает, — обман
 	var feed := Button.new()
 	feed.text = "Угостить"
-	feed.custom_minimum_size = Vector2(280, 76)
+	feed.custom_minimum_size = Vector2(280, 116)
 	feed.add_theme_font_size_override("font_size", 32)
 	feed.disabled = friend.is_max_level() or GameState.fruits.is_empty()
 	feed.pressed.connect(_open_feed.bind(friend.key()))
@@ -360,7 +360,7 @@ func _make_slot_cell(instance_key: String, slot: GearData.Slot) -> Control:
 	if item != null:
 		var take_off := Button.new()
 		take_off.text = "Снять"
-		take_off.custom_minimum_size = Vector2(0, 56)
+		take_off.custom_minimum_size = Vector2(0, 116)
 		take_off.add_theme_font_size_override("font_size", 24)
 		take_off.pressed.connect(func(): GameState.unequip(instance_key, slot))
 		box.add_child(take_off)
@@ -371,7 +371,7 @@ func _make_slot_cell(instance_key: String, slot: GearData.Slot) -> Control:
 func _add_gear_button(text: String, callback: Callable) -> void:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(0, 80)
+	button.custom_minimum_size = Vector2(0, 116)
 	button.add_theme_font_size_override("font_size", 30)
 	button.pressed.connect(callback)
 	_gear_panel.add_child(button)
