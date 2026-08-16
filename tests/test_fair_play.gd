@@ -18,7 +18,7 @@ func run_tests() -> void:
 	_test_surface_is_almost_all_common()
 	_test_high_grades_unlock_with_depth()
 	_test_taming_goes_step_by_step()
-	_test_friendship_still_grows_while_locked()
+	_test_locked_step_accepts_nothing()
 	_test_damage_grows_sharply_with_grade()
 	_test_shield_and_campfire_are_stingy()
 
@@ -155,23 +155,31 @@ func _test_taming_goes_step_by_step() -> void:
 	check(GameState.has_instance("banjo_moth", UNCOMMON), "необычный приручён")
 	check(GameState.can_tame("banjo_moth", RARE), "теперь открыт и редкий")
 
-	# И накопленная ранее дружба не пропала: одной победы хватает
-	check(GameState.add_friendship("banjo_moth", RARE, GameState.FRIENDSHIP_WIN),
-		"редкий присоединяется сразу — шкала была полна всё это время")
+	# А вот накопить «про запас» было нельзя: пока ступень закрыта, вклад
+	# не принимается вовсе. Шкала редкого стоит на нуле, и набивать её
+	# придётся заново — зато ни один фрукт не ушёл в пустоту
+	check_eq(GameState.get_friendship("banjo_moth", RARE), 0,
+		"в закрытую ступень ничего не накопилось")
+	check(not GameState.add_friendship("banjo_moth", RARE, GameState.FRIENDSHIP_WIN),
+		"одной победы по открывшейся ступени мало — шкала начинается с нуля")
+	check(GameState.get_friendship("banjo_moth", RARE) > 0,
+		"но теперь дружба пошла")
 
 
-## Пока ступень закрыта, дружба всё равно копится: труд не пропадает.
-func _test_friendship_still_grows_while_locked() -> void:
-	print("Дружба копится, даже пока ступень закрыта")
+## Пока ступень закрыта, дружба НЕ копится — и это защита, а не запрет.
+##
+## Раньше копилась «про запас»: полоска ползла, фрукты списывались,
+## а приручение всё равно не наступало. Двигать шкалу, с которой ничего
+## нельзя сделать, — то же самое, что выбрасывать угощение.
+func _test_locked_step_accepts_nothing() -> void:
+	print("В закрытую ступень дружба не копится")
 	GameState.reset()
 
-	GameState.add_friendship("bass_bear", RARE, 40)
-	check_eq(GameState.get_friendship("bass_bear", RARE), 40,
-		"дружба с редким записалась")
-
-	GameState.add_friendship("bass_bear", RARE, 30)
-	check_eq(GameState.get_friendship("bass_bear", RARE), 70, "и продолжила расти")
-	check(not GameState.has_instance("bass_bear", RARE), "но друга ещё нет")
+	check(not GameState.add_friendship("bass_bear", RARE, 40),
+		"вклад в закрытую ступень отклонён")
+	check_eq(GameState.get_friendship("bass_bear", RARE), 0,
+		"шкала осталась на нуле")
+	check(not GameState.has_instance("bass_bear", RARE), "друга, конечно, нет")
 
 	# Игра обязана назвать недостающую ступень, а не молчать
 	check_eq(GameState.missing_step("bass_bear", RARE), UNCOMMON,

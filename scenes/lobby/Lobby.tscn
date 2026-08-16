@@ -51,31 +51,31 @@ mouse_filter = 2
 
 [node name="GardenArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(198, 1330)
-scale = Vector2(2.0, 2.0)
+position = Vector2(540, 1665)
+scale = Vector2(4.2, 4.2)
 texture = ExtResource("3")
 
 [node name="GuardiansArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(540, 1330)
-scale = Vector2(2.0, 2.0)
+position = Vector2(248, 1190)
+scale = Vector2(2.3, 2.3)
 texture = ExtResource("4")
 
 [node name="ForestArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(750, 1690)
-scale = Vector2(2.2, 2.2)
+position = Vector2(545, 1000)
+scale = Vector2(2.0, 2.0)
 texture = ExtResource("5")
 
 [node name="StorehouseArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(882, 1330)
-scale = Vector2(2.0, 2.0)
+position = Vector2(848, 1245)
+scale = Vector2(1.8, 1.8)
 
 [node name="MerchantArt" type="Sprite2D" parent="Buildings"]
 texture_filter = 1
-position = Vector2(330, 1690)
-scale = Vector2(2.2, 2.2)
+position = Vector2(556, 1372)
+scale = Vector2(1.9, 1.9)
 
 [node name="GuardianLabel" type="Label" parent="."]
 offset_left = 60.0

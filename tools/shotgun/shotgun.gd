@@ -76,6 +76,8 @@ func _build_targets() -> void:
 			"setup": _ready_for_battle, "after": _spawn_every_note},
 		{"name": "12_victory", "scene": "res://scenes/run/RunFeed.tscn",
 			"setup": _played_a_while, "after": _open_victory},
+		{"name": "13_monster_card", "scene": "res://scenes/collection/Collection.tscn",
+			"setup": _rich_collection, "after": _open_monster_card},
 	]
 
 
@@ -215,3 +217,8 @@ func _open_victory(feed: Node) -> void:
 	var lines: Array[String] = ["+12 серебра", "Сундук: Шапочка из жёлудя"]
 	feed._pending_taming = monster
 	feed._show_victory(monster, lines)
+
+
+## Карточка существа: характеристики, которых раньше не было видно нигде.
+func _open_monster_card(screen: Node) -> void:
+	screen._open_card("disco_sprout", 0)

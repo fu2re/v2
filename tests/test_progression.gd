@@ -98,14 +98,25 @@ func _test_friendship_never_lost() -> void:
 func _test_fruit_bonus() -> void:
 	print("Дружба: вклад фрукта")
 	var Q := FruitData.Quality
-	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN),
-		GameState.FRIENDSHIP_FAVORITE_FRUIT, "любимый фрукт даёт полную прибавку")
+	check(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN)
+		> GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
+		"любимый фрукт даёт больше нелюбимого")
 	check_eq(GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
 		GameState.FRIENDSHIP_OTHER_FRUIT, "нелюбимый даёт меньше, но даёт")
 
-	# Качество умножает: 35 * 1.6 = 56
-	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PERFECT), 56,
-		"идеальный фрукт даёт множитель 1.6")
+	# Щедрость задаёт ТИР семечка, а не качество: у любимой сливки тир 1,
+	# поэтому прибавка выше базовой ровно на его множитель
+	var plum := Registry.fruit("bass_plum")
+	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN),
+		int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+			* FruitData.tier_friendship_scale(plum.tier))),
+		"прибавка считается от тира семечка")
+
+	# И тир действительно что-то меняет: верхний плод щедрее нижнего
+	var apple := Registry.fruit("chord_apple")
+	check(FruitData.tier_friendship_scale(apple.tier)
+		> FruitData.tier_friendship_scale(0),
+		"верхний тир щедрее нижнего")
 
 	# Даже худший случай продвигает вперёд — «не получилось» не бывает
 	check(GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN) > 0,

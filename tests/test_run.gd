@@ -221,14 +221,18 @@ func _test_loop_is_closed() -> void:
 	check(GameState.fruit_count("loop_fig", quality) > 0,
 		"фрукт в сумке качеством по сорту (%s)" % FruitData.quality_name(quality))
 
-	var bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
-		FruitData.Quality.PERFECT)
-	var plain_bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
+	# Долгая культура окупается размером прибавки: инжир тира 2 щедрее
+	# десятиминутной ягоды, и ровно за это его и ждут два часа
+	var fig_bonus := GameState.friendship_from_fruit("banjo_moth", "loop_fig",
 		FruitData.Quality.PLAIN)
-	check(bonus > plain_bonus, "танец на грядке окупился прибавкой к дружбе")
+	var berry_bonus := GameState.friendship_from_fruit("banjo_moth", "drum_berry",
+		FruitData.Quality.PLAIN)
+	check(fig_bonus > berry_bonus,
+		"долгая культура окупается прибавкой к дружбе (%d против %d)" % [
+			fig_bonus, berry_bonus])
 
-	GameState.consume_fruit("loop_fig", FruitData.Quality.PERFECT)
-	GameState.add_friendship("banjo_moth", MonsterData.Rarity.COMMON, bonus)
+	GameState.consume_fruit("loop_fig", quality)
+	GameState.add_friendship("banjo_moth", MonsterData.Rarity.COMMON, fig_bonus)
 	check(GameState.get_friendship("banjo_moth", MonsterData.Rarity.COMMON) > 0, "дружба выросла — контур замкнулся")
 
 

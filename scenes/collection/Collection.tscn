@@ -22,7 +22,7 @@ offset_right = 1020.0
 offset_bottom = 170.0
 theme_override_font_sizes/font_size = 60
 theme_override_colors/font_color = Color(0.8627451, 0.78039217, 0.6431373, 1)
-text = "Дом защитников"
+text = "Коллекция"
 horizontal_alignment = 1
 
 [node name="BackButton" type="Button" parent="." unique_id=2039462077]

@@ -13,6 +13,7 @@ func run_tests() -> void:
 	_test_growth_over_time()
 	_test_harvest_never_rots()
 	_test_tier_sets_quality()
+	_test_no_tier_is_pointless()
 	_test_clock_tampering()
 	_test_offline_cap()
 	_test_plot_purchase()
@@ -166,3 +167,44 @@ func _test_save_roundtrip() -> void:
 	check(absf(FarmState.growth_ratio(0) - ratio) < 0.05, "прогресс роста восстановился")
 	check(FarmState.known_seeds.has("drum_berry"), "открытые семена восстановились")
 
+
+
+## Ни один тир семечка не должен быть бессмысленным.
+##
+## Проверка появилась после разбора: качеств было три, а тиров четыре,
+## и редкий инжир давал РОВНО столько же дружбы, сколько необычная сливка,
+## при вчетверо большем времени роста и вдвое большей цене. Такой предмет
+## не сажают никогда, и заметить это по коду нельзя — только посчитав.
+func _test_no_tier_is_pointless() -> void:
+	print("Каждый тир семечка чем-то лучше предыдущего")
+	_fresh()
+
+	var species := Registry.all_monsters()[0]
+	var favorite: String = species.favorite_fruit_id
+	var favorite_fruit := Registry.fruit(favorite)
+	check(favorite_fruit != null, "любимый фрукт вида найден")
+	if favorite_fruit == null:
+		return
+
+	var previous := -1
+	var previous_time := -1
+	for tier in range(4):
+		var value := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+			* FruitData.tier_friendship_scale(tier)))
+		var seconds: int = FruitData.GROW_TIME[tier]
+
+		check(value > previous,
+			"тир %d даёт %d дружбы — не больше предыдущего (%d)" % [
+				tier, value, previous])
+		check(seconds > previous_time,
+			"тир %d растёт %d сек — не дольше предыдущего" % [tier, seconds])
+		previous = value
+		previous_time = seconds
+
+	# Верхний плод обязан быть событием, а не прибавкой: за восемь часов
+	# ожидания игрок должен получить целого друга, иначе ждать незачем
+	var top := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+		* FruitData.tier_friendship_scale(3)))
+	check(top >= Balance.friendship_threshold(MonsterData.Rarity.COMMON),
+		"верхний плод (%d) не закрывает обычную шкалу (%d) — ночь потрачена зря" % [
+			top, Balance.friendship_threshold(MonsterData.Rarity.COMMON)])

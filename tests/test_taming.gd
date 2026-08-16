@@ -13,6 +13,8 @@ const COMMON := MonsterData.Rarity.COMMON
 
 
 func run_tests() -> void:
+	_test_locked_step_takes_nothing()
+	_test_tamed_takes_no_more_friendship()
 	GameState.reset()
 
 	_test_win_always_counts()
@@ -145,7 +147,11 @@ func _test_grade_scales_are_independent() -> void:
 		"дружба с обычным не начислилась редкому")
 	check(not GameState.has_instance("synth_slime", rare), "редкий не приручился заодно")
 
-	# И наоборот: прогресс редкого не трогает обычного
+	# И наоборот: прогресс редкого не трогает обычного.
+	#
+	# Сначала открываем ступень: в закрытую дружба теперь не копится вовсе,
+	# и без необычного проверка мерила бы не независимость шкал, а запрет
+	GameState.tame("synth_slime", MonsterData.Rarity.UNCOMMON)
 	GameState.add_friendship("synth_slime", rare, 50)
 	check_eq(GameState.get_friendship("synth_slime", COMMON), common_threshold,
 		"шкала обычного осталась на месте")
@@ -167,3 +173,48 @@ func _test_progress_never_goes_backwards() -> void:
 		var current := GameState.get_friendship("beat_serpent", COMMON)
 		check(current >= previous, "шаг %d: шкала не уменьшилась" % i)
 		previous = current
+
+
+## Дружба не копится туда, где приручать пока нельзя.
+##
+## Раньше копилась «про запас»: шкала росла, фрукты тратились, а приручение
+## всё равно не наступало, пока не пройдена ступень ниже. Двигать полоску,
+## с которой ничего нельзя сделать, — то же самое, что выбрасывать фрукты.
+func _test_locked_step_takes_nothing() -> void:
+	print("В закрытую ступень дружба не копится")
+	GameState.reset()
+
+	var rare := MonsterData.Rarity.RARE
+	check(not GameState.can_tame("disco_sprout", rare), "редкая ступень закрыта")
+
+	var before := GameState.get_friendship("disco_sprout", rare)
+	check(not GameState.add_friendship("disco_sprout", rare, 500),
+		"вклад в закрытую ступень отклонён")
+	check_eq(GameState.get_friendship("disco_sprout", rare), before,
+		"шкала закрытой ступени не двинулась")
+	check(not GameState.has_instance("disco_sprout", rare),
+		"и приручения, конечно, не случилось")
+
+	# Открылась ступень — вклад снова принимается
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	GameState.tame("disco_sprout", MonsterData.Rarity.UNCOMMON)
+	check(GameState.can_tame("disco_sprout", rare), "ступень открылась")
+	GameState.add_friendship("disco_sprout", rare, 10)
+	check(GameState.get_friendship("disco_sprout", rare) > before,
+		"по открытой ступени дружба пошла")
+
+
+## С тем, кто уже в коллекции, дружиться заново не с кем.
+##
+## Иначе после боя с приручённым открывалось угощение: фрукты списывались,
+## шкала росла, и всё это не значило ничего.
+func _test_tamed_takes_no_more_friendship() -> void:
+	print("Приручённому дружба больше не начисляется")
+	GameState.reset()
+	GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+
+	var before := GameState.get_friendship("disco_sprout", MonsterData.Rarity.COMMON)
+	check(not GameState.add_friendship("disco_sprout", MonsterData.Rarity.COMMON, 50),
+		"вклад приручённому отклонён")
+	check_eq(GameState.get_friendship("disco_sprout", MonsterData.Rarity.COMMON), before,
+		"шкала приручённого не двинулась")

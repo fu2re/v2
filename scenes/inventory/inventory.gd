@@ -58,7 +58,7 @@ func _refresh() -> void:
 	if not any_fruit:
 		_add_row("Пусто — вырасти что-нибудь на грядке", "", DIM_COLOR)
 
-	_add_section("Снаряжение", "Надевается на гуардиана во «Друзьях»")
+	_add_section("Снаряжение", "Надевается на защитника в «Коллекции»")
 	var gear_ids := GameState.owned_gear_ids()
 	if gear_ids.is_empty():
 		_add_row("Пусто — купи у торговца в лесу", "", DIM_COLOR)

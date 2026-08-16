@@ -111,10 +111,15 @@ func _test_full_player_journey() -> void:
 	check(state.did_win, "бой выигран за %d попаданий" % swings)
 	check(swings < 500, "победа достижима, а не бесконечна")
 
-	# 4. Приручение: победа плюс угощение. Дружба копится шкале ЭТОГО грейда
-	var before := GameState.get_friendship(monster.species_id, monster.grade)
-	GameState.add_friendship(monster.species_id, monster.grade, GameState.FRIENDSHIP_WIN)
-	check(GameState.get_friendship(monster.species_id, monster.grade) > before,
+	# 4. Приручение: победа плюс угощение. Дружба копится шкале ЭТОГО грейда.
+	#
+	# Берём ОБЫЧНЫЙ грейд встреченного вида: на поляне мог попасться редкий,
+	# а в закрытую ступень дружба теперь не копится вовсе, и проверка мерила бы
+	# запрет вместо начисления
+	var step := MonsterData.Rarity.COMMON
+	var before := GameState.get_friendship(monster.species_id, step)
+	GameState.add_friendship(monster.species_id, step, GameState.FRIENDSHIP_WIN)
+	check(GameState.get_friendship(monster.species_id, step) > before,
 		"дружба выросла после боя")
 
 	# 5. Ритм переносится на следующую поляну

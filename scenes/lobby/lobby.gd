@@ -23,13 +23,13 @@ const BUILDINGS := [
 	},
 	{
 		"node": "GuardiansArt",
-		"title": "Дом защитников",
+		"title": "Коллекция",
 		"scene": "res://scenes/collection/Collection.tscn",
 		"art": ["res://art/building/building_guardians.png"],
 	},
 	{
 		"node": "StorehouseArt",
-		"title": "Амбар",
+		"title": "Инвентарь",
 		"scene": "res://scenes/inventory/Inventory.tscn",
 		# Пока амбар не нарисован, во дворе стоит мешок с семенами: место
 		# должно быть доступно, даже если его домик ещё в очереди на отрисовку
@@ -38,14 +38,14 @@ const BUILDINGS := [
 	},
 	{
 		"node": "MerchantArt",
-		"title": "Лавка",
+		"title": "Магазин",
 		"scene": "res://scenes/merchant/Merchant.tscn",
 		"art": ["res://art/building/building_merchant.png",
 			"res://art/prop/prop_chest.png"],
 	},
 	{
 		"node": "ForestArt",
-		"title": "Лес",
+		"title": "В путь",
 		"scene": "res://scenes/run/RunFeed.tscn",
 		"art": ["res://art/building/building_forest.png"],
 	},
@@ -54,6 +54,12 @@ const BUILDINGS := [
 ## Насколько постройка «подпрыгивает» под курсором. Наведение обязано быть
 ## видно: иначе непонятно, что двор вообще кликабельный.
 const HOVER_SCALE := 1.08
+
+## Высота строки подписи и запас до края экрана: по ним решается,
+## поместится ли подпись под постройкой или её надо поднять над ней.
+const CAPTION_HEIGHT := 48.0
+const CAPTION_MARGIN := 20.0
+const SCREEN_HEIGHT := 1920.0
 
 @onready var _buildings: Control = $Buildings
 @onready var _title: Label = $Title
@@ -103,13 +109,18 @@ func _build_hotspots() -> void:
 				sprite.visible = false
 				continue
 
-		var size := sprite.texture.get_size() * sprite.scale
+		# Границы ВИДИМОГО, а не всей текстуры. Постройки нарисованы в квадрате
+		# 128×128 с прозрачными полями, и по полной коробке получалось два
+		# вранья сразу: кнопка ловила клики по пустому воздуху рядом с домиком,
+		# а подпись огорода уезжала так низко, что села на соседний прилавок.
+		var bounds := _visible_bounds(sprite)
+		var size := bounds.size
 		var button := Button.new()
 		button.flat = true
 		button.text = ""
 		button.custom_minimum_size = size
 		button.size = size
-		button.position = sprite.position - size * 0.5
+		button.position = bounds.position
 		button.pressed.connect(_enter.bind(entry))
 		button.mouse_entered.connect(_hover.bind(sprite, true))
 		button.mouse_exited.connect(_hover.bind(sprite, false))
@@ -128,9 +139,16 @@ func _build_hotspots() -> void:
 		caption.add_theme_constant_override("outline_size", 10)
 		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		caption.size.x = size.x + 120.0
+
+		# Обычно подпись под постройкой. Но у ближней, крупной постройки низ
+		# уходит за край экрана, и подпись пропадала совсем — так исчез
+		# «Огород». Не помещается снизу — ставим сверху: подпись обязана быть
+		# видна всегда, иначе постройка выглядит безымянной
+		var below := bounds.end.y + 6.0
+		var y := below if below + CAPTION_HEIGHT <= SCREEN_HEIGHT - CAPTION_MARGIN \
+			else bounds.position.y - CAPTION_HEIGHT
 		caption.position = Vector2(
-			sprite.position.x - (size.x + 120.0) * 0.5,
-			sprite.position.y + size.y * 0.5 + 6.0)
+			bounds.get_center().x - (size.x + 120.0) * 0.5, y)
 		caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_buildings.add_child(caption)
 
@@ -192,3 +210,28 @@ func _refresh() -> void:
 		if FarmState.is_ready(i):
 			ready_plots += 1
 	_status.text = "В огороде поспело: %d" % ready_plots if ready_plots > 0 else ""
+
+
+## Прямоугольник ВИДИМОЙ части постройки в координатах двора.
+##
+## `get_used_rect()` даёт границы непрозрачных пикселей — то, что игрок
+## действительно видит. Считается один раз на постройку при входе во двор:
+## чтение изображения с видеопамяти дорого, но пять построек за экран
+## это выдерживают, а в `_process` эта функция не заходит никогда.
+func _visible_bounds(sprite: Sprite2D) -> Rect2:
+	var full := Rect2(
+		sprite.position - sprite.texture.get_size() * sprite.scale * 0.5,
+		sprite.texture.get_size() * sprite.scale)
+
+	var image := sprite.texture.get_image()
+	if image == null:
+		return full
+	var used := image.get_used_rect()
+	if used.size.x <= 0 or used.size.y <= 0:
+		return full
+
+	# Из пикселей текстуры в пиксели двора: сдвиг от левого верхнего угла
+	# спрайта плюс масштаб
+	return Rect2(
+		full.position + Vector2(used.position) * sprite.scale,
+		Vector2(used.size) * sprite.scale)

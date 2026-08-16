@@ -219,10 +219,11 @@ func _test_favorite_fruit_feeds_better() -> void:
 	var other := GameState.feeding_xp("bass_bear", "drum_berry", FruitData.Quality.PLAIN)
 	check(favorite > other, "любимый ценнее (%d против %d)" % [favorite, other])
 
-	# Качество тоже умножает — то же правило, что у дружбы
-	var perfect := GameState.feeding_xp("bass_bear", "drum_berry", FruitData.Quality.PERFECT)
-	check(perfect > other, "идеальный фрукт ценнее обычного (%d против %d)"
-		% [perfect, other])
+	# Сытность задаёт ТИР семечка. Качество больше не множит: оно само
+	# выводится из тира, и второй множитель накручивал бы тир дважды
+	var same_fruit := GameState.feeding_xp("bass_bear", "drum_berry", FruitData.Quality.PERFECT)
+	check_eq(same_fruit, other,
+		"качество не добавляет сытности сверх тира")
 
 	# Тир фрукта важен: долгие культуры кормят лучше
 	var high_tier := GameState.feeding_xp("bass_bear", "chord_apple", FruitData.Quality.PLAIN)

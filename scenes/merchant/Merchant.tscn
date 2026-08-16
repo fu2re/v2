@@ -22,7 +22,7 @@ offset_right = 1020.0
 offset_bottom = 160.0
 theme_override_font_sizes/font_size = 60
 theme_override_colors/font_color = Color(0.9411765, 0.87058824, 0.7529412, 1)
-text = "Лавка"
+text = "Магазин"
 horizontal_alignment = 1
 
 [node name="Purse" type="Label" parent="."]

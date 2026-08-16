@@ -73,7 +73,9 @@ func _start_battle() -> void:
 	_phrase.visible = false
 	_continue.visible = false
 	_monster_art.visible = false
-	_forest.visible = false
+	# Лес ОСТАЁТСЯ: первый бой игрок танцует там же, где встретил монстра.
+	# Пока фон гасился, обучение шло на пустой заливке — единственный бой
+	# в игре без леса за спиной, и выглядел он как незагрузившийся экран
 
 	_battle = preload("res://scenes/battle/DanceBattle.tscn").instantiate()
 	_battle.autostart = false

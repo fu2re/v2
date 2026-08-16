@@ -1,3 +1,4 @@
+class_name RunFeed
 extends Node2D
 
 ## Лента полян. Свайп вверх — следующая поляна, как в ленте коротких видео.
@@ -19,6 +20,13 @@ const TAP_FRACTION := 0.02
 ## Подсказка называет КНОПКУ, а жест лишь дублирует её: жест зависит
 ## от порогов и состояния и уже подводил игрока, кнопка — нет.
 const HINT_NEXT := "Кнопка «Дальше» или свайп вверх"
+## Сколько ждать после боя, прежде чем показать итог.
+##
+## Анимация падения монстра длится 0.45 с плюс кадр на крестики. Пауза
+## чуть длиннее: победа обязана успеть случиться на экране до того,
+## как её накроет панель с текстом.
+const VICTORY_PAUSE := 0.9
+
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
 ## Ключ экземпляра, которого берём в лес. Пусто — берём выбранного в коллекции.
@@ -231,27 +239,40 @@ func _show_stakes(glade: Glade) -> void:
 	var threshold := GameState.friendship_threshold(glade.grade)
 	var after_win := mini(value + GameState.FRIENDSHIP_WIN, threshold)
 
-	_friendship_track.visible = true
-	_friendship_fill.visible = true
-	var full_width := _friendship_track.size.x
-	_friendship_fill.size.x = full_width * clampf(float(value) / float(threshold), 0.0, 1.0)
+	var already := GameState.has_instance(glade.monster_id, glade.grade)
+
+	# У того, кто УЖЕ в коллекции, шкалы дружбы нет вовсе.
+	#
+	# Она показывала «0 / 100» при надписи «уже друг» — противоречие само
+	# по себе, а за ним тянулось и настоящее: после боя открывалось угощение,
+	# фрукты списывались, шкала росла, и всё это не значило ничего.
+	# Дружиться заново не с кем; с приручённым идут не за дружбой,
+	# а за опытом — и кормят его в коллекции (§7.5).
+	# Шкалы нет и там, где приручать пока нельзя: дружба туда не копится,
+	# и полоска показывала бы прогресс, которого не происходит
+	var open_now := GameState.can_tame(glade.monster_id, glade.grade)
+	var show_bar := not already and open_now
+	_friendship_track.visible = show_bar
+	_friendship_fill.visible = show_bar
+	if show_bar:
+		var full_width := _friendship_track.size.x
+		_friendship_fill.size.x = full_width \
+			* clampf(float(value) / float(threshold), 0.0, 1.0)
 
 	# Пометка «можно подружиться» затмевает всё остальное: это единственная
 	# ситуация, в которой пропуск стоит игроку по-настоящему дорого
-	var already := GameState.has_instance(glade.monster_id, glade.grade)
-	var open := GameState.can_tame(glade.monster_id, glade.grade)
-	var will_tame := not already and open and after_win >= threshold
+	var will_tame := not already and open_now and after_win >= threshold
 	_tame_banner.visible = will_tame
 	if will_tame:
 		_tame_banner.text = "Можно подружиться!"
 
 	if already:
-		_friendship_label.text = "Уже друг · дружба %d/%d" % [value, threshold]
-	elif not open:
+		_friendship_label.text = "Уже твой друг · бой ради опыта и добычи"
+	elif not open_now:
 		# Через ступень приручать нельзя, и молчать об этом нельзя тоже:
-		# полная шкала без объяснения выглядит как поломка
+		# без объяснения непонятно, почему шкалы нет вовсе
 		var step := GameState.missing_step(glade.monster_id, glade.grade)
-		_friendship_label.text = "Сначала подружись: %s\nДружба копится: %d/%d" % [
+		_friendship_label.text = "Подружиться пока нельзя.\nСначала подружись: %s" % [
 			MonsterData.rarity_name(step), value, threshold,
 		]
 	else:
@@ -667,6 +688,11 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 	# чего игра для детей делать не должна
 	GameState.add_battle_experience(monster.species_id)
 
+	# Победа открывает клетку коллекции — навсегда и независимо от того,
+	# удалось ли приручить (GDD §7.5)
+	if won:
+		GameState.mark_defeated(monster.species_id, monster.grade)
+
 	if RunManager.health <= 0:
 		_dismiss_battle()
 		RunManager.die()
@@ -702,9 +728,30 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 		if not grown.is_empty():
 			lines.append(grown)
 
-		# Кого угощать — запоминаем: приручение откроется по нажатию игрока
-		_pending_taming = monster
+		# Кого угощать — запоминаем: приручение откроется по нажатию игрока.
+		#
+		# Того, кто УЖЕ в коллекции, угощать незачем: дружба у него набрана,
+		# приручать нечего, и экран угощения только съедал бы фрукты впустую.
+		# Такой бой идёт за опытом и добычей, и они уже начислены выше
+		#
+		# То же и с тем, у кого закрыта ступень ниже: дружба ему сейчас
+		# не копится вовсе, и фрукты ушли бы в пустоту
+		var can_befriend := not GameState.has_instance(monster.species_id, monster.grade) \
+			and GameState.can_tame(monster.species_id, monster.grade)
+		_pending_taming = monster if can_befriend else null
 		_pending_perfect = perfect
+
+		# Панель ждёт, пока монстр упадёт. Без паузы итог выскакивал в тот же
+		# кадр, что и последняя нота, и анимация падения доигрывала ЗА ним:
+		# игрок читал текст, а сзади что-то шевелилось. Пауза чуть длиннее
+		# самой анимации — момент победы должен успеть случиться
+		var shown_glade := RunManager.current_glade
+		await get_tree().create_timer(VICTORY_PAUSE).timeout
+		# За время паузы игрок мог уйти домой или свайпнуть дальше. Сторожим
+		# ПОЛЯНУ, а не сцену боя: боя может не быть вовсе — итог показывают
+		# и обучение, и тесты, вызывая этот путь напрямую
+		if not is_inside_tree() or RunManager.current_glade != shown_glade:
+			return
 		_show_victory(monster, lines)
 	else:
 		# Монстр не побеждён — он убегает, и приручить его нельзя.
@@ -745,6 +792,23 @@ func _show_victory(monster: MonsterInstance, lines: Array[String]) -> void:
 	for line: String in lines:
 		_add_panel_label(line, 38)
 
+	# Угощение предлагается только тому, с кем ещё можно подружиться.
+	#
+	# С приручённым дружба набрана, и экран угощения только съедал бы фрукты
+	# впустую; с тем, у кого закрыта ступень ниже, дружба сейчас не копится
+	# вовсе. В обоих случаях кнопка вела бы в никуда, а кнопка, которая
+	# ничего не делает, читается ребёнком как поломка
+	if _pending_taming == null:
+		if GameState.has_instance(monster.species_id, monster.grade):
+			_add_panel_label("Он и так твой друг — дрались ради опыта и добычи", 30)
+		else:
+			var step := GameState.missing_step(monster.species_id, monster.grade)
+			if step >= 0:
+				_add_panel_label("Подружиться пока нельзя: сначала %s"
+					% MonsterData.rarity_name(step), 30)
+		_add_panel_button("Дальше", _close_victory)
+		return
+
 	# Дальше — угощение, и кнопка честно называет, что будет
 	var species := monster.data()
 	var favorite := Registry.fruit(species.favorite_fruit_id) if species != null else null
@@ -752,6 +816,17 @@ func _show_victory(monster: MonsterInstance, lines: Array[String]) -> void:
 		_add_panel_label("Любит: %s" % favorite.display_name, 30)
 
 	_add_panel_button("Угостить", _open_taming)
+
+
+## Закрыть итог боя, когда угощать некого. Панель гасим напрямую, как
+## и в `_open_taming`: под нами всё ещё сцена боя, и кнопки поляны там
+## не нужны — карточка вернётся сама, когда бой закроется.
+func _close_victory() -> void:
+	_panel_box.visible = false
+	_panel_bg.visible = false
+	_awaiting_result_swipe = true
+	_busy = false
+	_refresh_buttons()
 
 
 ## Перейти от итога боя к угощению.

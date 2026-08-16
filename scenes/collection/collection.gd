@@ -13,6 +13,11 @@ extends Node2D
 
 const CARD_HEIGHT := 290.0
 
+## Клетка витрины. Шесть в ряд при ширине списка 960 и зазоре 8:
+## 6×150 + 5×8 = 940 — влезает с запасом на полосу прокрутки.
+const CELL_SIZE := 150.0
+const CELL_GAP := 8
+
 ## Раскладка живёт в Collection.tscn и правится в инспекторе (GDD §13.2.1).
 @onready var _list: VBoxContainer = $ListScroll/List
 @onready var _status: Label = $Status
@@ -32,98 +37,105 @@ func _ready() -> void:
 	_gear_panel.visibility_changed.connect(
 		func(): backdrop.visible = _gear_panel.visible)
 
-	GameState.gear_changed.connect(_refresh)
+	GameState.gear_changed.connect(_on_gear_changed)
 	GameState.guardian_changed.connect(func(_id): _refresh())
 	_refresh()
 
 
+## Снаряжение сменилось — перестроить и список, и ОТКРЫТУЮ панель.
+##
+## Раньше сигнал обновлял только список за панелью, а сама панель оставалась
+## той, что построили при открытии: игрок надевал пояс и не видел никакой
+## разницы, пока не выходил и не заходил снова. Пересборка здесь безопасна —
+## сигнал приходит по факту смены, а не каждый кадр (CLAUDE.md).
+func _on_gear_changed() -> void:
+	_refresh()
+	if _gear_panel.visible and not _selected_key.is_empty():
+		_open_gear(_selected_key)
+
+
+## Витрина: строка на вид, колонка на грейд (GDD §7.5).
+##
+## Раньше здесь был список приручённых плюс отдельные карточки прогресса,
+## и увидеть КОЛЛЕКЦИЮ как целое было нельзя: сколько всего существ в игре,
+## что уже открыто, чего не хватает. Таблица отвечает на это одним взглядом,
+## а закрытые клетки-силуэты показывают, что впереди ещё есть что искать.
 func _refresh() -> void:
 	UIUtil.clear_children(_list)
 
-	for friend: MonsterInstance in GameState.all_instances():
-		_list.add_child(_make_friend_card(friend))
+	var progress := GameState.collection_progress()
+	_status.text = "Открыто %d из %d" % [progress.x, progress.y]
 
-	for monster in Registry.all_monsters():
-		var card := _make_progress_card(monster)
-		if card != null:
-			_list.add_child(card)
+	for species in Registry.all_monsters():
+		_list.add_child(_make_species_row(species))
 
 
-## Карточка приручённого экземпляра.
-func _make_friend_card(friend: MonsterInstance) -> Control:
-	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(960, CARD_HEIGHT)
+## Одна строка витрины: имя вида и шесть клеток грейдов слева направо.
+func _make_species_row(species: MonsterData) -> Control:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	card.add_child(box)
+	# Имя вида — только если хоть один грейд открыт. Иначе коллекция
+	# рассказывала бы содержание вперёд игрока
+	var any_open := false
+	for grade in range(MonsterData.Rarity.size()):
+		if GameState.is_revealed(species.id, grade):
+			any_open = true
+			break
 
 	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 44)
-	title.add_theme_color_override("font_color", friend.grade_color())
-	var active := " ← в лесу" if GameState.guardian_key() == friend.key() else ""
-	# Грейд в имени обязателен: два Ростика разных грейдов иначе неотличимы
-	var grade_mark := "" if friend.grade == MonsterData.Rarity.COMMON \
-		else " · %s" % friend.grade_name()
-	title.text = "%s%s%s" % [friend.display_name(), grade_mark, active]
-	box.add_child(title)
+	title.text = species.display_name if any_open else "? ? ?"
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color",
+		Color("F0DEC0") if any_open else Color("6B6862"))
+	row.add_child(title)
 
-	var species := friend.data()
-	var info := Label.new()
-	info.add_theme_font_size_override("font_size", 30)
-	info.add_theme_color_override("font_color", Color("ADA99F"))
-	var fruit := Registry.fruit(species.favorite_fruit_id) if species != null else null
-	info.text = "%s · уровень %d · любит %s" % [
-		MonsterData.genre_name(friend.genre()),
-		friend.level,
-		fruit.display_name if fruit != null else "?",
-	]
-	box.add_child(info)
+	var cells := HBoxContainer.new()
+	cells.add_theme_constant_override("separation", CELL_GAP)
+	cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for grade in range(MonsterData.Rarity.size()):
+		cells.add_child(_make_cell(species, grade))
+	row.add_child(cells)
+	return row
 
-	var progress := ProgressBar.new()
-	progress.custom_minimum_size = Vector2(0, 30)
-	var xp := friend.xp_progress()
-	progress.max_value = xp.y
-	progress.value = xp.x
-	progress.show_percentage = false
-	box.add_child(progress)
 
-	var status := Label.new()
-	status.add_theme_font_size_override("font_size", 28)
-	status.add_theme_color_override("font_color", Color("DCC7A4"))
-	status.text = "Друг · %s" % _gear_summary(friend.key())
-	box.add_child(status)
+## Клетка коллекции: спрайт грейда, рамка у приручённого, силуэт у закрытого.
+func _make_cell(species: MonsterData, grade: int) -> Control:
+	var state := CollectionGrid.state_for(species.id, grade)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
+	var cell := Button.new()
+	cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+	cell.icon = species.sprite_for_grade(grade)
+	cell.expand_icon = true
+	cell.text = ""
+	# Красим ТОЛЬКО картинку, а не всю кнопку: `modulate` гасил вместе
+	# со спрайтом и саму клетку, и чёрный силуэт на почерневшей клетке
+	# переставал читаться — вместо загадки получалось пустое место.
+	# Раскраска — правило игры, а не рисование, и живёт в CollectionGrid
+	cell.add_theme_color_override("icon_normal_color",
+		CollectionGrid.tint_for(state))
+	cell.add_theme_color_override("icon_disabled_color",
+		CollectionGrid.tint_for(state))
+	cell.tooltip_text = CollectionGrid.caption_for(species.id, grade)
 
-	var take := Button.new()
-	take.text = "Взять в лес"
-	take.custom_minimum_size = Vector2(300, 116)
-	take.add_theme_font_size_override("font_size", 32)
-	take.disabled = GameState.guardian_key() == friend.key()
-	take.pressed.connect(func(): GameState.set_guardian(friend.key()))
-	row.add_child(take)
+	if state == CollectionGrid.Cell.TAMED:
+		# Рамка отвечает на один вопрос — «мой или нет». Грейд и без неё
+		# виден по колонке, поэтому цвет рамки один на все грейды
+		var frame := StyleBoxFlat.new()
+		frame.bg_color = Color(0.153, 0.114, 0.078, 0.92)
+		frame.set_border_width_all(6)
+		frame.border_color = CollectionGrid.TAMED_FRAME
+		frame.set_corner_radius_all(18)
+		cell.add_theme_stylebox_override("normal", frame)
 
-	var gear := Button.new()
-	gear.text = "Снаряжение"
-	gear.custom_minimum_size = Vector2(300, 116)
-	gear.add_theme_font_size_override("font_size", 32)
-	gear.pressed.connect(_open_gear.bind(friend.key()))
-	row.add_child(gear)
-
-	# Угощение растит уровень (GDD §6.5). Кнопка гаснет на потолке и когда
-	# угощать нечем: предлагать нажать то, что не сработает, — обман
-	var feed := Button.new()
-	feed.text = "Угостить"
-	feed.custom_minimum_size = Vector2(280, 116)
-	feed.add_theme_font_size_override("font_size", 32)
-	feed.disabled = friend.is_max_level() or GameState.fruits.is_empty()
-	feed.pressed.connect(_open_feed.bind(friend.key()))
-	row.add_child(feed)
-
-	box.add_child(row)
-	return card
+	if CollectionGrid.opens_card(species.id, grade):
+		cell.pressed.connect(_open_card.bind(species.id, grade))
+	else:
+		# По закрытой клетке смотреть нечего: молчаливое нажатие честнее
+		# пустой карточки
+		cell.disabled = true
+	return cell
 
 
 ## Угостить друга: фрукт превращается в опыт (GDD §6.5).
@@ -192,67 +204,6 @@ func _feed_friend(instance_key: String, fruit_id: String,
 	_open_feed(instance_key)
 	_refresh()
 
-
-## Карточка «на подходе»: ближайший к приручению грейд этого вида.
-##
-## Возвращает null, если ни к одному грейду вид ещё не подступался —
-## показывать шесть пустых полосок на каждого незнакомца незачем.
-func _make_progress_card(monster: MonsterData) -> Control:
-	var best_grade := -1
-	var best_ratio := 0.0
-	for grade in MonsterData.RARITY_NAMES.size():
-		if GameState.has_instance(monster.id, grade):
-			continue
-		var value := GameState.get_friendship(monster.id, grade)
-		if value <= 0:
-			continue
-		var ratio := float(value) / float(GameState.friendship_threshold(grade))
-		if ratio > best_ratio:
-			best_ratio = ratio
-			best_grade = grade
-
-	if best_grade < 0:
-		return null
-
-	var value := GameState.get_friendship(monster.id, best_grade)
-	var threshold := GameState.friendship_threshold(best_grade)
-
-	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(960, CARD_HEIGHT * 0.7)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	card.add_child(box)
-
-	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 40)
-	title.add_theme_color_override("font_color", MonsterData.rarity_color(best_grade))
-	title.text = "%s · %s" % [monster.display_name, MonsterData.rarity_name(best_grade)]
-	box.add_child(title)
-
-	var progress := ProgressBar.new()
-	progress.custom_minimum_size = Vector2(0, 30)
-	progress.max_value = threshold
-	progress.value = value
-	progress.show_percentage = false
-	box.add_child(progress)
-
-	var status := Label.new()
-	status.add_theme_font_size_override("font_size", 28)
-	status.add_theme_color_override("font_color", Color("DCC7A4"))
-	var meetings := int(ceil(float(threshold - value) / GameState.FRIENDSHIP_WIN))
-	status.text = "Дружба %d/%d — примерно %d встреч" % [value, threshold, meetings]
-	box.add_child(status)
-
-	return card
-
-
-func _gear_summary(instance_key: String) -> String:
-	var parts: Array[String] = []
-	for slot in [GearData.Slot.BELT, GearData.Slot.CLOAK, GearData.Slot.HEADWEAR]:
-		var item := GameState.equipped_gear(instance_key, slot)
-		parts.append(item.display_name if item != null else "—")
-	return " / ".join(parts)
 
 
 ## Экран экипировки: три слота сверху, сундук снизу.
@@ -384,3 +335,121 @@ func _close_gear() -> void:
 
 func _go_back() -> void:
 	get_tree().change_scene_to_file(OnboardingState.LOBBY)
+
+
+## Карточка существа: характеристики, а не только картинка.
+##
+## Это ответ на «нигде не видно характеристик защитника». До неё игрок знал
+## о своём монстре ровно две вещи — имя и уровень, — и не мог сравнить двух
+## кандидатов перед забегом. Числа берутся у того же `MonsterInstance`,
+## что дерётся в бою, поэтому карточка не может разойтись с боем.
+func _open_card(species_id: String, grade: int) -> void:
+	var species := Registry.monster(species_id)
+	if species == null:
+		return
+
+	_selected_key = MonsterInstance.key_for(species_id, grade)
+	UIUtil.clear_children(_gear_panel)
+
+	var tamed := GameState.instance(_selected_key)
+	# У неприручённого статы считаются по тем же правилам — игрок должен
+	# видеть, за кем идёт, ещё до того, как тот согласится
+	var shown := tamed if tamed != null else MonsterInstance.create(species_id, grade)
+
+	_card_title(shown, tamed != null)
+	_card_portrait(species, grade)
+	_card_stats(shown, tamed)
+	_card_actions(tamed)
+
+	_add_gear_button("Закрыть", _close_gear)
+	_gear_panel.visible = true
+
+
+func _card_title(shown: MonsterInstance, tamed: bool) -> void:
+	var title := Label.new()
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", shown.grade_color())
+	title.text = "%s · %s" % [shown.display_name(), shown.grade_name()]
+	_gear_panel.add_child(title)
+
+	var badge := Label.new()
+	badge.add_theme_font_size_override("font_size", 28)
+	badge.add_theme_color_override("font_color",
+		CollectionGrid.TAMED_FRAME if tamed else Color("ADA99F"))
+	badge.text = "В твоей коллекции" if tamed else "Побеждён, но пока не подружились"
+	_gear_panel.add_child(badge)
+
+
+func _card_portrait(species: MonsterData, grade: int) -> void:
+	var portrait := TextureRect.new()
+	portrait.texture = species.sprite_for_grade(grade)
+	portrait.custom_minimum_size = Vector2(0, 260)
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_gear_panel.add_child(portrait)
+
+
+## Таблица характеристик. Каждая строка — «что это» и «сколько», в столбик:
+## склеенная строка чисел для семилетнего нечитаема.
+func _card_stats(shown: MonsterInstance, tamed: MonsterInstance) -> void:
+	var species := shown.data()
+	var fruit := Registry.fruit(species.favorite_fruit_id) if species != null else null
+
+	_add_stat("Стихия", MonsterData.genre_name(shown.genre()))
+	_add_stat("Здоровье", "%d" % shown.max_health())
+	_add_stat("Настрой", "%d" % shown.vibe())
+	_add_stat("Удар", "%.1f" % shown.power())
+	_add_stat("Любимый фрукт", fruit.display_name if fruit != null else "?")
+
+	if tamed == null:
+		var threshold := GameState.friendship_threshold(shown.grade)
+		var value := GameState.get_friendship(shown.species_id, shown.grade)
+		_add_stat("Дружба", "%d / %d" % [value, threshold])
+		return
+
+	_add_stat("Уровень", "%d" % tamed.level)
+	var xp := tamed.xp_progress()
+	_add_stat("Опыт", "макс" if tamed.is_max_level() else "%d / %d" % [xp.x, xp.y])
+
+	var bonuses := GameState.gear_bonuses(tamed.key())
+	_add_stat("Снаряжение", "окно ×%.2f · удар +%.1f · здоровье +%d · защита +%d%%" % [
+		bonuses.window_scale, bonuses.power_bonus, bonuses.health_bonus,
+		int(round(bonuses.shield_reduction * 100.0)),
+	])
+
+
+func _add_stat(name: String, value: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var label := Label.new()
+	label.text = name
+	label.custom_minimum_size = Vector2(320, 0)
+	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_color_override("font_color", Color("ADA99F"))
+	row.add_child(label)
+
+	var amount := Label.new()
+	amount.text = value
+	amount.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	amount.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	amount.add_theme_font_size_override("font_size", 32)
+	amount.add_theme_color_override("font_color", Color("F0DEC0"))
+	row.add_child(amount)
+
+	_gear_panel.add_child(row)
+
+
+## Что можно сделать с существом. У неприручённого — ничего: кнопки,
+## которые ничего не делают, ребёнок жмёт и решает, что игра сломалась.
+func _card_actions(tamed: MonsterInstance) -> void:
+	if tamed == null:
+		return
+
+	var key := tamed.key()
+	if GameState.guardian_key() != key:
+		_add_gear_button("Взять в лес", func(): GameState.set_guardian(key))
+	_add_gear_button("Снаряжение", func(): _open_gear(key))
+	_add_gear_button("Угостить", func(): _open_feed(key))

@@ -46,6 +46,12 @@ var battle_xp: Dictionary = {}
 ## Приручённые экземпляры: ключ "вид:грейд" -> MonsterInstance.
 var instances: Dictionary = {}
 
+## Кого игрок уже победил, ключом «вид:грейд». Отдельно от `instances`:
+## приручить можно не всё, что победил, а коллекция обязана помнить встречу
+## даже когда экземпляр не достался. Пока пары здесь нет, монстр показан
+## силуэтом — это и есть главная приманка коллекции (GDD §7.5).
+var defeated: Dictionary = {}
+
 ## Фрукты в сумке: "fruit_id:quality" -> количество.
 var fruits: Dictionary = {}
 ## Зелья в сумке: potion_id -> количество.
@@ -83,6 +89,7 @@ func reset() -> void:
 	friendship.clear()
 	battle_xp.clear()
 	instances.clear()
+	defeated.clear()
 	fruits.clear()
 	potions.clear()
 	silver = 0
@@ -192,14 +199,26 @@ func add_friendship(species_id: String, grade: int, amount: int) -> bool:
 		return false
 
 	var key := MonsterInstance.key_for(species_id, grade)
+
+	# Дружба НЕ копится там, где приручать пока нельзя.
+	#
+	# Раньше она копилась «про запас»: шкала росла, фрукты тратились,
+	# а приручение всё равно не наступало, пока не пройдена ступень ниже.
+	# Копить в закрытую шкалу — то же самое, что выбрасывать фрукты:
+	# полоска движется, а сделать с ней ничего нельзя. Лучше честно
+	# не принимать вклад и сказать, чего не хватает.
+	if not can_tame(species_id, grade):
+		return false
+
+	# С тем, кто уже в коллекции, дружиться заново не с кем
+	if instances.has(key):
+		return false
+
 	var threshold := friendship_threshold(grade)
 	var value: int = mini(get_friendship(species_id, grade) + amount, threshold)
 	friendship[key] = value
 	friendship_changed.emit(species_id, grade, value, threshold)
 
-	# Полная шкала приручает, только если предыдущая ступень уже пройдена.
-	# Дружба при этом копится дальше — труд не пропадает, просто ждёт
-	# своей очереди
 	if value >= threshold and not instances.has(key) and can_tame(species_id, grade):
 		tame(species_id, grade)
 		return true
@@ -215,7 +234,13 @@ func friendship_from_fruit(species_id: String, fruit_id: String,
 		return 0
 	var base := FRIENDSHIP_FAVORITE_FRUIT if data.favorite_fruit_id == fruit_id \
 		else FRIENDSHIP_OTHER_FRUIT
-	return int(round(base * FruitData.quality_multiplier(quality)))
+
+	# Щедрость плода задаёт ТИР, а не качество: качеств три, а тиров четыре,
+	# и на трёх ступенях два соседних тира давали поровну — редкий инжир рос
+	# вчетверо дольше сливки и стоил вдвое дороже ровно за ту же прибавку
+	var fruit := Registry.fruit(fruit_id)
+	var scale := FruitData.tier_friendship_scale(fruit.tier) if fruit != null else 1.0
+	return int(round(base * scale))
 
 
 ## Сколько опыта даст угощение этим фруктом (GDD §6.5).
@@ -229,7 +254,9 @@ func feeding_xp(species_id: String, fruit_id: String,
 		return 0
 
 	var base := Balance.feeding_xp_for_tier(fruit.tier)
-	var multiplier := FruitData.quality_multiplier(quality)
+	# Опыт уже считается от тира — второй множитель по качеству накручивал бы
+	# тир дважды
+	var multiplier := 1.0
 
 	var species := Registry.monster(species_id)
 	if species != null and species.favorite_fruit_id == fruit_id:
@@ -553,6 +580,7 @@ func to_dict() -> Dictionary:
 		"friendship": friendship.duplicate(),
 		"battle_xp": battle_xp.duplicate(),
 		"instances": serialized_instances,
+		"defeated": defeated.duplicate(),
 		"fruits": fruits.duplicate(),
 		"potions": potions.duplicate(),
 		"silver": silver,
@@ -568,6 +596,7 @@ func from_dict(d: Dictionary) -> void:
 	# несовместимый сейв не должен доходить сюда даже частично
 	friendship = d.get("friendship", {})
 	battle_xp = d.get("battle_xp", {})
+	defeated = d.get("defeated", {})
 	fruits = d.get("fruits", {})
 	potions = d.get("potions", {})
 	silver = int(d.get("silver", 0))
@@ -592,3 +621,34 @@ func from_dict(d: Dictionary) -> void:
 		for slot_key: Variant in raw[instance_key]:
 			slots[int(slot_key)] = String(raw[instance_key][slot_key])
 		equipped[instance_key] = slots
+
+
+# --- журнал встреч -----------------------------------------------------------
+
+## Записать победу над экземпляром. Коллекция помнит её навсегда, даже если
+## приручить не вышло: увидел — значит открыл.
+func mark_defeated(species_id: String, grade: int) -> void:
+	var key := MonsterInstance.key_for(species_id, grade)
+	if defeated.has(key):
+		return
+	defeated[key] = true
+	SaveManager.mark_dirty()
+
+
+## Открыт ли монстр в коллекции. Приручённый открыт всегда — иначе сейв
+## старой игры показал бы силуэт того, кто уже ходит с игроком в лес.
+func is_revealed(species_id: String, grade: int) -> bool:
+	var key := MonsterInstance.key_for(species_id, grade)
+	return defeated.has(key) or instances.has(key)
+
+
+## Сколько клеток коллекции открыто и сколько всего. Для строки прогресса:
+## собирателю нужно видеть, сколько осталось.
+func collection_progress() -> Vector2i:
+	var total := Registry.all_monsters().size() * MonsterData.Rarity.size()
+	var open := 0
+	for species in Registry.all_monsters():
+		for grade in range(MonsterData.Rarity.size()):
+			if is_revealed(species.id, grade):
+				open += 1
+	return Vector2i(open, total)

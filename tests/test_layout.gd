@@ -224,6 +224,9 @@ func _test_victory_screen_comes_before_taming() -> void:
 	state.setup(MonsterInstance.create("synth_slime", COMMON),
 		GameState.instance(RunManager.guardian_key), 100, 1)
 	feed._on_battle_finished(true, state)
+	# Итог показывается не сразу: сперва монстр падает (RunFeed.VICTORY_PAUSE).
+	# Без ожидания проверка мерила бы кадр, в котором панели ещё нет
+	await get_tree().create_timer(RunFeed.VICTORY_PAUSE + 0.2).timeout
 	await _frames(2)
 
 	check(feed._panel_box.visible, "экран победы показан")
