@@ -41,10 +41,9 @@ script = ExtResource("4_5jar3")
 [node name="SeriesLine" type="Node2D" parent="." unique_id=1690031837]
 z_index = -1
 
-[node name="KnockedOut" type="Node2D" parent="." unique_id=1547992069]
+[node name="KnockedOut" type="Node2D" parent="MonsterSprite" unique_id=1547992069]
 visible = false
 z_index = 5
-position = Vector2(540, 300)
 
 [node name="OutcomeLabel" type="Label" parent="." unique_id=860576089]
 visible = false

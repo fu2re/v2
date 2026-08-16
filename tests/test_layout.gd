@@ -234,7 +234,15 @@ func _test_victory_screen_comes_before_taming() -> void:
 	for child in feed._panel_box.get_children():
 		if child is Label:
 			shown += child.text + "\n"
-	check(shown.contains("наплясался"), "сказано, что монстр побеждён")
+	# Проверяем СОДЕРЖАНИЕ, а не формулировку: раньше здесь стояло слово
+	# «наплясался», и стоило поправить согласование («Пыльца наплясался»),
+	# как тест покраснел, хотя на экране всё было на месте. Игроку важно
+	# увидеть, кого он победил и что ему за это досталось
+	var monster := state.monster
+	check(shown.contains(monster.display_name()),
+		"на экране победы названо, кого победили")
+	check(shown.contains("серебра") or shown.contains("Сундук"),
+		"на экране победы показано, что досталось")
 	check(shown.contains("серебра"), "названа добыча: [%s]" % shown.strip_edges())
 
 	# И только по нажатию открывается угощение

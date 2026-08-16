@@ -74,6 +74,8 @@ func _build_targets() -> void:
 			"setup": _played_a_while},
 		{"name": "11_battle", "scene": "res://scenes/battle/DanceBattle.tscn",
 			"setup": _ready_for_battle, "after": _spawn_every_note},
+		{"name": "12_victory", "scene": "res://scenes/run/RunFeed.tscn",
+			"setup": _played_a_while, "after": _open_victory},
 	]
 
 
@@ -193,3 +195,23 @@ func _spawn_every_note(battle: Node) -> void:
 		var note = pool.acquire(0.0, types[i])
 		note.position = Vector2(540.0, 300.0 + i * 190.0)
 		active.append(note)
+
+
+## Экран победы поверх живой сцены боя.
+##
+## Единственная панель игры, которая ложится на другую сцену, — и именно там
+## кнопка «Угостить» оказалась погребена под слоем боя. Снимок нужен, чтобы
+## видеть, что панель сверху и целиком.
+func _open_victory(feed: Node) -> void:
+	var glade = RunManager.current_glade
+	if glade == null:
+		return
+	if glade.type != Glade.Type.BATTLE:
+		glade.type = Glade.Type.BATTLE
+		glade.monster_id = "disco_sprout"
+	feed._start_battle(glade)
+
+	var monster = MonsterInstance.create(glade.monster_id, glade.grade)
+	var lines: Array[String] = ["+12 серебра", "Сундук: Шапочка из жёлудя"]
+	feed._pending_taming = monster
+	feed._show_victory(monster, lines)

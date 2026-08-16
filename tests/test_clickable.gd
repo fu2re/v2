@@ -39,6 +39,31 @@ func run_tests() -> void:
 	await _check_panel("res://scenes/run/RunFeed.tscn", "торговец",
 		func(root): root._open_merchant(RunManager.current_glade))
 
+	# Экран победы — единственная панель, которая открывается ПОВЕРХ живой
+	# сцены боя. Именно там кнопка «Угостить» и оказалась погребена: панель
+	# лежала на нулевом слое, а бой со своим HUD — выше
+	await _check_panel("res://scenes/run/RunFeed.tscn", "победа поверх боя",
+		func(root): _open_victory(root))
+
+
+## Показать экран победы так же, как это делает игра: со сценой боя на месте.
+##
+## Без боя под панелью проверка бессмысленна — накрывать её будет нечему,
+## и первая версия этого теста именно поэтому ничего не поймала.
+func _open_victory(root: Node) -> void:
+	var glade := RunManager.current_glade
+	if glade == null:
+		return
+	if glade.type != Glade.Type.BATTLE:
+		glade.type = Glade.Type.BATTLE
+		glade.monster_id = "disco_sprout"
+	root._start_battle(glade)
+
+	var monster := MonsterInstance.create(glade.monster_id, glade.grade)
+	var lines: Array[String] = ["+12 серебра"]
+	root._pending_taming = monster
+	root._show_victory(monster, lines)
+
 
 ## Состояние, при котором панели вообще есть что показать.
 func _prepare_state() -> void:
@@ -170,10 +195,43 @@ func _last_backdrop_index(order: Array[Control]) -> int:
 ## Обход в том же порядке, в каком Godot строит дерево контролов:
 ## чем позже узел, тем он выше в разборе ввода.
 func _collect_controls(node: Node, out: Array[Control]) -> void:
+	var flat: Array[Control] = []
+	_walk_controls(node, flat)
+
+	# Сортируем по СЛОЮ, а не только по порядку в дереве.
+	#
+	# Godot разбирает ввод по CanvasLayer: слой с бо́льшим номером получает
+	# клик первым, независимо от того, где узел лежит в дереве. Пока модель
+	# этого не знала, тест считал панель победы доступной — а на живом экране
+	# её накрывала сцена боя со своим слоем, и кнопка «Угостить» не нажималась.
+	# Сортировка устойчивая, поэтому внутри одного слоя порядок дерева цел.
+	var indexed: Array = []
+	for i in flat.size():
+		indexed.append([_layer_of(flat[i]), i, flat[i]])
+	indexed.sort_custom(func(a, b):
+		if a[0] != b[0]:
+			return a[0] < b[0]
+		return a[1] < b[1])
+
+	for entry: Array in indexed:
+		out.append(entry[2])
+
+
+func _walk_controls(node: Node, out: Array[Control]) -> void:
 	if node is Control:
 		out.append(node)
 	for child in node.get_children():
-		_collect_controls(child, out)
+		_walk_controls(child, out)
+
+
+## На каком слое рисуется узел. Вне CanvasLayer это нулевой слой сцены.
+func _layer_of(node: Node) -> int:
+	var parent := node.get_parent()
+	while parent != null:
+		if parent is CanvasLayer:
+			return (parent as CanvasLayer).layer
+		parent = parent.get_parent()
+	return 0
 
 
 ## Кто получит клик в этой точке. Идём с конца: побеждает последний,

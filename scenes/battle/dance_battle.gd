@@ -58,7 +58,7 @@ var state := BattleState.new()
 @onready var _pool: NotePool = $NotePool
 @onready var _hud: BattleHUD = $BattleHUD
 @onready var _monster_sprite: Sprite2D = $MonsterSprite
-@onready var _knocked_out: Node2D = $KnockedOut
+@onready var _knocked_out: Node2D = $MonsterSprite/KnockedOut
 @onready var _outcome_label: Label = $OutcomeLabel
 @onready var _hero: Dancer = $Hero
 @onready var _guardian_dancer: Dancer = $GuardianDancer
@@ -525,12 +525,17 @@ func _show_outcome(won: bool) -> void:
 
 ## Крестики вместо глаз. Рисуются поверх спрайта, потому что плейсхолдеры
 ## одинаковых глаз не имеют, а знак «монстр наплясался» нужен уже сейчас.
+##
+## Узел — РЕБЁНОК спрайта, а не сосед. Пока он был соседом с собственной
+## позицией, монстр падал и поворачивался, а крестики оставались висеть
+## в воздухе на прежнем месте — ровно то, что видно на живом экране.
+## Координаты поэтому локальные и мелкие: спрайт масштабирован вчетверо.
 func _draw_knocked_out() -> void:
 	for side in [-1.0, 1.0]:
-		var c := Vector2(side * 34.0, -18.0)
-		var r := 18.0
-		_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 7.0)
-		_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 7.0)
+		var c := Vector2(side * 8.5, -4.5)
+		var r := 4.5
+		_knocked_out.draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color.BLACK, 1.8)
+		_knocked_out.draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color.BLACK, 1.8)
 
 
 

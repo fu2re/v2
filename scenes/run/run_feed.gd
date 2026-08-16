@@ -49,8 +49,8 @@ const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 ## зависит от состояния и порогов, а кнопка — нет.
 @onready var _action_button: Button = $ActionButton
 @onready var _next_button: Button = $NextButton
-@onready var _panel_bg: ColorRect = $PanelBackdrop
-@onready var _panel_box: VBoxContainer = $PanelScroll/PanelBox
+@onready var _panel_bg: ColorRect = $PanelLayer/PanelBackdrop
+@onready var _panel_box: VBoxContainer = $PanelLayer/PanelScroll/PanelBox
 
 var _battle: Node2D = null
 var _taming: CanvasLayer = null
@@ -89,7 +89,7 @@ func _ready() -> void:
 	_next_button.pressed.connect(_advance)
 	# Прокрутка живёт и гаснет вместе с панелью: пустой ScrollContainer
 	# во весь экран молча съедал бы клики по тому, что под ним
-	var scroll: ScrollContainer = $PanelScroll
+	var scroll: ScrollContainer = $PanelLayer/PanelScroll
 	_panel_box.visibility_changed.connect(func(): scroll.visible = _panel_box.visible)
 
 	_taming = preload("res://scenes/battle/TamingScreen.tscn").instantiate()
@@ -736,7 +736,11 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 ## Панель собирается теми же `_open_panel`/`_add_panel_*`, что и встречи:
 ## один способ показывать модальные окна на всю ленту.
 func _show_victory(monster: MonsterInstance, lines: Array[String]) -> void:
-	_open_panel("%s наплясался!" % monster.display_name())
+	# «Наплясались» во множественном числе не случайно: имена монстров бывают
+	# любого рода, и «Пыльца наплясался» — то, что игрок видел на экране.
+	# Плясали оба, поэтому форма честная и согласуется с чем угодно
+	_open_panel("Наплясались!")
+	_add_panel_label(monster.display_name(), 44)
 
 	for line: String in lines:
 		_add_panel_label(line, 38)

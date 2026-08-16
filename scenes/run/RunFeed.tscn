@@ -136,20 +136,23 @@ offset_right = 990.0
 offset_bottom = 1774.0
 color = Color(0.5921569, 0.76862746, 0.4156863, 1)
 
-[node name="PanelBackdrop" type="ColorRect" parent="." unique_id=370203205]
+[node name="PanelLayer" type="CanvasLayer" parent="."]
+layer = 40
+
+[node name="PanelBackdrop" type="ColorRect" parent="PanelLayer" unique_id=370203205]
 visible = false
 offset_right = 1080.0
 offset_bottom = 1920.0
 color = Color(0.07, 0.11, 0.08, 0.96)
 
-[node name="PanelScroll" type="ScrollContainer" parent="." unique_id=873230592]
+[node name="PanelScroll" type="ScrollContainer" parent="PanelLayer" unique_id=873230592]
 visible = false
 offset_left = 70.0
 offset_top = 200.0
 offset_right = 1010.0
 offset_bottom = 1700.0
 
-[node name="PanelBox" type="VBoxContainer" parent="PanelScroll" unique_id=1619577428]
+[node name="PanelBox" type="VBoxContainer" parent="PanelLayer/PanelScroll" unique_id=1619577428]
 visible = false
 custom_minimum_size = Vector2(940, 0)
 layout_mode = 2
