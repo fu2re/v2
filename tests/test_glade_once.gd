@@ -14,6 +14,7 @@ const COMMON := MonsterData.Rarity.COMMON
 
 
 func run_tests() -> void:
+	await _test_glade_is_empty_after_battle()
 	await _test_wild_bush_gives_once()
 	await _test_loot_bush_gives_once()
 	await _test_campfire_heals_once()
@@ -43,6 +44,62 @@ func _feed_with(glade: Glade) -> Node:
 	feed._show_glade(glade)
 	await _frames(1)
 	return feed
+
+
+## После боя поляна пуста: монстра нет, шкалы нет, награды не обещают.
+##
+## Живой отчёт со скриншотом: «этого экрана быть вообще не должно». Карточка
+## возвращалась в том же виде, в каком звала в бой — со спрайтом убежавшего
+## монстра, «Дружба 0/100» и «Победа: +10 серебра · сундук». Монстр к тому
+## моменту либо приручён, либо убежал, и обещать за него награду экран права
+## не имеет: игрок читает это как «сюда можно ещё раз».
+func _test_glade_is_empty_after_battle() -> void:
+	print("После боя поляна пуста")
+	var glade := _make(Glade.Type.BATTLE)
+	glade.grade = COMMON
+	var feed := await _feed_with(glade)
+
+	# До боя монстр на месте — иначе проверка ниже ничего не значит
+	check(feed._glade_art.texture != null, "до боя монстр показан")
+	check(feed._reward_label.visible, "до боя обещана награда")
+
+	feed._pending_result = "Проверка"
+	feed._awaiting_result_swipe = true
+	feed._dismiss_battle()
+	await _frames(2)
+
+	check(feed._glade_art.texture == null, "монстра на поляне больше нет")
+	check(not feed._reward_label.visible, "награду за него не обещают")
+	check(not feed._friendship_track.visible, "шкалы дружбы нет")
+	check(not feed._tame_banner.visible, "и пометки «можно подружиться» тоже")
+	check(feed._subline.text.is_empty(), "подпись про жанр и любимый фрукт убрана")
+	check(not feed._headline.text.contains(Registry.monster("synth_slime").display_name),
+		"в заголовке больше не имя монстра: [%s]" % feed._headline.text)
+	# Но уйти отсюда можно — иначе игрок заперт на пустой поляне
+	check(feed._next_button.visible, "кнопка «Дальше» на месте")
+	check(feed._next_button.pressed.get_connections().size() > 0,
+		"и у неё есть обработчик")
+
+	# Итог боя делает подсказку многострочной, и на живом прогоне она
+	# наезжала на полоску здоровья. Меряем ШРИФТОМ: `get_combined_minimum_size`
+	# у подписи с переносом возвращает размер ДО переноса и молча
+	# отчитывается, что всё помещается
+	feed._hint.text = "Вьюн убежал, но танец не пропал.\nЗащитник стал опытнее.\n%s" \
+		% RunFeed.HINT_NEXT
+	await _frames(2)
+	var font: Font = feed._hint.get_theme_font("font")
+	var size: int = feed._hint.get_theme_font_size("font_size")
+	var needed: Vector2 = font.get_multiline_string_size(feed._hint.text,
+		HORIZONTAL_ALIGNMENT_CENTER, feed._hint.size.x, size)
+	check(needed.y <= feed._hint.size.y + 1.0,
+		"итог боя помещается в подсказку (нужно %.0f, есть %.0f)"
+			% [needed.y, feed._hint.size.y])
+	check(feed._hint.position.y + needed.y <= feed._health_fill.position.y,
+		"и не наезжает на полоску здоровья")
+
+	RunManager.go_home()
+	feed.queue_free()
+	await _frames(2)
 
 
 func _make(type: Glade.Type, encounter := Glade.Encounter.MERCHANT) -> Glade:

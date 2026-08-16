@@ -849,6 +849,22 @@ func _open_taming() -> void:
 	_pending_taming = null
 
 
+## Поляна отдана: монстра здесь больше нет.
+##
+## После боя карточка возвращалась в том виде, в каком звала в бой, — со
+## спрайтом монстра, шкалой дружбы и строкой «Победа: +10 серебра · сундук».
+## Монстр к тому моменту либо приручён, либо убежал, и обещать за него
+## награду экран не имеет права: игрок читает это как «сюда можно ещё раз».
+## Поляна опустела, делать на ней нечего, остаётся только идти дальше.
+func _show_spent_glade() -> void:
+	_glade_art.texture = null
+	_headline.text = "Поляна опустела"
+	_headline.add_theme_color_override("font_color", Color("DCC7A4"))
+	_subline.text = ""
+	_hide_stakes()
+	_reward_label.visible = false
+
+
 ## Убрать сцену боя и вернуть карточку поляны.
 ##
 ## Вызывается по свайпу, а не сразу после боя: итог обязан оставаться
@@ -860,6 +876,7 @@ func _dismiss_battle() -> void:
 	_awaiting_result_swipe = false
 	_card.visible = true
 	_home_button.visible = true
+	_show_spent_glade()
 
 	# Бой кончился — лес возвращается. Без этого карточка с итогом висела бы
 	# в тишине до самого свайпа
@@ -868,7 +885,7 @@ func _dismiss_battle() -> void:
 		Jukebox.play_glade(Glade.TYPE_KEYS.get(glade.type, "battle"))
 	_refresh_buttons()
 	if not _pending_result.is_empty():
-		_hint.text = "%s\n\n%s" % [_pending_result, HINT_NEXT]
+		_hint.text = "%s\n%s" % [_pending_result, HINT_NEXT]
 		_pending_result = ""
 
 
