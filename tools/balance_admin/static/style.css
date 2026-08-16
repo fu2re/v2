@@ -192,12 +192,15 @@ table.obj-table th { color: var(--muted); font-weight: normal; font-size: 12px; 
 
 /* лента грейдов монстра */
 .grade-strip { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px; }
-.grade-strip figure { margin: 0; text-align: center; }
+.grade-strip figure { margin: 0; text-align: center; cursor: pointer; }
 .grade-strip img {
   width: 72px; height: 72px; object-fit: contain; background: var(--panel2);
   border: 1px solid var(--line); border-radius: 8px; image-rendering: pixelated;
 }
 .grade-strip figcaption { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.grade-strip figure.active img,
+.grade-strip figure.active .missing { border-color: var(--accent); }
+.grade-strip figure.active figcaption { color: var(--accent); }
 .grade-strip .missing {
   width: 72px; height: 72px; display: flex; align-items: center;
   justify-content: center; background: var(--panel2); color: var(--muted);

@@ -517,6 +517,12 @@ async function openEntities(kind, label, btn) {
     // Список готовых спрайтов: лента грейдов не должна светить битыми img
     const body = await getJSON("/api/images?dir=monster");
     extras.monsterImages = new Set(body.files || []);
+    // Множители грейдов и пороги дружбы: статы грейда = база × множитель,
+    // и переключатель обязан показывать именно то, что увидит игрок
+    const progression = (await getJSON("/api/configs/progression.json")).data;
+    extras.statScale = progression.grade_multipliers.stat_scale;
+    extras.strikeScale = progression.grade_multipliers.strike_scale;
+    extras.thresholds = progression.friendship.thresholds;
   }
 
   const rows = await getJSON(`/api/entities/${kind}`);
@@ -584,17 +590,22 @@ function entityCard(kind, row, extras) {
     colIdentity.appendChild(wrap);
   }
 
-  // -- лента грейдов: спрайты открываются по конвенции <id>_<грейд>.png,
-  // и увидеть все шесть важнее, чем путь к одному common в .tres
+  // -- лента грейдов: спрайты открываются по конвенции <id>_<грейд>.png.
+  // Она же — переключатель: выбранный грейд задаёт, чьи статы показывает
+  // и правит правая колонка
+  let selectedGrade = "common";
+  let renderMonsterStats = null;
   if (kind === "monsters" && extras?.monsterImages) {
     const h = document.createElement("h5");
-    h.textContent = "Грейды";
+    h.textContent = "Грейды — переключатель статов";
     colIdentity.appendChild(h);
     const strip = document.createElement("div");
     strip.className = "grade-strip";
     for (const grade of REFS.grade_keys) {
       const file = `${row.id}_${grade}.png`;
       const fig = document.createElement("figure");
+      fig.dataset.grade = grade;
+      if (grade === selectedGrade) fig.classList.add("active");
       if (extras.monsterImages.has(file)) {
         const img = document.createElement("img");
         img.loading = "lazy";
@@ -610,6 +621,12 @@ function entityCard(kind, row, extras) {
       const cap = document.createElement("figcaption");
       cap.textContent = grade;
       fig.appendChild(cap);
+      fig.onclick = () => {
+        selectedGrade = grade;
+        strip.querySelectorAll("figure").forEach(
+          (f) => f.classList.toggle("active", f.dataset.grade === grade));
+        if (renderMonsterStats) renderMonsterStats();
+      };
       strip.appendChild(fig);
     }
     colIdentity.appendChild(strip);
@@ -620,7 +637,82 @@ function entityCard(kind, row, extras) {
   colStats.className = "col";
   cols.appendChild(colStats);
   const statKeys = Object.keys(row.stats).filter((k) => !k.startsWith("_"));
-  if (statKeys.length) {
+  if (kind === "monsters" && extras?.statScale) {
+    // У монстра статы грейда = база × глобальный множитель грейда
+    // (progression.json). Переключатель показывает эффективные числа
+    // выбранного грейда; правка на любом грейде пересчитывает БАЗУ —
+    // отдельных статов на грейд в игре нет, лестница едина (GDD §6.3)
+    const liveBase = (key) => pending.stats[key] ?? row.stats[key];
+
+    renderMonsterStats = () => {
+      const scale = Number(extras.statScale[selectedGrade] || 1);
+      colStats.innerHTML =
+        `<h5>Числа грейда «${selectedGrade}» (JSON)</h5>`;
+
+      const fields = [
+        { key: "base_vibe", label: "Настрой", int: true },
+        { key: "base_health", label: "Здоровье", int: true },
+        { key: "base_power", label: "Сила удара", int: false },
+      ];
+      for (const f of fields) {
+        const base = Number(liveBase(f.key));
+        const effective = f.int
+          ? Math.round(base * scale)
+          : Math.round(base * scale * 100) / 100;
+
+        const wrap = document.createElement("div");
+        wrap.className = "field";
+        const lab = document.createElement("label");
+        lab.textContent = f.label;
+        wrap.appendChild(lab);
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.step = f.int ? "1" : "0.01";
+        input.value = effective;
+        wrap.appendChild(input);
+
+        const hint = document.createElement("div");
+        hint.className = "hint";
+        const baseText = () => {
+          const b = Number(liveBase(f.key));
+          return scale === 1
+            ? `это база вида (${f.key})`
+            : `база ${f.int ? Math.round(b) : b} × ${scale} (${f.key})`;
+        };
+        hint.textContent = baseText();
+        wrap.appendChild(hint);
+
+        input.oninput = () => {
+          const raw = Number(input.value);
+          if (Number.isNaN(raw)) return;
+          // Обратный пересчёт: правка легендарного двигает базу, и вся
+          // лестница масштабируется — единственная честная семантика
+          // при глобальных множителях
+          const newBase = f.int
+            ? Math.round(raw / scale)
+            : Math.round(raw / scale * 1000) / 1000;
+          pending.stats[f.key] = newBase;
+          hint.textContent = baseText();
+          input.classList.add("changed");
+          enableSave();
+        };
+        colStats.appendChild(wrap);
+      }
+
+      // Производные грейда, которые правятся не здесь — но видеть их
+      // рядом со статами нужно, иначе грейд опять читается только цифрой
+      const derived = document.createElement("div");
+      derived.className = "doc";
+      derived.textContent =
+        `Злость (множитель удара): ×${extras.strikeScale[selectedGrade]}\n`
+        + `Порог дружбы: ${extras.thresholds[selectedGrade]}\n`
+        + "Множители и пороги общие для всех видов — правятся "
+        + "в progression.json → grade_multipliers / friendship.";
+      colStats.appendChild(derived);
+    };
+    renderMonsterStats();
+  } else if (statKeys.length) {
     colStats.innerHTML = "<h5>Числа (JSON)</h5>";
     for (const key of statKeys) {
       const value = row.stats[key];
