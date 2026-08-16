@@ -29,12 +29,8 @@
       "type": "beat"
     },
     {
-      "beat": 8.25,
-      "type": "attack"
-    },
-    {
       "beat": 8.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 9.0,
@@ -201,10 +197,6 @@
       "type": "beat"
     },
     {
-      "beat": 52.25,
-      "type": "beat"
-    },
-    {
       "beat": 52.5,
       "type": "beat"
     },
@@ -218,11 +210,11 @@
     },
     {
       "beat": 54.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 55.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 57.0,
@@ -265,15 +257,7 @@
       "type": "beat"
     },
     {
-      "beat": 68.25,
-      "type": "beat"
-    },
-    {
       "beat": 68.5,
-      "type": "beat"
-    },
-    {
-      "beat": 68.75,
       "type": "beat"
     },
     {
@@ -282,7 +266,7 @@
     },
     {
       "beat": 69.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 71.5,
@@ -290,7 +274,7 @@
     },
     {
       "beat": 72.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 75.5,
@@ -309,16 +293,12 @@
       "type": "beat"
     },
     {
-      "beat": 77.25,
-      "type": "beat"
-    },
-    {
       "beat": 77.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 79.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 80.0,
@@ -333,15 +313,7 @@
       "type": "beat"
     },
     {
-      "beat": 84.25,
-      "type": "beat"
-    },
-    {
       "beat": 84.5,
-      "type": "beat"
-    },
-    {
-      "beat": 84.75,
       "type": "beat"
     },
     {
@@ -350,11 +322,11 @@
     },
     {
       "beat": 86.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 87.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 90.5,
@@ -377,12 +349,8 @@
       "type": "beat"
     },
     {
-      "beat": 93.25,
-      "type": "attack"
-    },
-    {
       "beat": 94.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 95.0,

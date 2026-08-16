@@ -29,16 +29,8 @@
       "type": "beat"
     },
     {
-      "beat": 8.25,
-      "type": "attack"
-    },
-    {
       "beat": 8.5,
-      "type": "beat"
-    },
-    {
-      "beat": 8.75,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 11.5,
@@ -277,16 +269,12 @@
       "type": "beat"
     },
     {
-      "beat": 69.25,
-      "type": "beat"
-    },
-    {
       "beat": 69.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 70.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 71.0,
@@ -306,15 +294,11 @@
     },
     {
       "beat": 76.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 77.0,
-      "type": "beat"
-    },
-    {
-      "beat": 77.25,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 77.5,
@@ -330,7 +314,7 @@
     },
     {
       "beat": 81.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 83.0,
@@ -338,15 +322,11 @@
     },
     {
       "beat": 84.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 85.0,
       "type": "skill"
-    },
-    {
-      "beat": 85.25,
-      "type": "beat"
     },
     {
       "beat": 85.5,
@@ -354,7 +334,7 @@
     },
     {
       "beat": 86.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 88.0,
@@ -366,7 +346,7 @@
     },
     {
       "beat": 90.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 91.5,
@@ -378,10 +358,6 @@
     },
     {
       "beat": 93.0,
-      "type": "attack"
-    },
-    {
-      "beat": 93.25,
       "type": "beat"
     },
     {
@@ -394,11 +370,11 @@
     },
     {
       "beat": 96.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 98.0,
-      "type": "attack"
+      "type": "beat"
     }
   ],
   "monster_pattern": [

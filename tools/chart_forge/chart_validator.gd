@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Правила разметки чартов на стороне Godot.
 ##
-## Те же семь правил, что в tools/chartgen/beatroot_chartgen/chart.py.
+## Те же восемь правил, что в tools/chartgen/beatroot_chartgen/chart.py.
 ## Дублирование намеренное: генератор проверяет чарт при создании, редактор —
 ## при каждой правке. Живая проверка в редакторе важнее отсутствия дубля,
 ## потому что нечестный чарт дешевле не выпустить, чем найти на плейтесте.
@@ -35,6 +35,15 @@ const MAX_DENSITY := {
 const MIN_SHIELD_GAP := 2.0
 const WINDUP_LEAD := 2.0
 const MIN_CONTRAST_EPS := 0.0001
+
+## Минимальный интервал между СОСЕДНИМИ нотами, в секундах.
+##
+## Средняя плотность (MAX_DENSITY) этого не ловит: пара шестнадцатых
+## на 256 BPM стоит в 59 мс при окне тапа ±110 мс (Judge.GOOD_WINDOW) —
+## окно накрывает обе ноты, тап засчитывает ближайшую, вторая уходит
+## в промах и рвёт серию. Запас 1.2 оставляет ошибке место: тап в свои
+## ±110 мс всегда ближе к своей ноте, чем к соседней.
+const MIN_NOTE_INTERVAL_SECONDS := Judge.GOOD_WINDOW * 1.2
 
 ## Серия — связка нот без длинной паузы. Атака её завершает.
 const SERIES_GAP := 2.0
@@ -69,6 +78,7 @@ static func validate(chart: ChartData) -> Array[Problem]:
 	_check_not_too_early(chart, bpb, problems)
 	_check_shield_collisions(chart, problems)
 	_check_attacks(chart, problems)
+	_check_note_interval(chart, problems)
 
 	problems.sort_custom(func(a, b): return a.beat < b.beat)
 	return problems
@@ -181,6 +191,18 @@ static func _check_shield_collisions(chart: ChartData, out: Array[Problem]) -> v
 		if chart.note_types[i] == ChartData.NoteType.SHIELD \
 				or chart.note_types[i + 1] == ChartData.NoteType.SHIELD:
 			out.append(Problem.new(chart.note_beats[i], "щит совпадает с нотой другого типа"))
+
+
+## 8. Соседние ноты не ближе окна GOOD с запасом (MIN_NOTE_INTERVAL_SECONDS).
+static func _check_note_interval(chart: ChartData, out: Array[Problem]) -> void:
+	var min_beats := MIN_NOTE_INTERVAL_SECONDS * chart.bpm / 60.0
+	for i in range(1, chart.note_count()):
+		var gap := chart.note_beats[i] - chart.note_beats[i - 1]
+		if gap < min_beats - MIN_CONTRAST_EPS:
+			out.append(Problem.new(chart.note_beats[i],
+				"ноты в %.0f мс друг от друга — окно тапа (±%.0f мс) накрывает обе"
+					% [gap * 60.0 / chart.bpm * 1000.0, Judge.GOOD_WINDOW * 1000.0]))
+			return
 
 
 static func describe_all(problems: Array[Problem]) -> String:

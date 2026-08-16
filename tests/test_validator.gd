@@ -15,6 +15,7 @@ func run_tests() -> void:
 	_test_catches_early_first_note()
 	_test_catches_shield_collision()
 	_test_density_limit_by_difficulty()
+	_test_catches_notes_closer_than_tap_window()
 	_test_forge_knows_every_note_type()
 
 
@@ -122,21 +123,36 @@ func _test_catches_shield_collision() -> void:
 func _test_density_limit_by_difficulty() -> void:
 	print("Предел плотности зависит от сложности")
 	var B := ChartData.NoteType.BEAT
-	# Шестнадцатые: 8 нот в секунду при 120 BPM
+	# Шаг 0.3 доли при 120 BPM = 150 мс: интервал (правило 8) соблюдён,
+	# перегружена только средняя плотность — тест мерит ровно её
 	var beats: Array = []
 	var types: Array = []
 	for i in 16:
-		beats.append(8.0 + i * 0.25)
+		beats.append(8.0 + i * 0.3)
 		types.append(B)
 	var dense_beats: Array = [4.0, 5.0, 6.0, 7.0] + beats
 	var dense_types: Array = [B, B, B, B] + types
 
 	check(_has_problem(_make(dense_beats, dense_types, "easy")),
-		"шестнадцатые на лёгкой сложности отклонены")
+		"плотный поток на лёгкой сложности отклонён")
 	check(_has_problem(_make(dense_beats, dense_types, "normal")),
-		"шестнадцатые на нормальной отклонены")
+		"плотный поток на нормальной отклонён")
 	check(not _has_problem(_make(dense_beats, dense_types, "hard")),
 		"на сложной та же плотность допустима")
+
+
+## Правило 8: соседние ноты не ближе окна GOOD с запасом. Средняя плотность
+## пары впритык не ловит — окно одного тапа накрывало обе, и вторая уходила
+## в промах, в котором игрок не виноват.
+func _test_catches_notes_closer_than_tap_window() -> void:
+	print("Ловит ноты ближе окна тапа")
+	var B := ChartData.NoteType.BEAT
+	# 0.25 доли при 120 BPM = 125 мс — меньше минимума в 132 мс
+	check(_has_problem(_make([4.0, 5.0, 6.0, 7.0, 8.0, 8.25], [B, B, B, B, B, B])),
+		"пара нот в 125 мс отклонена")
+	# 0.3 доли = 150 мс — уже честно
+	check(not _has_problem(_make([4.0, 5.0, 6.0, 7.0, 8.0, 8.3], [B, B, B, B, B, B])),
+		"150 мс между нотами — годно")
 
 
 ## Редактор обязан знать КАЖДЫЙ тип ноты из enum.

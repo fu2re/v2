@@ -86,6 +86,17 @@ STRONG_BEATS_ONLY = ("common", "easy")
 # Минимальный разрыв между щитами в долях. Меньше — игрок физически не успевает.
 MIN_SHIELD_GAP = 2.0
 
+# Минимальный интервал между СОСЕДНИМИ нотами, в секундах.
+#
+# Средняя плотность (MAX_NOTES_PER_WINDOW) этого не ловит: пара шестнадцатых
+# на 256 BPM стоит в 59 мс при окне тапа ±110 мс (Judge.GOOD_WINDOW в Godot) —
+# окно накрывает обе ноты, тап засчитывает ближайшую, вторая уходит в промах
+# и рвёт серию. Честно взять такую пару можно только 17 тапами в секунду.
+# Запас 1.2 оставляет ошибке место: тап в свои ±110 мс всегда ближе к своей
+# ноте, чем к соседней. Число обязано совпадать с MIN_NOTE_INTERVAL_SECONDS
+# в chart_validator.gd (= 0.110 * 1.2).
+MIN_NOTE_INTERVAL_SECONDS = 0.132
+
 # За сколько долей до щита монстр обязан начать замах.
 WINDUP_LEAD = 2.0
 
@@ -203,6 +214,7 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     notes = [ChartNote(b, t) for b, t in beats.items()]
     notes = _ease_in(notes, until=bpb * 2)
     notes = _thin(notes, MAX_NOTES_PER_WINDOW[difficulty], song.sec_per_beat)
+    notes = _spread(notes, song.sec_per_beat)
     notes = _mark_attacks(notes, TARGET_SERIES_NOTES.get(difficulty, 6))
 
     return Chart(
@@ -326,6 +338,32 @@ def _thin(notes: list[ChartNote], limit: int, sec_per_beat: float) -> list[Chart
     return kept
 
 
+def _spread(notes: list[ChartNote], sec_per_beat: float) -> list[ChartNote]:
+    """Развести соседние ноты не ближе MIN_NOTE_INTERVAL_SECONDS (правило 8).
+
+    Средняя плотность уже ограничена `_thin`, но она не запрещает ПАРУ нот
+    впритык: шестнадцатые на быстрых грейдах стояли в 59 мс, окно одного тапа
+    накрывало обе, и вторая уходила в промах, из которого игрок не виноват.
+
+    Обычная нота, вставшая слишком близко, выбрасывается. Особая (щит, скилл,
+    перекус) неприкосновенна — вместо неё уступает место обычный сосед слева.
+    """
+    min_gap = MIN_NOTE_INTERVAL_SECONDS / sec_per_beat  # интервал в долях
+    kept: list[ChartNote] = []
+    for n in sorted(notes, key=lambda x: x.beat):
+        while kept and n.beat - kept[-1].beat < min_gap - 1e-9 \
+                and kept[-1].type == "beat" and n.type != "beat":
+            kept.pop()
+        if kept and n.beat - kept[-1].beat < min_gap - 1e-9:
+            if n.type == "beat":
+                continue
+            # Две особые ноты впритык генератор не ставит (щиты разведены
+            # на MIN_SHIELD_GAP, скилл и перекус — на секунду от щитов);
+            # если случилось — оставляем обе, валидатор поймает и назовёт
+        kept.append(n)
+    return kept
+
+
 def validate(chart: Chart) -> list[str]:
     """Проверить чарт по правилам разметки. Пустой список = чарт годен."""
     problems: list[str] = []
@@ -381,6 +419,18 @@ def validate(chart: Chart) -> list[str]:
 
     # 7. Атака стоит только в конце связки и никогда сразу после паузы
     problems.extend(_check_attacks(notes))
+
+    # 8. Соседние ноты не ближе окна GOOD с запасом
+    min_gap_beats = MIN_NOTE_INTERVAL_SECONDS / spb
+    for a, b in zip(notes, notes[1:]):
+        gap = b.beat - a.beat
+        if gap < min_gap_beats - 1e-9:
+            problems.append(
+                f"доли {a.beat}–{b.beat}: ноты в {gap * spb * 1000:.0f} мс "
+                f"друг от друга — окно тапа накрывает обе "
+                f"(минимум {MIN_NOTE_INTERVAL_SECONDS * 1000:.0f} мс)"
+            )
+            break
 
     return problems
 

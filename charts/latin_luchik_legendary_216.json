@@ -41,10 +41,6 @@
       "type": "beat"
     },
     {
-      "beat": 9.75,
-      "type": "beat"
-    },
-    {
       "beat": 11.5,
       "type": "beat"
     },
@@ -54,11 +50,11 @@
     },
     {
       "beat": 13.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 14.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 15.5,
@@ -78,15 +74,11 @@
     },
     {
       "beat": 19.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 19.75,
-      "type": "beat"
-    },
-    {
-      "beat": 20.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 21.0,
@@ -102,7 +94,7 @@
     },
     {
       "beat": 23.75,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 25.0,
@@ -110,7 +102,7 @@
     },
     {
       "beat": 26.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 27.0,
@@ -121,12 +113,8 @@
       "type": "beat"
     },
     {
-      "beat": 28.0,
-      "type": "beat"
-    },
-    {
       "beat": 29.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 30.0,
@@ -142,7 +130,7 @@
     },
     {
       "beat": 33.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 34.0,
@@ -150,15 +138,11 @@
     },
     {
       "beat": 35.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 35.75,
       "type": "skill"
-    },
-    {
-      "beat": 36.0,
-      "type": "beat"
     },
     {
       "beat": 37.0,
@@ -170,11 +154,11 @@
     },
     {
       "beat": 39.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 39.75,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 40.5,
@@ -194,11 +178,11 @@
     },
     {
       "beat": 43.5,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 44.5,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 45.5,
@@ -218,11 +202,11 @@
     },
     {
       "beat": 49.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 50.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 51.0,
@@ -230,10 +214,6 @@
     },
     {
       "beat": 51.75,
-      "type": "beat"
-    },
-    {
-      "beat": 52.0,
       "type": "beat"
     },
     {
@@ -262,10 +242,6 @@
     },
     {
       "beat": 59.0,
-      "type": "beat"
-    },
-    {
-      "beat": 59.75,
       "type": "beat"
     },
     {
@@ -305,15 +281,7 @@
       "type": "beat"
     },
     {
-      "beat": 68.0,
-      "type": "beat"
-    },
-    {
       "beat": 71.75,
-      "type": "beat"
-    },
-    {
-      "beat": 72.0,
       "type": "beat"
     },
     {
@@ -321,16 +289,8 @@
       "type": "beat"
     },
     {
-      "beat": 74.0,
-      "type": "beat"
-    },
-    {
       "beat": 75.75,
       "type": "beat"
-    },
-    {
-      "beat": 76.0,
-      "type": "attack"
     },
     {
       "beat": 76.5,
@@ -342,11 +302,7 @@
     },
     {
       "beat": 77.5,
-      "type": "beat"
-    },
-    {
-      "beat": 79.75,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 80.0,
@@ -366,10 +322,6 @@
     },
     {
       "beat": 83.75,
-      "type": "attack"
-    },
-    {
-      "beat": 84.0,
       "type": "beat"
     },
     {
@@ -378,7 +330,7 @@
     },
     {
       "beat": 86.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 87.0,
@@ -390,7 +342,7 @@
     },
     {
       "beat": 89.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 90.0,
@@ -402,11 +354,7 @@
     },
     {
       "beat": 91.75,
-      "type": "beat"
-    },
-    {
-      "beat": 92.0,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 93.0,
@@ -414,7 +362,7 @@
     },
     {
       "beat": 94.0,
-      "type": "attack"
+      "type": "beat"
     },
     {
       "beat": 95.0,
@@ -422,7 +370,7 @@
     },
     {
       "beat": 95.75,
-      "type": "beat"
+      "type": "attack"
     },
     {
       "beat": 99.75,
