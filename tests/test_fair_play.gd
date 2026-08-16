@@ -12,9 +12,19 @@ const UNCOMMON := MonsterData.Rarity.UNCOMMON
 const RARE := MonsterData.Rarity.RARE
 
 
+## Сколько раз игрок успевает ткнуть в кнопку между двумя нотами, если долбит.
+##
+## Пять — оценка снизу: палец ребёнка выдаёт 5–10 нажатий в секунду, а нот
+## в чарте от двух до восьми в секунду. Занижено намеренно: если приём
+## не работает даже при пяти, при десяти он тем более не работает.
+const MASH_TAPS_BETWEEN_NOTES := 5
+
+
 func run_tests() -> void:
 	_test_spam_earns_nothing()
 	_test_stray_tap_does_not_hurt_health()
+	_test_one_button_does_not_survive()
+	_test_mashing_is_worse_than_rhythm()
 	_test_surface_is_almost_all_common()
 	_test_high_grades_unlock_with_depth()
 	_test_taming_goes_step_by_step()
@@ -55,10 +65,132 @@ func _test_spam_earns_nothing() -> void:
 	check(spammer.attacks_wasted > 0, "атака ушла вхолостую")
 
 
-## Но спам не должен ОТНИМАТЬ забег: цена — прогресс, а не здоровье.
-## Ребёнок, который просто пробует экран, не обязан за это платить.
+## Одной кнопкой бой не проходится.
+##
+## Живой отчёт: «могу просто всегда жать вправо и не получать урона».
+## Предыдущая проверка спама работала на голом состоянии и такого не видела —
+## она мерила связку из трёх нот, а не НАСТОЯЩИЙ чарт, где важно, сколько
+## в нём атак монстра и доходят ли они. Здесь чарт прогоняется целиком
+## ровно так, как это делает бой: правая кнопка берёт только `beat`,
+## всё остальное уходит в промах по истечении окна.
+func _test_one_button_does_not_survive() -> void:
+	print("Одной кнопкой бой не проходится")
+	GameState.reset()
+	var guardian := GameState.tame("bass_bear", COMMON)
+
+	for grade in [COMMON, MonsterData.Rarity.RARE, MonsterData.Rarity.EPIC]:
+		var chart := ChartSelect.load_for(Registry.monster("synth_slime"), grade)
+		if chart == null:
+			check(false, "чарт грейда %s не загрузился" % MonsterData.rarity_name(grade))
+			continue
+
+		var state := BattleState.new()
+		state.setup(MonsterInstance.create("synth_slime", grade), guardian, 100, 0)
+		var strikes := 0
+		for i in chart.note_count():
+			if state.is_over:
+				break
+			if i > 0 and chart.note_beats[i] - chart.note_beats[i - 1] > ChartValidator.SERIES_GAP:
+				state.break_series()
+			var type: int = chart.note_types[i]
+			if NoteRules.accepts(type, NoteRules.Lane.NORMAL):
+				# Правая кнопка нажата всегда и всегда идеально. И между
+				# нотами она тоже нажата — это и есть спам: кнопку долбят,
+				# а не жмут по одной ноте
+				for s in MASH_TAPS_BETWEEN_NOTES:
+					state.register_stray_tap()
+				state.register_hit(Judge.Grade.PERFECT)
+				continue
+			# Особая нота не взята: она истекает и судится промахом
+			strikes += 1
+			match type:
+				ChartData.NoteType.SHIELD:
+					state.take_strike(false)
+				ChartData.NoteType.HEAVY:
+					state.take_strike(true)
+				ChartData.NoteType.ATTACK:
+					state.register_attack(Judge.Grade.MISS)
+				ChartData.NoteType.SKILL:
+					state.use_skill(Judge.Grade.MISS)
+
+		var name := MonsterData.rarity_name(grade)
+		note("%s: пропущено особых %d, здоровье %d/%d, щит %d, Настрой %d/%d"
+			% [name, strikes, state.health, state.max_health, state.shield,
+				state.vibe, state.max_vibe])
+		# Проверяется НАБЛЮДАЕМЫЙ исход: держать кнопку нельзя. Не «сколько
+		# урона прошло» и не «сколько нот пропущено» — те цифры можно
+		# подкрутить, оставив приём рабочим
+		check(not state.did_win, "%s: спам одной кнопкой не побеждает" % name)
+		check(state.health <= 0, "%s: спам одной кнопкой доводит до поражения" % name)
+
+
+## Долбить кнопку строго хуже, чем жать по ноте.
+##
+## Это ГЛАВНОЕ утверждение про спам, и проверка выше его не делает: бой одной
+## кнопкой проигрывается и без штрафа за долбёжку — просто потому, что атаки
+## монстра доходят. Здесь обе игры одинаково точны по нотам, и разница ровно
+## одна: во второй между нотами кнопку долбят.
+func _test_mashing_is_worse_than_rhythm() -> void:
+	print("Долбёжка хуже игры по такту")
+	GameState.reset()
+	var guardian := GameState.tame("bass_bear", COMMON)
+	var chart := ChartSelect.load_for(Registry.monster("synth_slime"), COMMON)
+	check(chart != null, "чарт загрузился")
+	if chart == null:
+		return
+
+	var clean := _play_perfect(chart, guardian, 0)
+	var mashed := _play_perfect(chart, guardian, MASH_TAPS_BETWEEN_NOTES)
+
+	note("по такту: здоровье %d, щит %d, победа %s"
+		% [clean.health, clean.shield, "да" if clean.did_win else "нет"])
+	note("с долбёжкой: здоровье %d, щит %d, победа %s"
+		% [mashed.health, mashed.shield, "да" if mashed.did_win else "нет"])
+
+	check(clean.did_win, "точная игра побеждает")
+	check(clean.health + clean.shield > mashed.health + mashed.shield,
+		"долбёжка стоит запаса (%d против %d)"
+			% [mashed.health + mashed.shield, clean.health + clean.shield])
+	# И не только запаса: испорченная серия отнимает собственный урон игрока
+	check(mashed.attacks_wasted > clean.attacks_wasted,
+		"и атаки уходят вхолостую (%d против %d)"
+			% [mashed.attacks_wasted, clean.attacks_wasted])
+
+
+## Идеальное прохождение чарта. `mash` — сколько лишних тапов игрок успевает
+## воткнуть между нотами; ноль означает игру ровно по нотам.
+func _play_perfect(chart: ChartData, guardian: MonsterInstance,
+		mash: int) -> BattleState:
+	var state := BattleState.new()
+	state.setup(MonsterInstance.create("synth_slime", COMMON), guardian, 100, 0)
+	for i in chart.note_count():
+		if state.is_over:
+			break
+		if i > 0 and chart.note_beats[i] - chart.note_beats[i - 1] > ChartValidator.SERIES_GAP:
+			state.break_series()
+		for s in mash:
+			state.register_stray_tap()
+		match chart.note_types[i]:
+			ChartData.NoteType.ATTACK:
+				state.register_attack(Judge.Grade.PERFECT)
+			ChartData.NoteType.SHIELD, ChartData.NoteType.HEAVY:
+				state.block_strike()
+			ChartData.NoteType.SKILL:
+				state.use_skill(Judge.Grade.PERFECT)
+			_:
+				state.register_hit(Judge.Grade.PERFECT)
+	return state
+
+
+## Любопытство бесплатно, долбёжка — нет.
+##
+## Раньше здесь стояло «тап мимо НЕ бьёт по здоровью», и это оказалось дырой:
+## рваная серия отнимала у игрока только его собственный урон, поэтому долбить
+## правую кнопку было строго выгодно — каждый бит попадал в своё окно сам
+## собой, а промахи между ними не стоили ничего. Отсюда две разные вещи:
+## первые тапы прощаются, тапы ПОДРЯД — нет.
 func _test_stray_tap_does_not_hurt_health() -> void:
-	print("Тап мимо не бьёт по здоровью")
+	print("Потыкать в экран бесплатно, долбить — нет")
 	GameState.reset()
 	var state := BattleState.new()
 	state.setup(MonsterInstance.create("synth_slime", COMMON),
@@ -66,13 +198,25 @@ func _test_stray_tap_does_not_hurt_health() -> void:
 
 	var health := state.health
 	var shield := state.shield
-	for i in 30:
+	for i in BattleState.STRAY_FREE_TAPS:
 		state.register_stray_tap()
 
-	check_eq(state.health, health, "здоровье цело после тридцати лишних тапов")
+	check_eq(state.health, health, "здоровье цело: ребёнок пробует экран")
 	check_eq(state.shield, shield, "щит тоже цел")
-	check(not state.series_clean, "но серия испорчена")
+	check(not state.series_clean, "но серия уже испорчена")
 	check_eq(state.combo, 0, "и комбо сброшено")
+
+	# Дальше — платно
+	state.register_stray_tap()
+	check(state.shield < shield, "четвёртый тап подряд уже стоит")
+
+	# И счёт обрывается взятой нотой: пауза с попаданием возвращает прощение
+	state.register_hit(Judge.Grade.PERFECT)
+	var after_hit := state.shield
+	for i in BattleState.STRAY_FREE_TAPS:
+		state.register_stray_tap()
+	check_eq(state.shield, after_hit,
+		"после взятой ноты счёт лишних тапов начинается заново")
 
 
 # ────────────────────────────── редкость ────────────────────────────────────

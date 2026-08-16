@@ -66,6 +66,27 @@ const SHIELD_RESTORE := 2
 ## нота теряла смысл ровно там, где ребёнок встречает её впервые.
 const MAX_BLOW_SHARE := 0.9
 
+## Сколько лишних тапов подряд прощается, прежде чем они начнут стоить.
+##
+## Ноль был бы наказанием за любопытство: ребёнок, впервые увидевший экран,
+## тыкает в него, и платить за это он не должен. Но и бесплатным спам быть
+## не может — см. STRAY_TAP_DAMAGE.
+const STRAY_FREE_TAPS := 3
+
+## Цена каждого лишнего тапа СВЕРХ прощённых.
+##
+## Живой отчёт: «могу просто всегда жать вправо и не получать урона».
+## Так и было: рваная серия отнимала у игрока его собственный урон, но
+## здоровье не трогала, поэтому долбить правую кнопку двадцать раз в секунду
+## было строго выгодно — каждый бит попадал в своё окно сам собой, а девятнадцать
+## промахов между ними не стоили ничего. Ритм-игра при этом отменялась: «когда»
+## переставало иметь значение.
+##
+## Цена мала намеренно. Она не должна убивать — она должна сделать спам
+## ХУЖЕ игры по такту, а этого достаточно: непрерывная долбёжка съедает щит
+## за несколько секунд, и дальше каждый лишний тап идёт в здоровье.
+const STRAY_TAP_DAMAGE := 2
+
 ## Базовый запас щита.
 ##
 ## Щит СКВОЗНОЙ, как и здоровье: забег — это испытание на выносливость,
@@ -114,6 +135,8 @@ var experience_scale: float = 1.0
 
 var combo: int = 0
 var max_combo: int = 0
+## Сколько лишних тапов подряд без единой взятой ноты (см. STRAY_TAP_DAMAGE).
+var stray_run: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
 
@@ -181,6 +204,7 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 
 	combo = 0
 	max_combo = 0
+	stray_run = 0
 	blocked = 0
 	strikes_taken = 0
 	skills_used = 0
@@ -211,6 +235,9 @@ func genre_multiplier() -> float:
 func register_hit(grade: int) -> int:
 	if is_over:
 		return 0
+	# Взятая нота обрывает счёт лишних тапов: спам — это тапы ПОДРЯД,
+	# а не их общее число за бой
+	stray_run = 0
 
 	grade_counts[grade] += 1
 
@@ -239,6 +266,9 @@ func register_hit(grade: int) -> int:
 func register_attack(grade: int) -> int:
 	if is_over:
 		return 0
+	# Взятая нота обрывает счёт лишних тапов: спам — это тапы ПОДРЯД,
+	# а не их общее число за бой
+	stray_run = 0
 
 	grade_counts[grade] += 1
 
@@ -287,13 +317,21 @@ func register_attack(grade: int) -> int:
 ## До этого лишний тап не стоил ничего, и найденный на живом прогоне приём
 ## «спамить обе кнопки» давал попадание по каждой ноте бесплатно —
 ## то есть отменял ритм-игру целиком.
-func register_stray_tap() -> void:
+func register_stray_tap() -> int:
 	if is_over:
-		return
+		return 0
 	series_clean = false
 	if combo != 0:
 		combo = 0
 		combo_changed.emit(combo, 1.0)
+
+	# Считаются тапы ПОДРЯД, и счёт обнуляет любая взятая нота. Разница между
+	# «потыкал в экран» и «долблю кнопку» именно в этом: первое обрывается
+	# попаданием, второе — нет
+	stray_run += 1
+	if stray_run <= STRAY_FREE_TAPS:
+		return 0
+	return -_take_damage(STRAY_TAP_DAMAGE)
 
 
 ## Пауза в музыке обрывает серию.
@@ -321,6 +359,9 @@ func _reset_series() -> void:
 func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) -> int:
 	if is_over:
 		return 0
+	# Взятая нота обрывает счёт лишних тапов: спам — это тапы ПОДРЯД,
+	# а не их общее число за бой
+	stray_run = 0
 
 	grade_counts[grade] += 1
 
@@ -377,6 +418,10 @@ func effective_window_scale(current_beat: float = 0.0) -> float:
 func block_strike() -> void:
 	if is_over:
 		return
+	# Взятая нота обрывает счёт лишних тапов: спам — это тапы ПОДРЯД,
+	# а не их общее число за бой
+	stray_run = 0
+
 	blocked += 1
 	combo += 1
 	max_combo = maxi(max_combo, combo)
@@ -394,6 +439,10 @@ func block_strike() -> void:
 func take_strike(heavy: bool = false) -> int:
 	if is_over:
 		return 0
+	# Взятая нота обрывает счёт лишних тапов: спам — это тапы ПОДРЯД,
+	# а не их общее число за бой
+	stray_run = 0
+
 	strikes_taken += 1
 	grade_counts[Judge.Grade.MISS] += 1
 	combo = 0
