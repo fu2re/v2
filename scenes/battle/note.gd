@@ -13,7 +13,7 @@ const COLORS := {
 	ChartData.NoteType.BEAT: Color("00E5FF"),
 	ChartData.NoteType.SKILL: Color("FF6BDE"),
 	ChartData.NoteType.SHIELD: Color("2E9BFF"),
-	ChartData.NoteType.SNACK: Color("B87AFF"),
+	ChartData.NoteType.HEAVY: Color("B87AFF"),
 	# Атака — единственная нота, наносящая урон. Она обязана отличаться
 	# и цветом, и формой: игрок должен узнавать её краем глаза
 	ChartData.NoteType.ATTACK: Color("FFD24D"),
@@ -58,7 +58,7 @@ func _draw() -> void:
 			_draw_shield()
 		ChartData.NoteType.ATTACK:
 			_draw_star()
-		ChartData.NoteType.SNACK:
+		ChartData.NoteType.HEAVY:
 			_draw_flask()
 		_:
 			draw_circle(Vector2.ZERO, RADIUS, _color)

@@ -59,7 +59,7 @@ func _make(type: Glade.Type, encounter := Glade.Encounter.MERCHANT) -> Glade:
 ## Сколько всего добра у игрока: любое изменение здесь после второго
 ## нажатия и есть баг.
 func _wealth() -> int:
-	var total := RunManager.run_silver + GameState.total_potions()
+	var total := RunManager.run_silver
 	for count: int in RunManager.run_seed_bag.values():
 		total += count
 	for count: int in RunManager.run_fruits.values():
@@ -109,20 +109,35 @@ func _test_loot_bush_gives_once() -> void:
 	await _frames(2)
 
 
+## Костёр лечит РОВНО СТОЛЬКО, сколько съедено.
+##
+## Сам по себе он не лечит вовсе (GDD §8.2.3): здоровье возвращают фрукты,
+## и каждый съеденный уходит из сумки. Открыть панель десять раз можно —
+## лечиться будет нечем.
 func _test_campfire_heals_once() -> void:
-	print("Костёр лечит один раз")
+	print("Костёр лечит ровно на съеденное")
 	var feed: Node = await _feed_with(_make(Glade.Type.CAMPFIRE))
 	RunManager.set_health(10)
+	GameState.add_fruit("drum_berry", FruitData.Quality.PLAIN, 1)
 
+	# Пустой привал не лечит: открытие панели — не награда
 	feed._resolve_glade()
 	await _frames(1)
-	var after_first := RunManager.health
-	check(after_first > 10, "первый привал вылечил (%d)" % after_first)
+	check_eq(RunManager.health, 10, "открытая панель сама по себе не лечит")
 
+	var berry := Registry.fruit("drum_berry")
+	feed._eat_at_campfire("drum_berry", FruitData.Quality.PLAIN)
+	await _frames(1)
+	var after_first := RunManager.health
+	check_eq(after_first, 10 + berry.heal(), "съеденный фрукт вылечил")
+	check_eq(GameState.fruit_count("drum_berry", FruitData.Quality.PLAIN), 0,
+		"и ушёл из сумки")
+
+	# Есть нечего — здоровье стоит на месте
 	for i in 10:
-		feed._resolve_glade()
+		feed._eat_at_campfire("drum_berry", FruitData.Quality.PLAIN)
 		await _frames(1)
-	check_eq(RunManager.health, after_first, "десять повторов не долечили")
+	check_eq(RunManager.health, after_first, "без фруктов лечить нечем")
 
 	RunManager.go_home()
 	feed.queue_free()

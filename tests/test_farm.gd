@@ -191,7 +191,7 @@ func _test_no_tier_is_pointless() -> void:
 	for tier in range(4):
 		var value := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
 			* FruitData.tier_friendship_scale(tier)))
-		var seconds: int = FruitData.GROW_TIME[tier]
+		var seconds := Balance.fruit_grow_seconds(tier)
 
 		check(value > previous,
 			"тир %d даёт %d дружбы — не больше предыдущего (%d)" % [

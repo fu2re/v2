@@ -177,9 +177,10 @@ func _test_groove_is_shared_across_glades() -> void:
 	check_eq(RunManager.health, full - 40,
 		"Здоровье не восстановилось сам на новой поляне — в этом всё напряжение забега")
 
-	RunManager.rest_at_campfire()
-	check_eq(RunManager.health, full - 40 + RunManager.CAMPFIRE_RESTORE,
-		"костёр восстанавливает Ритм")
+	var berry := Registry.fruit("drum_berry")
+	RunManager.restore_health(berry.heal())
+	check_eq(RunManager.health, full - 40 + berry.heal(),
+		"съеденный у костра фрукт восстанавливает Ритм")
 
 	RunManager.restore_health(9999)
 	check_eq(RunManager.health, RunManager.max_health, "Здоровье не превышает максимум")

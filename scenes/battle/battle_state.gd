@@ -16,6 +16,9 @@ signal defeat()
 
 ## Урон за пропущенный щит — атака монстра дошла до цели.
 const STRIKE_DAMAGE := 10
+## Тяжёлая атака монстра — бывшая нота-зелье. Втрое больнее обычной:
+## особая нота должна ЧУВСТВОВАТЬСЯ особой, а не отличаться силуэтом.
+const HEAVY_STRIKE_DAMAGE := 30
 ## Урон за обычный промах. Мал намеренно: щит гасит его несколько раз подряд,
 ## и ребёнок успевает поймать ритм прежде, чем это станет больно.
 const MISS_DAMAGE := 3
@@ -360,24 +363,32 @@ func block_strike() -> void:
 
 
 ## Щит пропущен — атака монстра дошла до цели.
-func take_strike() -> void:
+## Пропущенная атака монстра. `heavy` — та же атака, но заметно больнее:
+## тяжёлый удар обязан ощущаться иначе, иначе особая нота не отличается
+## от обычной ничем, кроме формы (GDD §4.2.3).
+func take_strike(heavy: bool = false) -> int:
 	if is_over:
-		return
+		return 0
 	strikes_taken += 1
 	grade_counts[Judge.Grade.MISS] += 1
 	combo = 0
 	combo_changed.emit(combo, 1.0)
-	_take_damage(STRIKE_DAMAGE)
+	return _take_damage(HEAVY_STRIKE_DAMAGE if heavy else STRIKE_DAMAGE)
 
 
 ## Урон идёт СНАЧАЛА в щит и только потом в здоровье.
 ##
 ## Щит — это прощение: пока он держится, промахи стоят внимания, но не
 ## прогресса. Здоровье трогается только когда буфер выбит полностью.
-func _take_damage(amount: int) -> void:
+##
+## Возвращает, сколько урона было нанесено ВСЕГО — это число вылетает
+## на экране, и считать его второй раз в подаче значило бы завести
+## второй источник правды.
+func _take_damage(amount: int) -> int:
 	# Амулет смягчает урон, но никогда не обнуляет его: механика,
 	# за которой не надо следить, перестаёт быть механикой
 	var damage := maxi(int(round(amount * strike_scale * (1.0 - shield_reduction))), 1)
+	var total := damage
 
 	var absorbed := mini(shield, damage)
 	if absorbed > 0:
@@ -386,12 +397,13 @@ func _take_damage(amount: int) -> void:
 		shield_changed.emit(shield, max_shield)
 
 	if damage <= 0:
-		return
+		return total
 
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
 	if health <= 0:
 		_finish(false)
+	return total
 
 
 func restore_shield(amount: int) -> void:

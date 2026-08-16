@@ -326,6 +326,16 @@ def cmd_cues(args: argparse.Namespace) -> int:
             return 1
         _render(cue_mod.ambient(spec, motif), "ui")
 
+    print("\nВстречи с монстром:")
+    order = list(motifs.values())
+    if len(order) < cue_mod.ENCOUNTER_COUNT:
+        print(f"  ! мотивов {len(order)}, а встреч нужно "
+              f"{cue_mod.ENCOUNTER_COUNT} — ротация пойдёт по кругу")
+    for i in range(cue_mod.ENCOUNTER_COUNT):
+        motif = order[i % len(order)]
+        spec = cue_mod.ENCOUNTERS[i % len(cue_mod.ENCOUNTERS)]
+        _render(cue_mod.encounter(motif, spec, i), "glade")
+
     print("\nПоляны:")
     for spec in cue_mod.GLADES:
         for variant in range(cue_mod.GLADE_VARIANT_COUNT):

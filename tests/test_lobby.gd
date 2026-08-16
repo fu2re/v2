@@ -192,8 +192,6 @@ func _test_buying_costs_silver() -> void:
 	# Купленное действительно попало к игроку
 	if item is FruitData:
 		check(FarmState.seed_count(item.id) > 0, "семя легло в мешок")
-	elif item is PotionData:
-		check(GameState.potion_count(item.id) > 0, "зелье легло в сумку")
 	else:
 		check(GameState.gear_count(item.id) > 0, "вещь легла в сундук")
 

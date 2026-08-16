@@ -11,7 +11,6 @@ const VIBE_COLOR := Color("FF57C4")     # Настрой монстра
 const HEALTH_COLOR := Color("1ED8FF")   # здоровье игрока, сквозное на забег
 const SHIELD_COLOR := Color("2E9BFF")   # щит, буфер одного боя
 const WINDUP_COLOR := Color("FF5C7A")   # тревога: монстр замахнулся
-const POTION_COLOR := Color("B87AFF")   # тот же цвет, что у ноты-бутылочки
 const TRACK_COLOR := Color(0, 0, 0, 0.45)
 
 const BAR_HEIGHT := 34.0
@@ -33,10 +32,6 @@ var _vibe_label: Label = null
 var _monster_label: Label = null
 var _shield_label: Label = null
 var _health_label: Label = null
-## Сколько глотков осталось. Игрок должен знать это ДО того, как прилетит
-## нота-бутылочка: решение «пить или беречь» принимается за долю секунды,
-## и лезть в сумку посреди фразы невозможно.
-var _potion_label: Label = null
 var _warning_parts: Array[ColorRect] = []
 var _vibe_width := 0.0
 var _health_width := 0.0
@@ -65,16 +60,6 @@ func _ready() -> void:
 	_health_fill = _make_bar(Vector2(MARGIN, 1790.0), width, HEALTH_COLOR)
 	_shield_label = _add_caption(Vector2(MARGIN, 1660.0), "", SHIELD_COLOR)
 	_health_label = _add_caption(Vector2(MARGIN, 1750.0), "", HEALTH_COLOR)
-
-	# Счётчик зелий — в верхнем правом углу, в цвете самой ноты-бутылочки:
-	# по цвету видно, о чём речь, без единого слова. Внизу он вставал
-	# впритык к подписям дорожек, а низ экрана и без того плотный
-	_potion_label = _add_caption(Vector2(MARGIN, 14.0), "", POTION_COLOR)
-	_potion_label.add_theme_font_size_override("font_size", 34)
-	_potion_label.size = Vector2(1080.0 - MARGIN * 2.0, 44.0)
-	_potion_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_refresh_potions()
-	GameState.fruits_changed.connect(_refresh_potions)
 
 	# Комбо по центру и крупно. Раньше оно стояло в углу за танцорами
 	# и его попросту не замечали — а это главный показатель того,
@@ -266,14 +251,3 @@ func flash_hit() -> void:
 			WINDUP_COLOR.b, 0.0), 0.25)
 
 
-## Сколько глотков осталось.
-##
-## Пусто — подпись исчезает целиком, а не показывает «0»: нулей на экране
-## у ребёнка и без того хватает, а нот-бутылочек при пустой сумке
-## не появляется вовсе (GDD §4.2.3).
-func _refresh_potions() -> void:
-	if _potion_label == null:
-		return
-	var left := GameState.total_potions()
-	_potion_label.visible = left > 0
-	_potion_label.text = "Отвар  %d / %d" % [left, GameState.MAX_POTIONS]

@@ -88,8 +88,6 @@ static func item_icon(item: Resource) -> Texture2D:
 		return null
 	if item is FruitData:
 		return (item as FruitData).sprite()
-	if item is PotionData:
-		return (item as PotionData).sprite()
 	if item is GearData:
 		return (item as GearData).sprite()
 	if item is CosmeticData:

@@ -80,7 +80,7 @@ func _make_species_row(species: MonsterData) -> Control:
 	# рассказывала бы содержание вперёд игрока
 	var any_open := false
 	for grade in range(MonsterData.Rarity.size()):
-		if GameState.is_revealed(species.id, grade):
+		if GameState.is_met(species.id, grade):
 			any_open = true
 			break
 
@@ -409,8 +409,15 @@ func _card_stats(shown: MonsterInstance, tamed: MonsterInstance) -> void:
 		return
 
 	_add_stat("Уровень", "%d" % tamed.level)
+
+	# Опыт ПОЛОСКОЙ, а не строкой «120 / 220»: сколько осталось до уровня,
+	# читается взглядом, а не вычитанием в уме
 	var xp := tamed.xp_progress()
-	_add_stat("Опыт", "макс" if tamed.is_max_level() else "%d / %d" % [xp.x, xp.y])
+	if tamed.is_max_level():
+		_add_stat("Опыт", "максимальный уровень")
+	else:
+		_add_xp_bar(xp)
+		_add_next_level(tamed)
 
 	var bonuses := GameState.gear_bonuses(tamed.key())
 	_add_stat("Снаряжение", "окно ×%.2f · удар +%.1f · здоровье +%d · защита +%d%%" % [
@@ -453,3 +460,55 @@ func _card_actions(tamed: MonsterInstance) -> void:
 		_add_gear_button("Взять в лес", func(): GameState.set_guardian(key))
 	_add_gear_button("Снаряжение", func(): _open_gear(key))
 	_add_gear_button("Угостить", func(): _open_feed(key))
+
+
+## Полоска опыта до следующего уровня.
+func _add_xp_bar(progress: Vector2i) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var label := Label.new()
+	label.text = "Опыт"
+	label.custom_minimum_size = Vector2(320, 0)
+	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_color_override("font_color", Color("ADA99F"))
+	row.add_child(label)
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 36)
+	bar.show_percentage = false
+	bar.max_value = maxf(float(progress.y), 1.0)
+	bar.value = float(progress.x)
+	column.add_child(bar)
+
+	var caption := Label.new()
+	caption.text = "%d / %d" % [progress.x, progress.y]
+	caption.add_theme_font_size_override("font_size", 26)
+	caption.add_theme_color_override("font_color", Color("DCC7A4"))
+	column.add_child(caption)
+
+	row.add_child(column)
+	_gear_panel.add_child(row)
+
+
+## Каким станет существо на следующем уровне.
+##
+## Без этого «уровень 3» остаётся числом: непонятно, стоит ли кормить дальше
+## и что вообще даёт рост. Считаем ТЕМ ЖЕ объектом, который дерётся в бою, —
+## копия с уровнем на единицу больше, — поэтому обещание не может разойтись
+## с тем, что случится на самом деле.
+func _add_next_level(tamed: MonsterInstance) -> void:
+	var preview := MonsterInstance.create(tamed.species_id, tamed.grade)
+	preview.level = tamed.level + 1
+
+	_add_stat("На уровне %d" % preview.level,
+		"здоровье %d → %d · удар %.1f → %.1f" % [
+			tamed.max_health(), preview.max_health(),
+			tamed.power(), preview.power(),
+		])

@@ -31,6 +31,8 @@ func _refresh() -> void:
 	_wallet.text = "Серебро: %d        Золото: %d" % [GameState.silver, ShopState.gold]
 	UIUtil.clear_children(_list)
 
+	_add_hero_stats()
+
 	_add_section("Семена", "Их сажают на грядках")
 	var seeds := FarmState.available_seeds()
 	if seeds.is_empty():
@@ -69,17 +71,6 @@ func _refresh() -> void:
 		_add_row("%s (%s)" % [item.display_name, GearData.slot_name(item.slot)],
 			"x%d · %s" % [GameState.gear_count(gear_id), item.effect_text()], TEXT_COLOR, item)
 
-	# Зелья пьются в бою по ноте-зелью, а не отсюда: сумка их только считает
-	_add_section("Зелья", "Пьются в бою — по ноте-фляжке, особой кнопкой")
-	var any_potion := false
-	for potion in Registry.all_potions():
-		var count := GameState.potion_count(potion.id)
-		if count <= 0:
-			continue
-		any_potion = true
-		_add_row(potion.display_name, "x%d · %s" % [count, potion.effect_text()], TEXT_COLOR, potion)
-	if not any_potion:
-		_add_row("Пусто — купи у торговца в лесу", "", DIM_COLOR)
 
 
 func _format_time(seconds: float) -> String:
@@ -154,3 +145,53 @@ func _add_row(name: String, detail: String, colour := TEXT_COLOR,
 
 func _go_back() -> void:
 	get_tree().change_scene_to_file(OnboardingState.LOBBY)
+
+
+## Характеристики героя и его защитника.
+##
+## До этого раздела статы жили только в карточке существа, а «сколько у меня
+## здоровья в забеге» не отвечал ни один экран. Числа берутся у тех же
+## объектов, что дерутся в бою, поэтому сумка не может разойтись с боем.
+func _add_hero_stats() -> void:
+	_add_section("Герой", "С чем ты выходишь в лес")
+
+	var guardian := GameState.guardian()
+	if guardian == null:
+		_add_row("Защитника пока нет", "Подружись с кем-нибудь в лесу", DIM_COLOR)
+		return
+
+	var bonuses := GameState.gear_bonuses(guardian.key())
+	var health: int = guardian.max_health() + int(bonuses.get("health_bonus", 0))
+	var power: float = guardian.power() + float(bonuses.get("power_bonus", 0.0))
+
+	_add_row("%s · %s" % [guardian.display_name(), guardian.grade_name()],
+		"уровень %d · %s" % [guardian.level,
+			MonsterData.genre_name(guardian.genre())], TEXT_COLOR, guardian.data())
+
+	# Со снаряжением и без: игрок должен видеть, что именно дал пояс
+	_add_row("Здоровье", "%d  (своих %d + снаряжение %d)" % [
+		health, guardian.max_health(), int(bonuses.get("health_bonus", 0))])
+	_add_row("Удар", "%.1f  (своих %.1f + снаряжение %.1f)" % [
+		power, guardian.power(), float(bonuses.get("power_bonus", 0.0))])
+	_add_row("Окно попадания", "×%.2f" % float(bonuses.get("window_scale", 1.0)))
+	_add_row("Защита от удара", "%d%%" % int(round(
+		float(bonuses.get("shield_reduction", 0.0)) * 100.0)))
+
+	var xp := guardian.xp_progress()
+	_add_row("Опыт", "максимум" if guardian.is_max_level() \
+		else "%d / %d до уровня %d" % [xp.x, xp.y, guardian.level + 1])
+
+	# Бафы, съеденные у костра, живут до конца забега — и о них надо помнить,
+	# решая, идти ли дальше
+	if RunManager.is_active:
+		var eaten: Array[String] = []
+		if RunManager.buff("shield_reduction") > 0.0:
+			eaten.append("защита +%d%%" % int(round(
+				RunManager.buff("shield_reduction") * 100.0)))
+		if RunManager.buff("power_bonus") > 0.0:
+			eaten.append("удар +%.1f" % RunManager.buff("power_bonus"))
+		if RunManager.buff("window_scale") > 0.0:
+			eaten.append("окно +%d%%" % int(round(
+				RunManager.buff("window_scale") * 100.0)))
+		if not eaten.is_empty():
+			_add_row("Съедено у костра", " · ".join(eaten))

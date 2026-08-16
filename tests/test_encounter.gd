@@ -69,7 +69,6 @@ func _test_bush_is_never_empty() -> void:
 	for i in 40:
 		var before_silver := RunManager.run_silver
 		var before_seeds := _total_seeds()
-		var before_potions := GameState.total_potions()
 		var before_gear := _total_gear()
 
 		var text := RunManager.shake_bush(5)
@@ -77,7 +76,6 @@ func _test_bush_is_never_empty() -> void:
 
 		var got := RunManager.run_silver > before_silver \
 			or _total_seeds() > before_seeds \
-			or GameState.total_potions() > before_potions \
 			or _total_gear() > before_gear
 		check(got, "куст действительно что-то дал (%s)" % text)
 
@@ -115,7 +113,6 @@ func _test_granny_gives_something_back() -> void:
 
 	const PAID := 10
 	for i in 20:
-		var before_potions := GameState.total_potions()
 		var before_seeds := _total_seeds()
 		var before_gear := _total_gear()
 		var before_silver := RunManager.run_silver
@@ -123,11 +120,10 @@ func _test_granny_gives_something_back() -> void:
 		var gift := RunManager.pay_granny(PAID)
 		check(not gift.is_empty(), "подарок назван")
 
-		# Серебро тоже считается подарком: когда сумка зелий полна, бабушка
-		# отсыпает монеток. Сравниваем с тем, что осталось ПОСЛЕ платы, —
-		# иначе собственный взнос игрока замаскировал бы отсутствие подарка
-		var got := GameState.total_potions() > before_potions \
-			or _total_seeds() > before_seeds \
+		# Серебро тоже считается подарком: не всякий раз находится семя.
+		# Сравниваем с тем, что осталось ПОСЛЕ платы, — иначе собственный
+		# взнос игрока замаскировал бы отсутствие подарка
+		var got := _total_seeds() > before_seeds \
 			or _total_gear() > before_gear \
 			or RunManager.run_silver > before_silver - PAID
 		check(got, "подарок действительно получен (%s)" % gift)

@@ -147,7 +147,6 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 		_guardian_dancer.visible = true
 		_guardian_dancer.setup(guardian.sprite(), GameState.equipped_slots(guardian.key()))
 
-	_gate_potion_notes()
 
 	_pool.release_all()
 	_active.clear()
@@ -156,41 +155,6 @@ func begin(prepared: ChartData, vibe_override: int = 0) -> void:
 
 	Conductor.play(chart)
 
-
-## Нота-зелье ставится в бой только если зелье есть в сумке (GDD §4.2.3).
-##
-## Пустые ноты не ВЫБРАСЫВАЮТСЯ, а становятся обычными битами: выброс
-## изменил бы плотность и разорвал бы серии там, где чарт их задумывал,
-## а тап должен остаться. Правится копия массива, чтобы не портить чарт
-## в кеше — его же увидит следующий бой.
-func _gate_potion_notes() -> void:
-	if GameState.has_any_potion():
-		return
-
-	var patched := chart.note_types.duplicate()
-	var changed := false
-	for i in patched.size():
-		if patched[i] == ChartData.NoteType.SNACK:
-			patched[i] = ChartData.NoteType.BEAT
-			changed = true
-	if not changed:
-		return
-
-	# Копия чарта: исходный лежит в кеше загрузчика и переиспользуется
-	var gated := ChartData.new()
-	gated.id = chart.id
-	gated.genre = chart.genre
-	gated.difficulty = chart.difficulty
-	gated.bpm = chart.bpm
-	gated.offset = chart.offset
-	gated.duration = chart.duration
-	gated.beats_per_bar = chart.beats_per_bar
-	gated.audio_path = chart.audio_path
-	gated.note_beats = chart.note_beats
-	gated.note_types = patched
-	gated.pattern_beats = chart.pattern_beats
-	gated.pattern_actions = chart.pattern_actions
-	chart = gated
 
 
 func _process(_delta: float) -> void:
@@ -280,7 +244,11 @@ func _expire_missed() -> void:
 func _miss(note: Note) -> void:
 	match note.type:
 		ChartData.NoteType.SHIELD:
-			state.take_strike()
+			_popup_damage(state.take_strike(false), _hero.position, false)
+			_shake_screen()
+		ChartData.NoteType.HEAVY:
+			# Тяжёлая атака бьёт втрое больнее обычной
+			_popup_damage(state.take_strike(true), _hero.position, false)
 			_shake_screen()
 		ChartData.NoteType.ATTACK:
 			state.register_attack(Judge.Grade.MISS)
@@ -412,20 +380,17 @@ func _judge_tap(lane: int) -> void:
 			state.use_skill(grade, Conductor.song_beat, chart.beats_per_bar)
 			_hero.nod()
 			_guardian_dancer.nod()
-		ChartData.NoteType.SNACK:
-			# Единственная нота с выбором: особой кнопкой зелье выпивают,
-			# обычной — засчитывают как простой бит и берегут на потом
-			state.register_hit(grade)
-			if NoteRules.consumes_potion(best.type, lane):
-				var restored := GameState.consume_potion()
-				if restored > 0:
-					state.restore_health(restored)
-					_flash_potion()
+		ChartData.NoteType.HEAVY:
+			# Тяжёлая атака монстра. Блокируется той же особой кнопкой,
+			# что и обычная, но пропущенная бьёт втрое больнее — раньше
+			# на этом месте стояла нота-зелье, и зелий в игре больше нет
+			state.block_strike()
 			_hero.nod()
 			_guardian_dancer.nod()
 		ChartData.NoteType.ATTACK:
 			var dealt := state.register_attack(grade)
 			_flash_attack(dealt > 0)
+			_popup_damage(dealt, _monster_sprite.position, true)
 			_hero.attack(dealt > 0)
 			_guardian_dancer.attack(dealt > 0)
 		_:
@@ -454,16 +419,6 @@ func _telegraph_monster() -> void:
 	var tween := create_tween()
 	tween.tween_property(_monster_sprite, "scale", Vector2(4.6, 4.6), 0.25)
 	tween.tween_property(_monster_sprite, "scale", Vector2(4.0, 4.0), 0.25)
-
-
-## Зелье выпито: короткая тёплая вспышка. Без неё трата предмета
-## неотличима от обычного попадания, и игрок не понимает, что потратил.
-func _flash_potion() -> void:
-	if _hero == null:
-		return
-	var tween := create_tween()
-	_hero.modulate = Color("9BE86A")
-	tween.tween_property(_hero, "modulate", Color.WHITE, 0.4)
 
 
 func _shake_screen() -> void:
@@ -593,3 +548,36 @@ func enable_coach() -> Node:
 			coach.note_hit())
 	battle_finished.connect(func(_won: bool, _s: BattleState): coach.finish())
 	return coach
+
+
+## Вылетающая цифра урона.
+##
+## До неё бой был честным, но немым: шкала Настроя ползла, а насколько именно
+## помог конкретный удар, игрок не знал. Число, вылетевшее из монстра, связывает
+## нажатие с результатом мгновенно — и по нему же видно, что тяжёлая атака
+## монстра бьёт втрое больнее обычной.
+##
+## Цвета разные и не случайные: свой урон читается в цвете попадания,
+## чужой — в цвете тревоги, том же, которым мигает замах (§11.1.1).
+func _popup_damage(amount: int, at: Vector2, to_monster: bool) -> void:
+	if amount <= 0:
+		return
+
+	var label := Label.new()
+	label.text = "-%d" % amount
+	label.add_theme_font_size_override("font_size", 64 if to_monster else 56)
+	label.add_theme_color_override("font_color",
+		Color("FFD24D") if to_monster else Color("FF5C7A"))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("outline_size", 10)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.size = Vector2(300, 80)
+	# Слегка вразброс: два числа подряд в одной точке слипаются в кашу
+	label.position = at + Vector2(-150.0 + randf_range(-40.0, 40.0), -60.0)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(label)
+
+	var tween := create_tween()
+	tween.tween_property(label, "position:y", label.position.y - 140.0, 0.7)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.7)
+	tween.tween_callback(label.queue_free)

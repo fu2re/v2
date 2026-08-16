@@ -60,9 +60,11 @@ func _open_victory(root: Node) -> void:
 	root._start_battle(glade)
 
 	var monster := MonsterInstance.create(glade.monster_id, glade.grade)
-	var lines: Array[String] = ["+12 серебра"]
 	root._pending_taming = monster
-	root._show_victory(monster, lines)
+	# Показ идёт по шагам с паузами; ждать их здесь незачем — проверка
+	# смотрит, доступна ли кнопка, а она появляется в конце
+	var prizes: Array[Dictionary] = [{"text": "+12 серебра", "item": null}]
+	root._play_victory(monster, prizes, {}, {}, 0)
 
 
 ## Состояние, при котором панели вообще есть что показать.
@@ -110,6 +112,10 @@ func _run_check(path: String, label: String, opener := Callable()) -> void:
 
 	if opener.is_valid():
 		opener.call(root)
+		# Панель победы собирается по шагам с паузами, и кнопки появляются
+		# в конце показа. Ждём его целиком: иначе проверка мерила бы кадр,
+		# в котором кнопок ещё нет по замыслу, а не по ошибке
+		await get_tree().create_timer(2.6).timeout
 		for i in 2:
 			await get_tree().process_frame
 

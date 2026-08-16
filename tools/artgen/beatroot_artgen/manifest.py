@@ -23,7 +23,6 @@ DATA_DIRS: dict[str, str] = {
     "fruit": "data/fruits",
     "gear": "data/gear",
     "cosmetic": "data/cosmetics",
-    "potion": "data/potions",
 }
 
 _TRES_ID = re.compile(r'^id\s*=\s*"([^"]+)"', re.MULTILINE)
@@ -47,6 +46,14 @@ class Kind:
     ## приглушена намеренно, и логотип в ней выходит землистым. Всё, что
     ## показывается рядом с нотами, квантуется обязательно.
     quantize: bool = True
+    ## Разрешена ли рампа золота. По умолчанию нет: как только золото попало
+    ## в общий набор квантования, к нему потянулись все тёплые светлые пиксели
+    ## подряд и коллекция пожелтела. Золото — примета, а не краска, и доступно
+    ## только тем, кому оно полагается: легендарному грейду и золотой монете.
+    gold: bool = False
+    ## Разрешена ли свекольная рампа. Нужна ровно иконке приложения: игра
+    ## называется BEATROOT, и корнеплод обязан читаться корнеплодом.
+    beet: bool = False
 
 
 @dataclass(frozen=True)
@@ -154,6 +161,8 @@ def load(path: Path = MANIFEST_PATH) -> list[Asset]:
             style=str(cfg.get("style", "")),
             graded=bool(cfg.get("graded", False)),
             quantize=bool(cfg.get("quantize", True)),
+            gold=bool(cfg.get("gold", False)),
+            beet=bool(cfg.get("beet", False)),
         )
 
     assets: list[Asset] = []

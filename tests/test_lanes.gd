@@ -14,7 +14,7 @@ const SPECIAL := NoteRules.Lane.SPECIAL
 func run_tests() -> void:
 	_test_lane_assignment()
 	_test_shield_needs_special_button()
-	_test_potion_accepts_both()
+	_test_no_note_takes_both_buttons()
 	_test_every_note_type_has_lane()
 	await _test_notes_fall_towards_their_button()
 	await _test_series_line_stays_straight()
@@ -49,20 +49,20 @@ func _test_shield_needs_special_button() -> void:
 		"обычный бит особой кнопкой не берётся")
 
 
-## Зелье — единственная нота с выбором (GDD §4.2.3).
-func _test_potion_accepts_both() -> void:
-	print("Зелье принимает обе кнопки")
-	check(NoteRules.accepts(ChartData.NoteType.SNACK, SPECIAL),
-		"особой — выпить")
-	check(NoteRules.accepts(ChartData.NoteType.SNACK, NORMAL),
-		"обычной — сберечь")
+## Ни одна нота больше не принимает обе кнопки (GDD §4.2.3).
+##
+## Такой была нота-зелье, но зелий в игре нет: лечение переехало к костру,
+## а тяжёлая атака блокируется той же особой кнопкой, что и обычная.
+func _test_no_note_takes_both_buttons() -> void:
+	print("Ни одна нота не принимает обе кнопки")
+	check(NoteRules.accepts(ChartData.NoteType.HEAVY, SPECIAL),
+		"тяжёлая атака берётся особой")
+	check(not NoteRules.accepts(ChartData.NoteType.HEAVY, NORMAL),
+		"и обычной НЕ берётся")
 
-	check(NoteRules.consumes_potion(ChartData.NoteType.SNACK, SPECIAL),
-		"особая кнопка тратит зелье")
-	check(not NoteRules.consumes_potion(ChartData.NoteType.SNACK, NORMAL),
-		"обычная — сберегает")
-	check(not NoteRules.consumes_potion(ChartData.NoteType.BEAT, SPECIAL),
-		"обычный бит зелий не трогает")
+	for type in range(ChartData.NoteType.size()):
+		var both := NoteRules.accepts(type, SPECIAL) and NoteRules.accepts(type, NORMAL)
+		check(not both, "тип %d не принимает обе кнопки" % type)
 
 
 ## Сторож против забытого типа: новый тип ноты обязан получить дорожку,

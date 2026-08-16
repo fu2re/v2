@@ -34,11 +34,18 @@ def test_пропавший_из_манифеста_монстр_виден():
 
 
 def test_лишний_в_манифесте_ассет_виден():
-    """Мутация: промпт есть, ресурса в игре нет — генерация уйдёт впустую."""
+    """Мутация: промпт есть, ресурса в игре нет — генерация уйдёт впустую.
+
+    Призрак делается из МОНСТРА, а не из `assets[0]`. Первая версия брала
+    первый попавшийся ассет и однажды взяла зелье — раздел данных для зелий
+    ещё не создан, сверка его пропускает, и вместе с ним пропустила призрака.
+    Тест краснел, хотя проверял не то, что сломано.
+    """
     import dataclasses
 
     assets = manifest.load()
-    assets.append(dataclasses.replace(assets[0], id="привидение", base_id="привидение"))
+    monster = next(a for a in assets if a.kind.name == "monster")
+    assets.append(dataclasses.replace(monster, id="привидение", base_id="привидение"))
     problems = manifest.check(assets, PROJECT_ROOT)
     assert any("привидение" in p for p in problems)
 

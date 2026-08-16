@@ -228,14 +228,11 @@ class GladeSpec:
 
 
 GLADES: tuple[GladeSpec, ...] = (
-    # Бой: подъём с задержкой на вершине — вопрос без ответа.
-    GladeSpec("battle", "Бой", 116.0, 69, "guitar", bass_degree=0, variants=(
-        ((0, 2, 4, 3), (0.5, 0.5, 0.5, 1.5)),
-        ((0, 1, 3, 5), (0.5, 0.25, 0.75, 1.5)),
-        ((2, 1, 4, 4), (0.25, 0.5, 0.75, 1.5)),
-        ((0, 3, 2, 5), (0.75, 0.25, 0.5, 1.5)),
-        ((1, 2, 3, 6), (0.5, 0.5, 0.25, 1.75)),
-    )),
+    # Бой сюда НЕ входит: встреча с монстром — это не подсказка, а сцена.
+    # Игрок стоит перед карточкой и решает, ввязываться ли, и четыре ноты
+    # на две секунды в этот момент читаются как звонок в дверь, а не как
+    # «впереди кто-то большой». Ему отведён отдельный генератор ниже.
+    #
     # Дикий куст: лёгкий росчерк вверх, ничего не обещает и не угрожает.
     GladeSpec("wild_bush", "Дикий куст", 104.0, 74, "pluck", bass_degree=2, variants=(
         ((2, 4, 5, 4), (0.4, 0.4, 0.4, 1.2)),
@@ -289,3 +286,160 @@ def glade_cue(spec: GladeSpec, variant: int) -> Song:
         bpm=spec.bpm, bars=max(int(-(-total // BEATS_PER_BAR)), 1),
         beats_per_bar=BEATS_PER_BAR, lead_track="lead", tracks=tracks,
     )
+
+
+# --- встреча с монстром -------------------------------------------------------
+#
+# Отдельная форма, а не удлинённая подсказка поляны. Карточка боя — это сцена:
+# игрок смотрит на монстра и решает, ввязываться ли. Значит нужна музыка
+# с развитием — вступление, нарастание, кульминация и возврат в петлю.
+#
+# **Угроза здесь делается НЕ минором.** Во-первых, все треки игры мажорные.
+# Во-вторых, аудитория 7+, и по GDD монстр «сбивается с ритма», а не получает
+# урон, — пугать ребёнка нечем и незачем. Нужное чувство — «ого, кто-то
+# большой», а не «страшно». Оно набирается четырьмя приёмами, каждый из
+# которых внутри мажора:
+#
+#   * низкий регистр и настойчивый пульс — «оно приближается»;
+#   * педальный тон под меняющейся гармонией — напряжение без диссонанса;
+#   * восходящая секвенция — «оно всё ближе»;
+#   * трезвучия vi и ii — минорные аккорды ВНУТРИ мажорной тональности.
+#     Тональность остаётся мажорной, а краска темнеет.
+
+# Раскладка восьми тактов. Выписана таблицей, а не выведена арифметикой:
+# драматургия встречи — это дизайнерское решение, и его должно быть видно.
+#
+#   такт 0     педаль и один удар колокольчика — «оно тебя заметило»
+#   такты 1–2  входит пульс, мелодии ещё нет — «оно приближается»
+#   такты 3–4  мелодия, первая половина фразы мотива
+#   такты 5–6  та же фраза ступенью выше — восходящая секвенция
+#   такт  7    кульминация: верхний тон, сдвоенный том, обрыв в петлю
+ENCOUNTER_BARS = 8
+ENCOUNTER_MELODY_FROM = 3
+ENCOUNTER_LIFT_FROM = 5
+ENCOUNTER_LIFT = 2
+
+# Сколько мелодий встречи держать в ротации. Десять — чтобы за забег
+# из тридцати полян одна и та же не попалась дважды подряд.
+ENCOUNTER_COUNT = 10
+
+
+@dataclass(frozen=True)
+class EncounterSpec:
+    """Характер встречи. Пять характеров на десять мотивов."""
+
+    name: str
+    bpm: float
+    lead: str
+    kick: tuple[float, ...]
+    accent: tuple[float, ...]
+    bass: str          # "drone" | "pulse" | "run" | "stab"
+    tonic: int = 62
+
+
+ENCOUNTERS: tuple[EncounterSpec, ...] = (
+    EncounterSpec("нарастание", 112.0, "guitar",
+                  kick=(0.0, 2.0), accent=(3.5,), bass="pulse"),
+    EncounterSpec("удары", 104.0, "guitar",
+                  kick=(0.0, 1.5), accent=(2.0, 3.0), bass="stab"),
+    EncounterSpec("педаль", 120.0, "saw",
+                  kick=(0.0, 1.0, 2.0, 3.0), accent=(1.5,), bass="drone"),
+    EncounterSpec("погоня", 126.0, "saw",
+                  kick=(0.0, 0.75, 1.5, 2.5), accent=(3.75,), bass="run"),
+    EncounterSpec("фанфара", 108.0, "guitar",
+                  kick=(0.0, 2.5), accent=(1.0, 3.0), bass="pulse"),
+)
+
+# Гармония встречи: тоника, затем минорные трезвучия внутри мажора,
+# и возврат на доминанту — чтобы петля тянула обратно к началу,
+# а не разрешалась и не останавливалась.
+ENCOUNTER_CHORDS = (0, 9, 5, 7, 0, 9, 2, 7)   # I vi IV V I vi ii V
+
+
+def _encounter_bass(spec: EncounterSpec, bar: int, root: int) -> list[Note]:
+    base = bar * BEATS_PER_BAR
+    if spec.bass == "drone":
+        # Педаль: тоника держится под меняющейся гармонией. Напряжение
+        # берётся из расхождения баса и аккорда, а не из диссонанса.
+        return [Note(base, spec.tonic - 24, float(BEATS_PER_BAR), 0.95)]
+    if spec.bass == "pulse":
+        return [Note(base + i, root, 0.8, 0.9) for i in range(BEATS_PER_BAR)]
+    if spec.bass == "run":
+        return [Note(base + i * 0.5, root + (0 if i % 2 == 0 else 7), 0.45, 0.85)
+                for i in range(BEATS_PER_BAR * 2)]
+    if spec.bass == "stab":
+        return [Note(base, root, 0.4, 1.0), Note(base + 1.5, root, 0.4, 0.9),
+                Note(base + 2.5, root + 7, 0.9, 0.85)]
+    raise ValueError(f"неизвестная фигура баса встречи: {spec.bass}")
+
+
+def encounter(motif: Motif, spec: EncounterSpec, index: int) -> Song:
+    """Мелодия встречи с монстром: вступление, нарастание, кульминация, петля."""
+    tonic = spec.tonic
+    plan = motif.plan or ("A", "B", "A", "C")
+
+    lead: list[Note] = []
+    counter: list[Note] = []
+    bass: list[Note] = []
+    kick: list[Note] = []
+    tom: list[Note] = []
+    bell: list[Note] = []
+    pad: list[Note] = []
+
+    for bar in range(ENCOUNTER_BARS):
+        base = bar * BEATS_PER_BAR
+        chord = ENCOUNTER_CHORDS[bar % len(ENCOUNTER_CHORDS)]
+        root = tonic - 24 + chord
+
+        # Подложка трезвучиями идёт с самого начала: она и есть та краска,
+        # которая темнеет на vi и ii, оставаясь в мажоре.
+        for semitones in (0, 3 if chord in (9, 2) else 4, 7):
+            pad.append(Note(base, tonic - 12 + chord + semitones,
+                            float(BEATS_PER_BAR), 0.5))
+
+        if bar == 0:
+            bass.append(Note(base, tonic - 24, float(BEATS_PER_BAR), 0.9))
+            bell.append(Note(base + 2.0, tonic + 12, 2.0, 0.8))
+            continue
+
+        bass.extend(_encounter_bass(spec, bar, root))
+        kick.extend(hits([base + b for b in spec.kick]))
+        tom.extend(hits([base + b for b in spec.accent], 0.75))
+
+        if bar >= ENCOUNTER_MELODY_FROM:
+            lift = ENCOUNTER_LIFT if bar >= ENCOUNTER_LIFT_FROM else 0
+            phrase = motif.notes(plan[0], tonic + lift)
+            # Такт мелодии берётся из соответствующего такта фразы мотива:
+            # такт 3 встречи — первый такт фразы, такт 6 — четвёртый.
+            # Так фраза звучит целиком, а не первыми четырьмя нотами четырежды.
+            start = (bar - ENCOUNTER_MELODY_FROM) * BEATS_PER_BAR
+            for n in phrase:
+                if not start <= n.beat < start + BEATS_PER_BAR:
+                    continue
+                lead.append(Note(base + (n.beat - start), n.pitch,
+                                 min(n.length, 1.0), 0.9))
+
+        # Кульминация: последний такт держит верхний тон и обрывается,
+        # чтобы петля тянула обратно, а не заканчивалась.
+        if bar == ENCOUNTER_BARS - 1:
+            counter.append(Note(base, tonic + 12 + 7, 2.5, 0.85))
+            tom.extend(hits([base + 3.0, base + 3.5], 0.9))
+
+    tracks = [
+        Track("pad", "pad", pad, gain=0.8),
+        Track("bass", "sub", bass, gain=1.0),
+        Track("kick", "kick", kick, gain=1.0),
+        Track("tom", "tom", tom, gain=0.7),
+        Track("bell", "bell", bell, gain=0.6),
+        Track("lead", spec.lead, lead, gain=0.95),
+    ]
+    if counter:
+        tracks.append(Track("counter", "guitar", counter, gain=0.7))
+
+    return Song(
+        id=f"glade_battle_{index + 1}", base_id="glade_battle", grade="",
+        title=f"Встреча · {spec.name}", genre="cue", bpm=spec.bpm,
+        bars=ENCOUNTER_BARS, beats_per_bar=BEATS_PER_BAR,
+        lead_track="lead", tracks=tracks,
+    )
+

@@ -8,13 +8,11 @@ const MONSTER_DIR := "res://data/monsters"
 const FRUIT_DIR := "res://data/fruits"
 const GEAR_DIR := "res://data/gear"
 const COSMETIC_DIR := "res://data/cosmetics"
-const POTION_DIR := "res://data/potions"
 
 static var _monsters: Dictionary = {}
 static var _fruits: Dictionary = {}
 static var _gear: Dictionary = {}
 static var _cosmetics: Dictionary = {}
-static var _potions: Dictionary = {}
 static var _loaded := false
 
 
@@ -25,7 +23,6 @@ static func ensure_loaded() -> void:
 	_fruits = _scan(FRUIT_DIR)
 	_gear = _scan(GEAR_DIR)
 	_cosmetics = _scan(COSMETIC_DIR)
-	_potions = _scan(POTION_DIR)
 	_loaded = true
 
 
@@ -109,21 +106,7 @@ static func monsters_of_rarity(rarity: MonsterData.Rarity) -> Array[MonsterData]
 	return out
 
 
-static func potion(id: String) -> PotionData:
-	ensure_loaded()
-	return _potions.get(id)
-
-
 ## Зелья, отсортированы по цене: дешёвое первым, как и снаряжение.
-static func all_potions() -> Array[PotionData]:
-	ensure_loaded()
-	var out: Array[PotionData] = []
-	for p: PotionData in _potions.values():
-		out.append(p)
-	out.sort_custom(func(a, b): return a.price < b.price)
-	return out
-
-
 static func cosmetic(id: String) -> CosmeticData:
 	ensure_loaded()
 	return _cosmetics.get(id)

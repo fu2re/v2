@@ -10,6 +10,12 @@ extends RefCounted
 enum Cell {
 	## Не встречался: чёрный силуэт. Видно, что кто-то есть, но не видно кто.
 	HIDDEN,
+	## Встречен на поляне, но не побеждён: силуэт светлеет.
+	##
+	## Ступень между «не знаю о нём» и «победил». Без неё встреча с редким
+	## экземпляром не меняла в коллекции ровно ничего, и игрок, прошедший
+	## мимо уникального, видел ту же черноту, что и до забега.
+	MET,
 	## Побеждён, но не приручён: скин открыт, рамки нет.
 	REVEALED,
 	## Приручён: скин открыт и обведён рамкой.
@@ -30,6 +36,8 @@ static func state_for(species_id: String, grade: int) -> Cell:
 		return Cell.TAMED
 	if GameState.is_revealed(species_id, grade):
 		return Cell.REVEALED
+	if GameState.is_met(species_id, grade):
+		return Cell.MET
 	return Cell.HIDDEN
 
 
@@ -42,6 +50,9 @@ static func tint_for(state: Cell) -> Color:
 	match state:
 		Cell.HIDDEN:
 			return Color(0, 0, 0, 0.85)
+		Cell.MET:
+			# Силуэт уже не чёрный, но и не скин: «видел, но не победил»
+			return Color(0.32, 0.28, 0.24, 0.95)
 		Cell.REVEALED:
 			return Color(REVEALED_DIM, REVEALED_DIM, REVEALED_DIM, 1.0)
 		_:
@@ -54,6 +65,8 @@ static func caption_for(species_id: String, grade: int) -> String:
 	var state := state_for(species_id, grade)
 	if state == Cell.HIDDEN:
 		return "?"
+	if state == Cell.MET:
+		return "%s · встречен" % MonsterData.rarity_name(grade)
 	return MonsterData.rarity_name(grade)
 
 

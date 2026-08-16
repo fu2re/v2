@@ -51,6 +51,12 @@ ENVIRONMENT: dict[str, list[str]] = {
     # подобрана как самая насыщенная, ещё проходящая ОБА правила: ярче нельзя,
     # тусклее — перестаёт читаться золотом и сливается с охрой.
     "gold":    ["#4A3410", "#7A5A18", "#A8822A", "#D4AC42", "#F2D06A"],
+    # Свёкла. Игра называется BEATROOT, и корнеплод обязан читаться корнеплодом,
+    # а не картошкой: без этой рампы свёкла квантовалась в почву и выходила бурой.
+    # Расстояние до игровых цветов с запасом (0.17 при пороге 0.15) — красный
+    # мира тёмный и приглушённый, а `windup` светлый и розовый. Две верхние
+    # ступени подобраны перебором как самые красные из проходящих ОБА правила.
+    "beet":    ["#2A0E14", "#4A1620", "#6E2230", "#9E3E35", "#AE4C45"],
     "skin":    ["#5C3A2A", "#8A5A40", "#B07C58", "#D0A078", "#E8C6A0"],
 }
 
@@ -164,11 +170,13 @@ def save(path: Path) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-## Рампы, доступные не всем. Золото — привилегия легендарного грейда.
-RESTRICTED_RAMPS = ("gold",)
+## Рампы, доступные не всем: приметы, а не краски. Золото — привилегия
+## легендарного грейда, свекольный красный — иконки приложения. Обе в общем
+## наборе притянули бы к себе все близкие пиксели и растеклись бы по коллекции.
+RESTRICTED_RAMPS = ("gold", "beet")
 
 
-def quantization_palette(gold: bool = False) -> np.ndarray:
+def quantization_palette(gold: bool = False, beet: bool = False) -> np.ndarray:
     """Цвета, к которым приводится сгенерированный арт.
 
     Только мир: ассеты не должны случайно попасть в игровые цвета.
@@ -179,8 +187,9 @@ def quantization_palette(gold: bool = False) -> np.ndarray:
     оставаться приметой легендарного, а если оно есть у каждого, оно не значит
     ничего.
     """
+    allowed = {"gold": gold, "beet": beet}
     ramps = {
         name: ramp for name, ramp in ENVIRONMENT.items()
-        if gold or name not in RESTRICTED_RAMPS
+        if allowed.get(name, True)
     }
     return np.array([hex_to_rgb(c) for ramp in ramps.values() for c in ramp])

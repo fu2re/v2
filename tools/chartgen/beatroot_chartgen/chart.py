@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .song import Song
 
-NOTE_TYPES = ("beat", "skill", "shield", "snack", "attack")
+NOTE_TYPES = ("beat", "skill", "shield", "heavy", "attack")
 
 # Серия — это связка нот без длинной паузы. Атака ЗАВЕРШАЕТ серию: следующая
 # нота начинает новую. Поэтому в длинной связке атак несколько, а не одна.
@@ -198,7 +198,7 @@ def generate(song: Song, difficulty: str = "normal") -> Chart:
     total = song.total_beats
     for at in (total * 0.35, total * 0.85):
         _retype(beats, at=at, new_type="skill", avoid=shields, min_gap=window)
-    _retype(beats, at=total * 0.6, new_type="snack", avoid=shields, min_gap=window)
+    _retype(beats, at=total * 0.6, new_type="heavy", avoid=shields, min_gap=window)
 
     notes = [ChartNote(b, t) for b, t in beats.items()]
     notes = _ease_in(notes, until=bpb * 2)

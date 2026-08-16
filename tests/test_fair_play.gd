@@ -255,8 +255,11 @@ func _test_shield_and_campfire_are_stingy() -> void:
 		"нота-щит возвращает совсем немного (%d)" % BattleState.SHIELD_RESTORE)
 	check(BattleState.SHIELD_RESTORE > 0, "но всё же возвращает")
 
-	check(RunManager.CAMPFIRE_RESTORE <= 10,
-		"костёр лечит не больше десяти (%d)" % RunManager.CAMPFIRE_RESTORE)
+	# Костёр сам по себе не лечит вовсе: у него едят фрукты, и цена лечения —
+	# упущенное угощение (GDD §8.2.3)
+	var cheapest := Balance.fruit_heal(0)
+	check(cheapest <= 20,
+		"самый простой фрукт лечит не больше двадцати (%d)" % cheapest)
 
 	# Починка щита обязана быть дешевле пропущенной атаки, иначе выгодно
 	# ловить удары ради восстановления

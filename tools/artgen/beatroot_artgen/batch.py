@@ -97,12 +97,14 @@ def _postprocess(raw: Image.Image, asset: Asset) -> Image.Image:
     где ассет — объект: у поляны фон и есть содержимое."""
     from .palette import quantization_palette
 
-    # Золото доступно только легендарному: иначе к нему тянутся все тёплые
-    # светлые пиксели подряд и желтеет вся коллекция
+    # Золото доступно только тем, кому полагается: легендарному грейду и видам
+    # с флагом (золотая монета). Иначе к рампе тянутся все тёплые светлые
+    # пиксели подряд и желтеет вся коллекция.
     legendary = asset.grade is not None and asset.grade.key == "legendary"
     return pixelize(raw, target=asset.kind.size, remove_background=asset.kind.cutout,
                     quantize=asset.kind.quantize,
-                    palette=quantization_palette(gold=legendary))
+                    palette=quantization_palette(gold=legendary or asset.kind.gold,
+                                                beet=asset.kind.beet))
 
 
 def generate_asset(asset: Asset, client: ComfyClient | None, checkpoint: str, root: Path,

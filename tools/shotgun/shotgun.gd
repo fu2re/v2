@@ -126,7 +126,6 @@ func _full_bags() -> void:
 	FarmState.add_seed("drum_berry", 7)
 	FarmState.add_seed("bass_plum", 3)
 	GameState.add_gear("acorn_charm")
-	GameState.add_potion("health_potion", 2)
 
 
 # --- съёмка ------------------------------------------------------------------
@@ -172,7 +171,6 @@ func _shoot(target: Dictionary) -> void:
 ## и счётчик глотков. Обе вещи проверяются только глазом.
 func _ready_for_battle() -> void:
 	_played_a_while()
-	GameState.add_potion("health_potion", GameState.MAX_POTIONS)
 
 
 ## Выложить на дорожку по одной ноте каждого типа.
@@ -184,7 +182,7 @@ func _spawn_every_note(battle: Node) -> void:
 	var types := [
 		ChartData.NoteType.BEAT, ChartData.NoteType.ATTACK,
 		ChartData.NoteType.SKILL, ChartData.NoteType.SHIELD,
-		ChartData.NoteType.SNACK,
+		ChartData.NoteType.HEAVY,
 	]
 	var pool = battle.get("_pool")
 	var active: Array = battle.get("_active")
@@ -214,9 +212,14 @@ func _open_victory(feed: Node) -> void:
 	feed._start_battle(glade)
 
 	var monster = MonsterInstance.create(glade.monster_id, glade.grade)
-	var lines: Array[String] = ["+12 серебра", "Сундук: Шапочка из жёлудя"]
 	feed._pending_taming = monster
-	feed._show_victory(monster, lines)
+	var prizes: Array[Dictionary] = [
+		{"text": "+12 серебра", "item": null},
+		{"text": "Шапочка из жёлудя", "item": Registry.gear("acorn_charm")},
+	]
+	feed._play_victory(monster, prizes, {}, {}, 0)
+	# Показ идёт по шагам — ждём его целиком, иначе снимок ловит середину
+	await feed.get_tree().create_timer(2.4).timeout
 
 
 ## Карточка существа: характеристики, которых раньше не было видно нигде.

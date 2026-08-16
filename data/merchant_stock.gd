@@ -38,7 +38,7 @@ static func seconds_until_rotation(now_seconds: int = -1) -> int:
 
 ## Витрина усадьбы: семена всегда плюс несколько зелий и вещей по ротации.
 ##
-## Возвращает массив ресурсов (FruitData — это семя, PotionData, GearData).
+## Возвращает массив ресурсов (FruitData — это семя, GearData).
 static func farm_stock(rotation: int = -1) -> Array:
 	var index := rotation if rotation >= 0 else rotation_index()
 	var out: Array = []
@@ -48,7 +48,6 @@ static func farm_stock(rotation: int = -1) -> Array:
 	for fruit in Registry.all_fruits():
 		out.append(fruit)
 
-	out.append_array(_rotate(Registry.all_potions(), index, FARM_POTION_SLOTS))
 	out.append_array(_rotate(Registry.all_gear(), index + 7, FARM_GEAR_SLOTS))
 	return out
 
@@ -58,8 +57,6 @@ static func farm_stock(rotation: int = -1) -> Array:
 static func forest_stock(depth: int) -> Array:
 	var pool: Array = []
 	for item in Registry.all_gear():
-		pool.append(item)
-	for item in Registry.all_potions():
 		pool.append(item)
 	if pool.is_empty():
 		return []
@@ -94,8 +91,6 @@ static func price_of(item: Resource) -> int:
 static func describe(item: Resource) -> String:
 	if item is FruitData:
 		return "семя · зреет %s" % _grow_time(item)
-	if item is PotionData:
-		return item.effect_text()
 	return item.effect_text()
 
 
@@ -114,17 +109,9 @@ static func buy(item: Resource) -> bool:
 	if price <= 0 or GameState.silver < price:
 		return false
 
-	# Сумка зелий не резиновая (GameState.MAX_POTIONS). Проверяем ДО того,
-	# как взять серебро: иначе покупка молча съедала бы деньги и ничего
-	# не давала — худший вид поломки, потому что выглядит как работающая
-	if item is PotionData and not GameState.has_potion_room():
-		return false
-
 	GameState.add_silver(-price)
 	if item is FruitData:
 		FarmState.add_seed(item.id, 1)
-	elif item is PotionData:
-		GameState.add_potion(item.id)
 	else:
 		GameState.add_gear(item.id)
 	SaveManager.mark_dirty()

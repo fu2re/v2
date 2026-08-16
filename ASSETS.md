@@ -86,6 +86,7 @@
 | Файл | Происхождение | Лицензия |
 |---|---|---|
 | `art/gear/acorn_charm.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
+| `art/icon/app_icon.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/monster/banjo_moth_common.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/monster/banjo_moth_epic.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/monster/banjo_moth_legendary.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
@@ -113,6 +114,8 @@
 | `art/building/building_storehouse.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/fruit/chord_apple.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/gear/cloud_shoes.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
+| `art/currency/coin_gold.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
+| `art/currency/coin_silver.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/cosmetic/crown_of_beats.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/cosmetic/disco_overalls.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/monster/disco_sprout_common.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
@@ -147,7 +150,6 @@
 | `art/glade/glade_campfire.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/glade/glade_encounter.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/glade/glade_wild_bush.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
-| `art/forest/forest_01..20.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/gear/heartwood_amulet.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/hero/hero_girl.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |
 | `art/hero/hero_kid.png` | ComfyUI, `flux1-schnell-fp8.safetensors`, постобработка `tools/artgen` | Собственное производство |

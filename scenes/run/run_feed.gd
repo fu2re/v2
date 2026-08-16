@@ -27,6 +27,12 @@ const HINT_NEXT := "Кнопка «Дальше» или свайп вверх"
 ## как её накроет панель с текстом.
 const VICTORY_PAUSE := 0.9
 
+## Сколько держится каждый шаг показа: приз, прибавка уровня.
+## Достаточно, чтобы прочитать, и мало, чтобы не заскучать на десятой победе.
+const PRIZE_STEP := 0.65
+## За сколько полоска опыта добегает до края.
+const XP_FILL_SECONDS := 0.5
+
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
 ## Ключ экземпляра, которого берём в лес. Пусто — берём выбранного в коллекции.
@@ -149,6 +155,11 @@ func _show_glade(glade: Glade) -> void:
 			# Спрайт грейда: легендарный обязан отличаться от обычного
 			# ещё на карточке, до боя
 			_glade_art.texture = monster.sprite_for_grade(glade.grade) if monster != null else null
+			# Встреча сама по себе открывает клетку коллекции наполовину:
+			# силуэт светлеет, имя вида появляется. Полный скин по-прежнему
+			# за победой (GDD §7.5) — иначе коллекция собиралась бы свайпами
+			# мимо, без единого танца
+			GameState.mark_met(glade.monster_id, glade.grade)
 			_show_stakes(glade)
 		Glade.Type.WILD_BUSH:
 			_subline.text = "Здесь можно собрать семена"
@@ -157,7 +168,7 @@ func _show_glade(glade: Glade) -> void:
 			var bush := Registry.fruit(glade.fruit_id)
 			_glade_art.texture = bush.sprite() if bush != null else null
 		Glade.Type.CAMPFIRE:
-			_subline.text = "Можно перевести дух\n+%d к здоровью" % RunManager.CAMPFIRE_RESTORE
+			_subline.text = "Можно перевести дух\nи подкрепиться фруктами"
 			_headline.add_theme_color_override("font_color", Color("FF5C7A"))
 			_hint.text = "Кнопка «Отдохнуть» или тап по экрану"
 			_glade_art.texture = null
@@ -462,8 +473,9 @@ func _resolve_glade() -> void:
 					_busy = false
 					_refresh_buttons()
 		Glade.Type.CAMPFIRE:
-			_glade_used = true
-			RunManager.rest_at_campfire()
+			# Костёр не лечит сам: у него ЕДЯТ фрукты, и флаг «поляна отдала
+			# своё» здесь не ставится — панель можно открыть снова, пока
+			# не ушёл дальше. Съеденное при этом не возвращается
 			_open_campfire()
 		_:
 			_glade_used = true
@@ -556,21 +568,35 @@ func _buy_item(item: Resource) -> void:
 	var id: String = item.id
 	if RunManager.run_silver < price:
 		return
-	# Сумка зелий ограничена — проверяем до списания серебра
-	if item is PotionData and not GameState.has_potion_room():
-		return
 	RunManager.add_loot_silver(-price)
-	if item is PotionData:
-		GameState.add_potion(id)
-	else:
-		GameState.add_gear(id)
+	GameState.add_gear(id)
 	_open_merchant(RunManager.current_glade)
 
 
 ## Костёр — единственная точка смены гуардиана внутри забега (GDD §15.1).
 func _open_campfire() -> void:
 	_open_panel("Костёр")
-	_add_panel_label("Здоровье восстановлено: %d / %d" % [RunManager.health, RunManager.max_health])
+	_add_panel_label("Здоровье: %d / %d" % [RunManager.health, RunManager.max_health])
+
+	# Лечение стоит угощения — единственное настоящее решение внутри забега
+	# (GDD §8.2.3). Зелий в игре нет: тот же фрукт либо съедается здесь ради
+	# здоровья и бафа, либо приберегается для приручения. Раньше костёр лечил
+	# даром, и выбирать было не из чего
+	var eaten := false
+	for fruit in Registry.all_fruits():
+		for quality in [FruitData.Quality.PERFECT, FruitData.Quality.JUICY,
+				FruitData.Quality.PLAIN]:
+			var count := GameState.fruit_count(fruit.id, quality)
+			if count <= 0:
+				continue
+			eaten = true
+			var button := _add_panel_button("Съесть: %s ×%d\n+%d здоровья%s" % [
+				fruit.display_name, count, fruit.heal(), _buff_text(fruit),
+			], _eat_at_campfire.bind(fruit.id, quality))
+			UIUtil.decorate_row(button, fruit)
+
+	if not eaten:
+		_add_panel_label("Есть нечего — фрукты растут на грядках.", 30)
 
 	var friends := GameState.all_instances()
 	if friends.size() <= 1:
@@ -698,35 +724,34 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 		RunManager.die()
 		return
 
+	# Снимок защитника ДО награды: экран победы показывает, как опыт вырос,
+	# а для этого нужно знать, откуда он рос. Считать «после минус прибавка»
+	# нельзя — на переходе уровня шкала обнуляется, и разность врёт
+	var before := _guardian_snapshot()
+
 	# Опыт — тому, кто дрался, и НЕ ТОЛЬКО за победу (GDD §6.5). За убежавшего
 	# монстра меньше, но не ноль: иначе новичок, которому пока нечем добить,
 	# застревает навсегда — бой обязателен, а гуардиан от него не растёт
 	var levels := RunManager.reward_guardian_xp(monster.grade, perfect, won)
-	var grown := ""
-	if levels > 0:
-		var guardian := GameState.instance(RunManager.guardian_key)
-		grown = "%s подрос до уровня %d!" % [
-			guardian.display_name(), guardian.level,
-		] if guardian != null else ""
+	var after := _guardian_snapshot()
 
 	if won:
 		var silver: int = RunManager.current_glade.silver_reward
 		RunManager.add_loot_silver(silver)
 
-		# Итог собирается ЗДЕСЬ, а показывается на экране победы: пока
-		# монстр падает и на экране «Наплясался!», игрок должен успеть
-		# увидеть, что ему досталось. Раньше поверх этого мгновенно
-		# выезжало угощение, и добычу никто не читал
-		var lines: Array[String] = ["+%d серебра" % silver]
+		# Призы копятся СПИСКОМ, а показываются по одному (GDD §8.1.3).
+		# Каждый — с картинкой: строка «Сундук: Кожаный пояс» требует чтения,
+		# а пояс на экране узнаётся сразу
+		var prizes: Array[Dictionary] = [
+			{"text": "+%d серебра" % silver, "item": null,
+				"icon": "res://art/currency/coin_silver.png"},
+		]
 
 		var prize := RunManager.roll_victory_gear(monster.grade)
 		if not prize.is_empty():
 			var item := Registry.gear(prize)
 			if item != null:
-				lines.append("Сундук: %s" % item.display_name)
-
-		if not grown.is_empty():
-			lines.append(grown)
+				prizes.append({"text": item.display_name, "item": item})
 
 		# Кого угощать — запоминаем: приручение откроется по нажатию игрока.
 		#
@@ -752,7 +777,7 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 		# и обучение, и тесты, вызывая этот путь напрямую
 		if not is_inside_tree() or RunManager.current_glade != shown_glade:
 			return
-		_show_victory(monster, lines)
+		await _play_victory(monster, prizes, before, after, levels)
 	else:
 		# Монстр не побеждён — он убегает, и приручить его нельзя.
 		# Дружба не начисляется вовсе: подружиться можно только с тем,
@@ -763,8 +788,10 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 		# потерянное время
 		_pending_result = "%s убежал, но танец не пропал.\nЗащитник стал опытнее." \
 			% monster.display_name()
-		if not grown.is_empty():
-			_pending_result = "%s\n%s" % [_pending_result, grown]
+		if levels > 0 and not after.is_empty():
+			_pending_result = "%s\n%s подрос до уровня %d!" % [
+				_pending_result, after["name"], after["level"],
+			]
 		_awaiting_result_swipe = true
 		_busy = false
 		# Подсказку меняем СРАЗУ, а не после закрытия боя: иначе под сценой
@@ -782,42 +809,6 @@ func _on_battle_finished(won: bool, state: BattleState) -> void:
 ##
 ## Панель собирается теми же `_open_panel`/`_add_panel_*`, что и встречи:
 ## один способ показывать модальные окна на всю ленту.
-func _show_victory(monster: MonsterInstance, lines: Array[String]) -> void:
-	# «Наплясались» во множественном числе не случайно: имена монстров бывают
-	# любого рода, и «Пыльца наплясался» — то, что игрок видел на экране.
-	# Плясали оба, поэтому форма честная и согласуется с чем угодно
-	_open_panel("Наплясались!")
-	_add_panel_label(monster.display_name(), 44)
-
-	for line: String in lines:
-		_add_panel_label(line, 38)
-
-	# Угощение предлагается только тому, с кем ещё можно подружиться.
-	#
-	# С приручённым дружба набрана, и экран угощения только съедал бы фрукты
-	# впустую; с тем, у кого закрыта ступень ниже, дружба сейчас не копится
-	# вовсе. В обоих случаях кнопка вела бы в никуда, а кнопка, которая
-	# ничего не делает, читается ребёнком как поломка
-	if _pending_taming == null:
-		if GameState.has_instance(monster.species_id, monster.grade):
-			_add_panel_label("Он и так твой друг — дрались ради опыта и добычи", 30)
-		else:
-			var step := GameState.missing_step(monster.species_id, monster.grade)
-			if step >= 0:
-				_add_panel_label("Подружиться пока нельзя: сначала %s"
-					% MonsterData.rarity_name(step), 30)
-		_add_panel_button("Дальше", _close_victory)
-		return
-
-	# Дальше — угощение, и кнопка честно называет, что будет
-	var species := monster.data()
-	var favorite := Registry.fruit(species.favorite_fruit_id) if species != null else null
-	if favorite != null:
-		_add_panel_label("Любит: %s" % favorite.display_name, 30)
-
-	_add_panel_button("Угостить", _open_taming)
-
-
 ## Закрыть итог боя, когда угощать некого. Панель гасим напрямую, как
 ## и в `_open_taming`: под нами всё ещё сцена боя, и кнопки поляны там
 ## не нужны — карточка вернётся сама, когда бой закроется.
@@ -1004,3 +995,204 @@ func _refresh_buttons() -> void:
 	_next_button.visible = true
 	_next_button.disabled = blocked
 	_next_button.text = "Сначала бой" if blocked else "Дальше ↑"
+
+
+## Съесть фрукт у костра: здоровье и баф до конца забега.
+##
+## Тот же плод мог пойти монстру на дружбу — в этом вся соль: лечение
+## не бесплатное, оно стоит будущего друга (GDD §8.2.3).
+func _eat_at_campfire(fruit_id: String, quality: FruitData.Quality) -> void:
+	if not GameState.consume_fruit(fruit_id, quality):
+		return
+	var fruit := Registry.fruit(fruit_id)
+	if fruit == null:
+		return
+
+	RunManager.restore_health(fruit.heal())
+	RunManager.add_buff(fruit.buff())
+	_open_campfire()
+
+
+## Подпись бафа для кнопки. Пусто — тир без бафа, и строку не пишем вовсе:
+## «баф: нет» занимает место и ничего не сообщает.
+func _buff_text(fruit: FruitData) -> String:
+	var buff := fruit.buff()
+	if buff.is_empty():
+		return ""
+	var parts: Array[String] = []
+	if buff.has("shield_reduction"):
+		parts.append("защита +%d%%" % int(round(float(buff["shield_reduction"]) * 100.0)))
+	if buff.has("power_bonus"):
+		parts.append("удар +%.1f" % float(buff["power_bonus"]))
+	if buff.has("window_scale"):
+		parts.append("окно +%d%%" % int(round(float(buff["window_scale"]) * 100.0)))
+	return "\n" + " · ".join(parts) + " до конца забега"
+
+
+## Снимок защитника: уровень, шкала опыта и статы.
+##
+## Нужен дважды — до награды и после, — чтобы экран победы мог показать
+## не только «стало», но и «было». Разность считать нельзя: на переходе
+## уровня шкала обнуляется, и «после минус прибавка» врёт.
+func _guardian_snapshot() -> Dictionary:
+	var guardian := GameState.instance(RunManager.guardian_key)
+	if guardian == null:
+		return {}
+	var progress := guardian.xp_progress()
+	return {
+		"name": guardian.display_name(),
+		"level": guardian.level,
+		"xp": progress.x,
+		"xp_needed": progress.y,
+		"health": guardian.max_health(),
+		"power": guardian.power(),
+		"max_level": guardian.is_max_level(),
+	}
+
+
+## Экран победы: сначала опыт, потом призы — по одному.
+##
+## Раньше всё вываливалось разом простыней текста, и рост защитника терялся
+## среди строк добычи. Порядок здесь не украшение: сперва игрок видит, что
+## его существо стало сильнее, и только потом — что нашлось в сундуке.
+## Пока идут анимации, уйти нельзя: свайп и кнопка появляются в конце,
+## иначе половину показа пролистывают, не заметив.
+func _play_victory(monster: MonsterInstance, prizes: Array[Dictionary],
+		before: Dictionary, after: Dictionary, levels: int) -> void:
+	_open_panel("Наплясались!")
+	_add_panel_label(monster.display_name(), 44)
+
+	# Уйти пока нельзя: показ ещё идёт
+	_awaiting_result_swipe = false
+	_busy = true
+	_refresh_buttons()
+
+	if not before.is_empty():
+		await _show_experience(before, after, levels)
+
+	for prize: Dictionary in prizes:
+		if not is_inside_tree():
+			return
+		await _show_prize(prize)
+
+	_finish_victory(monster)
+
+
+## Полоска опыта защитника и её рост.
+##
+## Ползёт, а не прыгает: рост, случившийся мгновенно, читается как «уже было
+## так». При переходе уровня полоска добегает до края, обнуляется и идёт
+## дальше — ровно так, как это произошло на самом деле.
+func _show_experience(before: Dictionary, after: Dictionary, levels: int) -> void:
+	var title := Label.new()
+	title.text = "%s · уровень %d" % [before["name"], before["level"]]
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color("DCC7A4"))
+	_panel_box.add_child(title)
+
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 44)
+	bar.show_percentage = false
+	bar.max_value = maxf(float(before["xp_needed"]), 1.0)
+	bar.value = float(before["xp"])
+	_panel_box.add_child(bar)
+
+	var caption := Label.new()
+	caption.add_theme_font_size_override("font_size", 28)
+	caption.add_theme_color_override("font_color", Color("ADA99F"))
+	_panel_box.add_child(caption)
+
+	if bool(before.get("max_level", false)):
+		caption.text = "Опыт: максимальный уровень"
+		await get_tree().create_timer(PRIZE_STEP).timeout
+		return
+
+	# Каждый пройденный уровень — свой пробег полоски до края и обнуление
+	for i in levels:
+		var tween := create_tween()
+		tween.tween_property(bar, "value", bar.max_value, XP_FILL_SECONDS)
+		await tween.finished
+		bar.value = 0.0
+		title.text = "%s · уровень %d" % [before["name"], int(before["level"]) + i + 1]
+
+	bar.max_value = maxf(float(after["xp_needed"]), 1.0)
+	var last := create_tween()
+	last.tween_property(bar, "value", float(after["xp"]), XP_FILL_SECONDS)
+	await last.finished
+	caption.text = "Опыт %d / %d" % [after["xp"], after["xp_needed"]]
+
+	if levels <= 0:
+		await get_tree().create_timer(PRIZE_STEP * 0.5).timeout
+		return
+
+	# Уровень взят — показываем, ЧТО именно выросло. Без этого «уровень 3»
+	# остаётся числом, за которым не видно ни здоровья, ни удара
+	var grew := Label.new()
+	grew.add_theme_font_size_override("font_size", 34)
+	grew.add_theme_color_override("font_color", Color("FFD24D"))
+	grew.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grew.text = "Новый уровень!  Здоровье %d → %d · удар %.1f → %.1f" % [
+		before["health"], after["health"], before["power"], after["power"],
+	]
+	_panel_box.add_child(grew)
+	await get_tree().create_timer(PRIZE_STEP).timeout
+
+
+## Один приз: картинка и подпись. Ничего не выпало — ничего и не пишем.
+func _show_prize(prize: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var item: Resource = prize.get("item")
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(96, 96)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Картинка обязательна у КАЖДОГО приза. У серебра предмета нет,
+	# поэтому путь задаётся прямо: пустой слот вместо монеты сдвигал бы
+	# подпись и делал строку непохожей на остальные
+	var direct: String = prize.get("icon", "")
+	if not direct.is_empty() and ResourceLoader.exists(direct):
+		icon.texture = load(direct) as Texture2D
+	else:
+		icon.texture = UIUtil.item_icon(item)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+
+	var text := Label.new()
+	text.text = String(prize.get("text", ""))
+	text.add_theme_font_size_override("font_size", 38)
+	text.add_theme_color_override("font_color", Color("F0DEC0"))
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(text)
+
+	_panel_box.add_child(row)
+
+	# Приз выезжает, а не появляется: движение отделяет один приз от другого,
+	# и подряд идущие строки перестают сливаться в список
+	row.modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(row, "modulate:a", 1.0, 0.2)
+	await get_tree().create_timer(PRIZE_STEP).timeout
+
+
+## Показ закончился — можно идти дальше.
+func _finish_victory(monster: MonsterInstance) -> void:
+	if _pending_taming != null:
+		var species := monster.data()
+		var favorite := Registry.fruit(species.favorite_fruit_id) if species != null else null
+		if favorite != null:
+			_add_panel_label("Любит: %s" % favorite.display_name, 30)
+		_add_panel_button("Угостить", _open_taming)
+		return
+
+	if GameState.has_instance(monster.species_id, monster.grade):
+		_add_panel_label("Он и так твой друг — дрались ради опыта и добычи", 30)
+	else:
+		var step := GameState.missing_step(monster.species_id, monster.grade)
+		if step >= 0:
+			_add_panel_label("Подружиться пока нельзя: сначала %s"
+				% MonsterData.rarity_name(step), 30)
+	_add_panel_button("Дальше", _close_victory)

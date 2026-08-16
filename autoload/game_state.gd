@@ -46,6 +46,13 @@ var battle_xp: Dictionary = {}
 ## Приручённые экземпляры: ключ "вид:грейд" -> MonsterInstance.
 var instances: Dictionary = {}
 
+## Кого игрок уже ВСТРЕТИЛ на поляне, ключом «вид:грейд».
+##
+## Встреча — первая ступень открытия: увидел на поляне, значит знаешь,
+## что такой есть. Силуэт после этого светлеет, но скин показывает только
+## победа — иначе коллекция собиралась бы свайпами мимо, без единого танца.
+var met: Dictionary = {}
+
 ## Кого игрок уже победил, ключом «вид:грейд». Отдельно от `instances`:
 ## приручить можно не всё, что победил, а коллекция обязана помнить встречу
 ## даже когда экземпляр не достался. Пока пары здесь нет, монстр показан
@@ -54,11 +61,6 @@ var defeated: Dictionary = {}
 
 ## Фрукты в сумке: "fruit_id:quality" -> количество.
 var fruits: Dictionary = {}
-## Зелья в сумке: potion_id -> количество.
-##
-## Отдельно от фруктов: фрукт скармливают монстру ради дружбы, зелье
-## выпивают сами ради здоровья. Общее хранилище смешало бы две разные вещи.
-var potions: Dictionary = {}
 ## Заработанная валюта: серебро.
 var silver: int = 0
 
@@ -89,9 +91,9 @@ func reset() -> void:
 	friendship.clear()
 	battle_xp.clear()
 	instances.clear()
+	met.clear()
 	defeated.clear()
 	fruits.clear()
-	potions.clear()
 	silver = 0
 	gear_owned.clear()
 	equipped.clear()
@@ -345,88 +347,6 @@ func add_silver(amount: int) -> void:
 	silver_changed.emit(silver)
 
 
-# --- зелья -------------------------------------------------------------------
-
-## Сколько зелий помещается в сумку.
-##
-## Предел, а не место под склад: с тремя глотками бой остаётся боем.
-## Без предела достаточно накопить два десятка отваров, и любая встреча
-## выигрывается перепиванием, а ритм перестаёт что-либо решать.
-const MAX_POTIONS := 3
-
-
-## Положить зелье в сумку. Возвращает, сколько влезло: сверх предела
-## не берём, и покупка сверх него не должна молча съедать серебро.
-func add_potion(potion_id: String, count: int = 1) -> int:
-	if Registry.potion(potion_id) == null:
-		push_error("Неизвестное зелье: %s" % potion_id)
-		return 0
-	var room := MAX_POTIONS - total_potions()
-	var taken := mini(count, maxi(room, 0))
-	if taken <= 0:
-		return 0
-	potions[potion_id] = potions.get(potion_id, 0) + taken
-	fruits_changed.emit()
-	return taken
-
-
-## Влезет ли ещё хоть одно. Спрашивают лавка и сундук — до того,
-## как взять деньги.
-func has_potion_room() -> bool:
-	return total_potions() < MAX_POTIONS
-
-
-func potion_count(potion_id: String) -> int:
-	return potions.get(potion_id, 0)
-
-
-func total_potions() -> int:
-	var total := 0
-	for count: int in potions.values():
-		total += count
-	return total
-
-
-## Есть ли что пить. От этого зависит, ставится ли нота-зелье в бой:
-## игра никогда не предлагает нажать то, что не сработает (GDD §4.2.3).
-func has_any_potion() -> bool:
-	return total_potions() > 0
-
-
-## Какое зелье выпьется следующим.
-##
-## Зелье в игре одно, и выбирать не из чего — это намеренно: выбор посреди
-## ритмической фразы игрок всё равно сделать не успевает, а два похожих
-## пузырька в сумке только заставляли жадничать. Перебор остался на случай
-## будущих зелий и берёт слабейшее.
-func next_potion() -> PotionData:
-	var best: PotionData = null
-	for potion_id: String in potions:
-		if potions[potion_id] <= 0:
-			continue
-		var item := Registry.potion(potion_id)
-		if item == null:
-			continue
-		if best == null or item.restore_health < best.restore_health:
-			best = item
-	return best
-
-
-## Выпить зелье. Возвращает, сколько здоровья оно вернуло (0 — нечего пить).
-func consume_potion() -> int:
-	var item := next_potion()
-	if item == null:
-		return 0
-
-	var left := potion_count(item.id) - 1
-	if left <= 0:
-		potions.erase(item.id)
-	else:
-		potions[item.id] = left
-	fruits_changed.emit()
-	return item.restore_health
-
-
 # --- снаряжение --------------------------------------------------------------
 
 func add_gear(gear_id: String, count: int = 1) -> void:
@@ -580,9 +500,9 @@ func to_dict() -> Dictionary:
 		"friendship": friendship.duplicate(),
 		"battle_xp": battle_xp.duplicate(),
 		"instances": serialized_instances,
+		"met": met.duplicate(),
 		"defeated": defeated.duplicate(),
 		"fruits": fruits.duplicate(),
-		"potions": potions.duplicate(),
 		"silver": silver,
 		"gear_owned": gear_owned.duplicate(),
 		"equipped": equipped.duplicate(true),
@@ -596,9 +516,9 @@ func from_dict(d: Dictionary) -> void:
 	# несовместимый сейв не должен доходить сюда даже частично
 	friendship = d.get("friendship", {})
 	battle_xp = d.get("battle_xp", {})
+	met = d.get("met", {})
 	defeated = d.get("defeated", {})
 	fruits = d.get("fruits", {})
-	potions = d.get("potions", {})
 	silver = int(d.get("silver", 0))
 	gear_owned = d.get("gear_owned", {})
 	active_guardian_key = d.get("active_guardian", "")
@@ -624,6 +544,22 @@ func from_dict(d: Dictionary) -> void:
 
 
 # --- журнал встреч -----------------------------------------------------------
+
+## Записать ВСТРЕЧУ с экземпляром: увидел на поляне.
+func mark_met(species_id: String, grade: int) -> void:
+	var key := MonsterInstance.key_for(species_id, grade)
+	if met.has(key):
+		return
+	met[key] = true
+	SaveManager.mark_dirty()
+
+
+## Встречался ли уже. Победа и приручение включают встречу сами собой:
+## победить того, кого не видел, нельзя.
+func is_met(species_id: String, grade: int) -> bool:
+	var key := MonsterInstance.key_for(species_id, grade)
+	return met.has(key) or is_revealed(species_id, grade)
+
 
 ## Записать победу над экземпляром. Коллекция помнит её навсегда, даже если
 ## приручить не вышло: увидел — значит открыл.

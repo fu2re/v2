@@ -26,12 +26,11 @@ const BASE_SEEDS := 8
 ## глубине шанс редкого не достигает 100%. Встреча с легендарным обязана
 ## оставаться удачей, а не расписанием.
 
-## Сколько здоровья возвращает привал у костра.
+## Костёр сам по себе НЕ лечит: у него едят фрукты (GDD §8.2.3).
 ##
-## Мало намеренно: здоровье сквозное на весь забег, и костёр — передышка,
-## а не кнопка «начать сначала». Когда он возвращал двадцать пять, глубина
-## переставала накапливаться и решение «идти дальше или уйти» обесценивалось.
-const CAMPFIRE_RESTORE := 10
+## Зелий в игре нет, и лечение стоит угощения — тот же плод мог пойти монстру
+## на дружбу. Это единственное настоящее решение внутри забега; даровое
+## восстановление отняло бы у него весь смысл.
 
 var is_active: bool = false
 var depth: int = 0
@@ -82,6 +81,7 @@ func start_run(new_guardian_key: String) -> bool:
 	run_fruits.clear()
 	run_seed_bag.clear()
 	run_silver = 0
+	run_buffs.clear()
 	current_glade = null
 	is_active = true
 
@@ -210,8 +210,24 @@ func restore_health(amount: int) -> void:
 	set_health(health + amount)
 
 
-func rest_at_campfire() -> void:
-	restore_health(CAMPFIRE_RESTORE)
+## Бафы, набранные за забег: ключ -> суммарная величина.
+##
+## Держатся до конца забега, а не одного боя: съеденный фрукт должен
+## ощущаться вложением. Каждый упирается в свой потолок из таблицы —
+## иначе достаточно съесть десяток яблок, и окно попадания перестаёт
+## что-либо значить.
+var run_buffs: Dictionary = {}
+
+
+func add_buff(buff: Dictionary) -> void:
+	for key: String in buff:
+		var cap := Balance.fruit_buff_cap(key)
+		var value := float(run_buffs.get(key, 0.0)) + float(buff[key])
+		run_buffs[key] = minf(value, cap) if cap > 0.0 else value
+
+
+func buff(key: String) -> float:
+	return float(run_buffs.get(key, 0.0))
 
 
 ## Сменить гуардиана у костра — единственная точка смены внутри забега.
@@ -341,16 +357,6 @@ func shake_bush(for_depth: int) -> String:
 	var picked := _pick_key(weights) if not weights.is_empty() else "silver_handful"
 
 	match picked:
-		"potion":
-			# Полная сумка — не повод отдать пустой куст: зелье просто
-			# не влезает, и вместо него достаётся серебро (запасной вариант
-			# внизу). Без этой проверки куст рапортовал бы о зелье, которого
-			# игрок не получил
-			var potions := Registry.all_potions()
-			if not potions.is_empty() and GameState.has_potion_room():
-				var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
-				GameState.add_potion(potion.id)
-				return "%s — в сумку!" % potion.display_name
 		"seed_random_known":
 			var fruits := Registry.all_fruits()
 			if not fruits.is_empty():
@@ -384,7 +390,7 @@ func pay_granny(amount: int) -> String:
 	add_loot_silver(-given)
 
 	var weights := Balance.granny_gift_weights()
-	var picked := _pick_key(weights) if not weights.is_empty() else "potion"
+	var picked := _pick_key(weights) if not weights.is_empty() else "seed_high_tier"
 
 	match picked:
 		"seed_tier_up":
@@ -404,14 +410,6 @@ func pay_granny(amount: int) -> String:
 			if item != null:
 				return "Свёрток: %s" % item.display_name
 
-	# Зелье — только если влезает: сумка ограничена (GameState.MAX_POTIONS),
-	# а подарок, о котором сказали, но не отдали, обиднее, чем скромный
-	var potions := Registry.all_potions()
-	if not potions.is_empty() and GameState.has_potion_room():
-		var potion: PotionData = potions[_rng.randi_range(0, potions.size() - 1)]
-		GameState.add_potion(potion.id)
-		return "Гостинец: %s" % potion.display_name
-
 	# Зелье не влезло — бабушка даёт серебро. Подарок обязан быть
 	# материальным: «тёплое слово» после того, как игрок отдал ей деньги,
 	# читается как обман, а не как трогательность
@@ -427,6 +425,12 @@ func pay_granny(amount: int) -> String:
 ## Принимает ГРЕЙД, а не монстра: сундук зависит от того, насколько опасен был
 ## конкретный экземпляр, и вызывающему не нужно тащить сюда весь объект.
 func roll_victory_gear(grade: int) -> String:
+	# Сначала — выпадет ли сундук ВООБЩЕ. Пока он падал за каждую победу,
+	# снаряжение перестало быть событием: вещей в ленте набиралось больше,
+	# чем игрок успевал надеть, а торговец стал не нужен
+	if _rng.randf() >= Balance.victory_chest_chance(grade):
+		return ""
+
 	var odds := Balance.victory_chest_odds(grade)
 
 	var total := 0.0

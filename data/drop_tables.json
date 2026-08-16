@@ -32,11 +32,12 @@
   "loot_bush": {
     "description": "Куст с лутом (GDD §8.2.1, v0.4): потряси в такт. Лут всегда обычного грейда, сундук — редкая удача.",
     "weights_percent": {
-      "potion": 35,
-      "seed_random_known": 25,
-      "silver_handful": 25,
-      "gear_chest_like_victory": 15
+      "seed_random_known": 62,
+      "silver_handful": 30,
+      "fruit_single": 6,
+      "gear_chest_like_victory": 2
     },
+    "why": "Куст — источник СЕМЯН, а не склад вещей. Зелья упразднены (GDD §4.2.3), сундук из частой находки стал редкой удачей: когда он выпадал каждый седьмой раз, снаряжение обесценивалось и лавка теряла смысл. Фрукт с куста возможен, но редок: фрукты растят, а не подбирают.",
     "silver_handful": "5 * (1 + 0.15 * depth), округление",
     "chest_note": "Сундук роллится как victory_chest для монстра обычного грейда."
   },
@@ -47,9 +48,9 @@
     "ask_min_fraction": 0.10,
     "ask_max_fraction": 0.40,
     "gift_weights_percent": {
-      "potion": 40,
-      "seed_tier_up": 35,
-      "gear_mid_tier": 25
+      "seed_tier_up": 62,
+      "silver_handful": 30,
+      "gear_mid_tier": 8
     },
     "gift_notes": {
       "seed_tier_up": "семя на тир выше лучшего известного игроку (потолок — максимальный тир)",
@@ -111,6 +112,15 @@
       "mid": ["spring_boots", "river_stone", "brass_bell"],
       "expensive": ["cloud_shoes", "heartwood_amulet", "thunder_pick"]
     },
+    "drop_chance_percent_by_monster_rarity": {
+      "_why": "Сундук падает НЕ всегда. Раньше вещь давала каждая победа, и снаряжение перестало быть событием: сундук в ленте попадался чаще, чем игрок успевал его надеть, а торговец стал не нужен. Теперь находка — удача, и чем опаснее монстр, тем она вероятнее.",
+      "common": 10,
+      "uncommon": 16,
+      "rare": 24,
+      "unique": 34,
+      "epic": 46,
+      "legendary": 60
+    },
     "odds_percent_by_monster_rarity": {
       "common":    { "cheap": 70, "mid": 25, "expensive": 5 },
       "uncommon":  { "cheap": 55, "mid": 33, "expensive": 12 },
@@ -124,15 +134,17 @@
   "wild_bush": {
     "description": "Дикий куст (тип поляны, не встреча): вид фрукта выбирается равновероятно из всех видов игры. Единственный источник семян НОВЫХ культур.",
     "yield": {
-      "fruits_plain_quality": 2,
+      "_why": "Куст даёт СЕМЕНА. Фрукт с него — редкая удача, а не норма: фрукты выращивают на грядке, и если их можно набрать в лесу, ферма становится необязательной.",
       "seed_of_same_fruit": 1,
+      "fruit_chance_percent": 15,
+      "fruits_when_lucky": 1,
       "silver": "8 * (1 + 0.15 * depth), округление"
     }
   },
 
   "campfire": {
     "description": "Не дроп, но фиксируем: отдых восстанавливает здоровье, здесь же — единственная точка смены гуардиана в забеге.",
-    "health_restore": 25
+    "health_restore": "не лечит сам: у костра ЕДЯТ фрукты, и лечение стоит угощения (GDD §8.2.3)"
   },
 
   "soft_death": {

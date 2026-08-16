@@ -226,17 +226,18 @@ func _test_victory_screen_comes_before_taming() -> void:
 	feed._on_battle_finished(true, state)
 	# Итог показывается не сразу: сперва монстр падает (RunFeed.VICTORY_PAUSE).
 	# Без ожидания проверка мерила бы кадр, в котором панели ещё нет
-	await get_tree().create_timer(RunFeed.VICTORY_PAUSE + 0.2).timeout
+	# Ждём весь показ: сперва пауза на падение монстра, потом опыт и призы
+	# по одному. Проверка раньше мерила кадр, в котором добычи ещё нет
+	# по замыслу, а не по ошибке
+	await get_tree().create_timer(RunFeed.VICTORY_PAUSE + 2.6).timeout
 	await _frames(2)
 
 	check(feed._panel_box.visible, "экран победы показан")
 	check(not feed._taming.visible, "угощение ЕЩЁ не открыто")
 
-	# На экране победы игрок должен увидеть, что ему досталось
-	var shown := ""
-	for child in feed._panel_box.get_children():
-		if child is Label:
-			shown += child.text + "\n"
+	# Обходим ДЕРЕВО панели, а не только её прямых детей: приз теперь строка
+	# из картинки и подписи, и подпись лежит на уровень глубже
+	var shown := _all_text(feed._panel_box)
 	# Проверяем СОДЕРЖАНИЕ, а не формулировку: раньше здесь стояло слово
 	# «наплясался», и стоило поправить согласование («Пыльца наплясался»),
 	# как тест покраснел, хотя на экране всё было на месте. Игроку важно
@@ -257,3 +258,17 @@ func _test_victory_screen_comes_before_taming() -> void:
 	RunManager.go_home()
 	feed.queue_free()
 	await _frames(2)
+
+
+## Весь текст поддерева одной строкой.
+##
+## Панель победы собирает призы строками «картинка + подпись», поэтому
+## подписи лежат не прямыми детьми, а на уровень глубже. Обход по прямым
+## детям видел только заголовок и не находил добычу, которая на экране была.
+func _all_text(node: Node) -> String:
+	var out := ""
+	if node is Label:
+		out += (node as Label).text + "\n"
+	for child in node.get_children():
+		out += _all_text(child)
+	return out

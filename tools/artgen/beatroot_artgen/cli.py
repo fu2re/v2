@@ -312,6 +312,33 @@ def cmd_splash(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_icon(args: argparse.Namespace) -> int:
+    from . import icon, review
+    from .promote import load_decisions
+
+    variant = args.variant
+    if variant is None:
+        variant = load_decisions(PROJECT_ROOT).get("app_icon", {}).get("variant")
+    if variant is None:
+        variant = review.load_verdicts(PROJECT_ROOT).get("app_icon", {}).get("chosen")
+        if variant is not None:
+            print("предпросмотр: по вердикту Клода, решения человека ещё нет")
+    if variant is None:
+        print("! app_icon: нет ни решения, ни вердикта (или укажи --variant)")
+        return 1
+
+    source = ART_DIR / "candidates" / "app_icon" / f"{variant}.png"
+    if not source.exists():
+        print(f"! вариант {variant} не найден ({source})")
+        return 1
+
+    out = Path(args.out) if args.out else ART_DIR / "app_icon.png"
+    icon.build(source, out, size=args.size)
+    print(f"-> {out.relative_to(PROJECT_ROOT)}  ({args.size}x{args.size})")
+    print("Плашка собрана кодом: генерации отдана только морда героя")
+    return 0
+
+
 def cmd_lobby(args: argparse.Namespace) -> int:
     from . import lobby, review
     from .promote import load_decisions
@@ -491,6 +518,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--emblem", help="вариант logo_emblem; по умолчанию принятый")
     p.add_argument("--out", help="куда положить заставку")
     p.set_defaults(func=cmd_splash)
+
+    p = sub.add_parser("icon", help="собрать иконку приложения: герой на плашке")
+    p.add_argument("--variant", help="вариант app_icon; по умолчанию принятый")
+    p.add_argument("--size", type=int, default=1024)
+    p.add_argument("--out", help="куда положить иконку")
+    p.set_defaults(func=cmd_icon)
 
     p = sub.add_parser("lobby", help="собрать двор усадьбы с постройками")
     p.add_argument("--out", help="куда положить картинку двора")

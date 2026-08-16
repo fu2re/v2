@@ -172,22 +172,6 @@ gen_height = 1024
 cutout = true
 style = "single wearable item, worn handmade craft, flat orthographic icon, straight front view, no perspective, no foreshortening, thick readable silhouette"
 
-# Зелья. Отдельный вид, а не gear: их не носят, а выпивают, и на экране
-# они всегда стоят рядом друг с другом — общий силуэт склянки важнее,
-# чем сходство с остальным снаряжением.
-[kind.potion]
-size = 64
-variants = 3
-gen_width = 1024
-gen_height = 1024
-cutout = true
-style = "single small drink container, handmade rustic vessel, flat orthographic icon, straight front view, no perspective, thick readable silhouette"
-
-[[asset]]
-id = "health_potion"
-kind = "potion"
-subject = "small corked glass bottle of warm amber herbal drink, cloth tie around the neck"
-
 [kind.cosmetic]
 size = 64
 variants = 3
@@ -701,6 +685,67 @@ subject = "the interior of a wooden storehouse, shelves with jars, stacked sacks
 id = "screen_merchant"
 kind = "screen"
 subject = "a market stall counter seen from the buyer side, shelves of clay jars, seed bags and folded cloth behind it"
+
+
+# ──────────────────────── иконка приложения и валюты ────────────────────────
+#
+# Иконка — бренд, и палитра мира ей не нужна: она живёт в витрине магазина
+# рядом с чужими иконками, а не рядом с нотами. Отсюда quantize = false, как
+# было у эмблемы. Кадр квадратный и сплошной, без вырезки: иконка приложения
+# и есть плашка целиком.
+#
+# Лицом взят Топотун, а не свёкла: свёклу ты убрал из заставки, а медвежонок
+# уже отобран как самый милый и узнаётся мордой даже в 48 пикселей витрины.
+# cutout = true, хотя иконка и не спрайт. Причина: шаблон промпта выводится
+# из этого признака, и при cutout = false иконка получила шаблон ФОНА —
+# «пустое место, никаких персонажей, фон во весь кадр», а следом морду
+# медвежонка. Модель выполнила первое и приклеила второе поверх пустыни.
+#
+# Иконка — третий случай, которого в бинарном делении «фон или спрайт» нет:
+# объект со СВОЕЙ плашкой. Решается как заставка и двор — вырезаем объект,
+# а плашку собираем кодом (`artgen icon`). Композиция вообще не дело генерации.
+[kind.icon]
+size = 256
+variants = 6
+gen_width = 1024
+gen_height = 1024
+cutout = true
+quantize = true
+beet = true
+style = "bold simple shapes, thick readable silhouette, straight front view, subject fills the frame"
+
+# Свёкла в палитре мира выйдет тёмно-бордовой, а не сочно-малиновой: потолок
+# насыщенности мира 0.128. Читаемость в витрине вытягивается не цветом,
+# а СИЛУЭТОМ — тёмный корнеплод на светлой плашке. Отсюда и нажим на
+# «толстый узнаваемый силуэт» в стиле вида, и светлая плашка в icon.py.
+[[asset]]
+id = "app_icon"
+kind = "icon"
+subject = "a plump round beetroot with a bushy top of broad leaves and a long tapering root, deep dark red root, rich green leaves"
+
+# Монеты — иконки интерфейса, но объекты, и модель их рисует уверенно.
+# Квантование остаётся: они показываются рядом с нотами. Золотая рампа
+# разрешена флагом — без неё золото ушло бы в охру и от серебра не отличалось.
+[kind.currency]
+size = 64
+variants = 4
+gen_width = 1024
+gen_height = 1024
+cutout = true
+gold = true
+style = "single coin seen straight from the front, flat orthographic icon, no perspective, thick raised rim, bold readable shape"
+
+[[asset]]
+id = "coin_gold"
+kind = "currency"
+subject = "a thick round gold coin of gleaming polished gold, a simple leaf stamped in relief in the middle"
+
+# Серебро отличается не только цветом: у него другая форма чекана. На 32px
+# в интерфейсе цвет теряется первым, и по одному цвету валюты не различить.
+[[asset]]
+id = "coin_silver"
+kind = "currency"
+subject = "a thick round silver coin of pale grey polished metal, a simple six-pointed star stamped in relief in the middle"
 
 
 # ─────────────────────────────── заставка ───────────────────────────────────

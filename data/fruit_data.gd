@@ -6,44 +6,25 @@ extends Resource
 
 enum Quality { PLAIN, JUICY, PERFECT }
 
-## Качество как множитель прибавки дружбы. Это награда за танец растению —
-## ребёнок танцует, потому что приятно, взрослый выжимает качество.
-const QUALITY_MULTIPLIER := {
-	Quality.PLAIN: 1.0,
-	Quality.JUICY: 1.3,
-	Quality.PERFECT: 1.6,
-}
-
-## Время роста в секундах по тиру семени (GDD §7.1).
-const GROW_TIME := {
-	0: 600,     # обычное, 10 мин
-	1: 1800,    # необычное, 30 мин
-	2: 7200,    # редкое, 2 ч
-	3: 28800,   # эпическое, 8 ч
-}
-
-## Во сколько раз плод тира щедрее самого простого (GDD §7.2).
+## Всё, что фрукт даёт игре, задано ТИРОМ семечка и живёт в data/fruits.json.
 ##
-## Считается от ТИРА, а не от качества, и это исправление настоящей поломки:
-## качеств три, а тиров четыре, поэтому редкий инжир и необычная сливка
-## давали ОДИНАКОВУЮ дружбу — при том что инжир рос вчетверо дольше и стоил
-## вдвое дороже. Тир 2 был предметом, который незачем сажать никогда.
-##
-## Разброс ×4 против разброса времени ×48 — так и задумано. Ожидание в ферме
-## покупается не эффективностью за час, а размером одного урожая: за ночь
-## никто не соберёт десятиминутную грядку сорок восемь раз. Верхний плод
-## закрывает обычную шкалу дружбы В ОДИНОЧКУ — «посадил перед сном, проснулся
-## с новым другом» и есть то, ради чего вообще ждут.
-const TIER_FRIENDSHIP := {
-	0: 1.0,
-	1: 1.7,
-	2: 2.7,
-	3: 4.0,
-}
+## В коде не осталось ни одного числа: время роста, дружба, лечение и бафы
+## правятся дизайнером в таблице, а не программистом в константах. Так уже
+## пришлось чинить один раз — числа в коде и в таблице разъехались молча.
 
 
 static func tier_friendship_scale(tier: int) -> float:
-	return TIER_FRIENDSHIP.get(clampi(tier, 0, 3), 1.0)
+	return Balance.fruit_friendship_scale(tier)
+
+
+## Сколько здоровья вернёт плод у костра (GDD §8.2.3).
+static func tier_heal(tier: int) -> int:
+	return Balance.fruit_heal(tier)
+
+
+## Чем плод подкручивает бой до конца забега. Пусто — тир без бафа.
+static func tier_buff(tier: int) -> Dictionary:
+	return Balance.fruit_buff(tier)
 
 @export var id: String = ""
 @export var display_name: String = ""
@@ -53,16 +34,30 @@ static func tier_friendship_scale(tier: int) -> float:
 var _sprite: Texture2D = null
 
 
-static func quality_multiplier(q: Quality) -> float:
-	return QUALITY_MULTIPLIER.get(q, 1.0)
-
-
 static func quality_name(q: Quality) -> String:
 	return ["Обычный", "Сочный", "Идеальный"][q]
 
 
+## Ярлык качества по тиру семечка — единственный источник после того,
+## как танец растению убрали.
+static func quality_for_tier(tier: int) -> Quality:
+	if tier >= 3:
+		return Quality.PERFECT
+	if tier >= 1:
+		return Quality.JUICY
+	return Quality.PLAIN
+
+
 func grow_seconds() -> int:
-	return GROW_TIME.get(tier, 600)
+	return Balance.fruit_grow_seconds(tier)
+
+
+func heal() -> int:
+	return Balance.fruit_heal(tier)
+
+
+func buff() -> Dictionary:
+	return Balance.fruit_buff(tier)
 
 
 func sprite() -> Texture2D:

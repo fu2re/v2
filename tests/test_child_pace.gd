@@ -84,7 +84,7 @@ func _test_first_friend_costs_no_grind() -> void:
 	# иначе ферма никому не нужна
 	var need := GameState.friendship_threshold(COMMON) - GameState.FRIENDSHIP_WIN
 	var per_fruit := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
-		* FruitData.quality_multiplier(FruitData.Quality.PERFECT)))
+		* FruitData.tier_friendship_scale(3)))
 	var fruits := int(ceil(float(need) / maxf(per_fruit, 1)))
 	# Один бой ради встречи плюс поход за урожаем между ними
 	var glades := int(ceil(1.0 * species / maxf(battle_share, 0.01)))

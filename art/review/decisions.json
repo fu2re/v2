@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-15T21:12:08+00:00",
+  "updated": "2026-08-16T06:06:14+00:00",
   "decisions": {
     "disco_sprout_common": {
       "status": "принят",
@@ -564,6 +564,24 @@
       "variant": "00",
       "attempt": 0,
       "at": "2026-08-15T21:12:08+00:00"
+    },
+    "coin_gold": {
+      "status": "принят",
+      "variant": "01",
+      "attempt": 0,
+      "at": "2026-08-16T05:57:47+00:00"
+    },
+    "coin_silver": {
+      "status": "принят",
+      "variant": "02",
+      "attempt": 0,
+      "at": "2026-08-16T05:57:47+00:00"
+    },
+    "app_icon": {
+      "status": "принят",
+      "variant": "2-02",
+      "attempt": 2,
+      "at": "2026-08-16T06:06:14+00:00"
     }
   }
 }

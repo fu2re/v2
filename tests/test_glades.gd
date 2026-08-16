@@ -33,8 +33,11 @@ func _test_campfire_restores() -> void:
 	_tame(["disco_sprout"])
 	RunManager.start_run(_key("disco_sprout"))
 	RunManager.set_health(30)
-	RunManager.rest_at_campfire()
-	check_eq(RunManager.health, 30 + RunManager.CAMPFIRE_RESTORE, "Ритм поднялся")
+	# Костёр лечит съеденным фруктом, а не сам по себе
+	GameState.add_fruit("drum_berry", FruitData.Quality.PLAIN, 1)
+	var berry := Registry.fruit("drum_berry")
+	RunManager.restore_health(berry.heal())
+	check_eq(RunManager.health, 30 + berry.heal(), "Ритм поднялся от фрукта")
 	RunManager.go_home()
 
 
@@ -116,20 +119,37 @@ func _test_merchant_stock_is_stable() -> void:
 	feed.queue_free()
 
 
-## Победа над монстром даёт снаряжение, и чем выше грейд — тем ценнее.
+## Победа над монстром ИНОГДА даёт снаряжение, и чем выше грейд — тем чаще
+## и тем ценнее.
+##
+## Именно «иногда»: сундук падал за каждую победу, и снаряжение перестало
+## быть событием — вещей набиралось больше, чем игрок успевал надеть,
+## а торговец стал не нужен.
 func _test_victory_gives_gear() -> void:
-	print("За победу выдаётся снаряжение")
+	print("За победу иногда выдаётся снаряжение")
 	GameState.reset()
 	RunManager.set_seed(555)
 
+	# Шанс растёт с грейдом: награда обязана отражать риск
+	check(Balance.victory_chest_chance(MonsterData.Rarity.LEGENDARY)
+		> Balance.victory_chest_chance(MonsterData.Rarity.COMMON),
+		"с легендарного сундук падает чаще")
+	check(Balance.victory_chest_chance(MonsterData.Rarity.COMMON) < 0.5,
+		"с обычного сундук — удача, а не норма (%.0f%%)" % [
+			Balance.victory_chest_chance(MonsterData.Rarity.COMMON) * 100.0])
+
+	# Выпавшее обязано быть настоящим предметом, попавшим в сундук игрока
 	for grade in [MonsterData.Rarity.COMMON, MonsterData.Rarity.LEGENDARY]:
 		var name := MonsterData.rarity_name(grade)
-		var before := GameState.owned_gear_ids().size()
-		var prize := RunManager.roll_victory_gear(grade)
-		check(not prize.is_empty(), "%s: сундук что-то дал" % name)
-		check(Registry.gear(prize) != null, "%s: выпавший предмет существует" % name)
-		check(GameState.owned_gear_ids().size() >= before,
-			"%s: предмет попал в сундук игрока" % name)
+		var dropped := 0
+		for i in 200:
+			var prize := RunManager.roll_victory_gear(grade)
+			if prize.is_empty():
+				continue
+			dropped += 1
+			check(Registry.gear(prize) != null,
+				"%s: выпавший предмет существует" % name)
+		check(dropped > 0, "%s: за две сотни побед сундук выпал хоть раз" % name)
 
 	# Чем выше грейд ЭКЗЕМПЛЯРА, тем дороже средняя добыча: награда обязана
 	# отражать риск, иначе за редкими незачем идти

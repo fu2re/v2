@@ -15,6 +15,7 @@ extends RefCounted
 const PROGRESSION_PATH := "res://data/progression.json"
 const DROP_TABLES_PATH := "res://data/drop_tables.json"
 const MERCHANT_PATH := "res://data/merchant.json"
+const FRUITS_PATH := "res://data/fruits.json"
 
 ## Порядок грейдов. Совпадает с MonsterData.Rarity и с ключами в JSON —
 ## имя грейда служит ключом во всех таблицах.
@@ -33,6 +34,7 @@ const FALLBACK_GLADE_WEIGHTS := {"battle": 65.0, "wild_bush": 12.0, "campfire": 
 static var _progression: Dictionary = {}
 static var _drops: Dictionary = {}
 static var _merchant: Dictionary = {}
+static var _fruits: Dictionary = {}
 static var _loaded := false
 
 
@@ -42,6 +44,7 @@ static func ensure_loaded() -> void:
 	_progression = _read(PROGRESSION_PATH)
 	_drops = _read(DROP_TABLES_PATH)
 	_merchant = _read(MERCHANT_PATH)
+	_fruits = _read(FRUITS_PATH)
 	_loaded = true
 
 
@@ -290,6 +293,26 @@ static func victory_chest_odds(grade: int) -> PackedFloat32Array:
 	return out
 
 
+## Шанс, что сундук вообще выпадет за победу (GDD §8.1.2).
+##
+## Отдельно от долей тиров: те отвечают на «что именно», а этот — на «дадут ли
+## вообще». Пока сундук падал всегда, снаряжение перестало быть событием.
+static func victory_chest_chance(grade: int) -> float:
+	ensure_loaded()
+	var chest := _section(_drops, "victory_chest")
+	var chances := _section(chest, "drop_chance_percent_by_monster_rarity")
+	return float(chances.get(grade_key(grade), 10.0)) / 100.0
+
+
+## Шанс подобрать с дикого куста ещё и фрукт. Мал намеренно: фрукты растят
+## на грядке, и если их можно набрать в лесу, ферма становится лишней.
+static func wild_bush_fruit_chance() -> float:
+	ensure_loaded()
+	var bush := _section(_drops, "wild_bush")
+	var yield_row := _section(bush, "yield")
+	return float(yield_row.get("fruit_chance_percent", 15.0)) / 100.0
+
+
 # --- торговец ----------------------------------------------------------------
 
 ## Цена семени по тиру. У семян нет своего ресурса, поэтому цена живёт
@@ -315,3 +338,57 @@ static func granny_ask_fraction() -> Vector2:
 	var low := float(granny.get("ask_min_fraction", 0.10))
 	var high := float(granny.get("ask_max_fraction", 0.40))
 	return Vector2(minf(low, high), maxf(low, high))
+
+
+# --- фрукты -------------------------------------------------------------------
+
+## Строка таблицы для тира семечка. Пустая — тир не описан, и вызывающий
+## обязан подставить запасное значение сам.
+static func fruit_tier(tier: int) -> Dictionary:
+	ensure_loaded()
+	var tiers := _section(_fruits, "tiers")
+	var value: Variant = tiers.get(str(clampi(tier, 0, 3)), null)
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+## Время роста в секундах. Здесь и нигде больше: раньше оно жило константой
+## в `FruitData`, и подкрутить его без программиста было нельзя.
+static func fruit_grow_seconds(tier: int) -> int:
+	var row := fruit_tier(tier)
+	return int(row.get("grow_seconds", [600, 1800, 7200, 28800][clampi(tier, 0, 3)]))
+
+
+## Во сколько раз плод тира щедрее самого простого при угощении.
+static func fruit_friendship_scale(tier: int) -> float:
+	var row := fruit_tier(tier)
+	return float(row.get("friendship_scale", [1.0, 1.7, 2.7, 4.0][clampi(tier, 0, 3)]))
+
+
+## Сколько здоровья вернёт плод, съеденный у костра (GDD §8.2.3).
+static func fruit_heal(tier: int) -> int:
+	var row := fruit_tier(tier)
+	return int(row.get("heal", [12, 22, 36, 55][clampi(tier, 0, 3)]))
+
+
+## Что плод даёт сверх лечения: доля к защите, прибавка к удару или окно.
+## Пустой словарь — тир без бафа, и это нормально.
+static func fruit_buff(tier: int) -> Dictionary:
+	var row := fruit_tier(tier)
+	var value: Variant = row.get("buff", {})
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+## Потолок каждого бафа за забег. Без него достаточно съесть десяток яблок,
+## чтобы окно попадания перестало что-либо значить.
+static func fruit_buff_cap(key: String) -> float:
+	ensure_loaded()
+	var buffs := _section(_fruits, "buffs")
+	var caps := _section(buffs, "max_total")
+	return float(caps.get(key, 0.0))
+
+
+## Ярлык качества по тиру. Только для показа: числа считаются от тира.
+static func fruit_quality_label(tier: int) -> String:
+	ensure_loaded()
+	var labels := _section(_fruits, "quality_labels")
+	return String(labels.get(str(clampi(tier, 0, 3)), "Обычный"))

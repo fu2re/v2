@@ -25,6 +25,7 @@ func run_tests() -> void:
 	_test_note_types_match()
 	_test_glade_types_match()
 	_test_rarities_match()
+	_test_collection_opens_in_steps()
 
 
 func _gdd_text() -> String:
@@ -105,7 +106,7 @@ func _test_every_scene_folder_is_documented() -> void:
 func _test_note_types_match() -> void:
 	print("Типы нот совпадают с документом")
 	var text := _gdd_text()
-	for type: String in ["beat", "attack", "skill", "shield", "snack"]:
+	for type: String in ["beat", "attack", "skill", "shield", "heavy"]:
 		check(text.contains("`%s`" % type), "тип ноты %s не описан в GDD" % type)
 
 
@@ -125,3 +126,43 @@ func _test_rarities_match() -> void:
 		var title := MonsterData.rarity_name(grade)
 		check(text.contains(title),
 			"грейд «%s» не описан в GDD" % title)
+
+
+## Коллекция открывается ступенями: встретил → победил → приручил.
+##
+## Проверка появилась по живому отчёту: игрок встретил в забеге уникальных
+## монстров, а в коллекции они остались чёрными — встреча не отмечалась вовсе,
+## и единственным событием была победа.
+func _test_collection_opens_in_steps() -> void:
+	print("Коллекция открывается ступенями")
+	SaveManager.enter_test_mode()
+	GameState.reset()
+
+	var id := "beat_serpent"
+	var grade := MonsterData.Rarity.UNIQUE
+
+	check_eq(CollectionGrid.state_for(id, grade), CollectionGrid.Cell.HIDDEN,
+		"незнакомый — силуэт")
+
+	GameState.mark_met(id, grade)
+	check_eq(CollectionGrid.state_for(id, grade), CollectionGrid.Cell.MET,
+		"встреченный — уже не силуэт")
+	check(CollectionGrid.opens_card(id, grade), "по встреченному карточка открывается")
+
+	GameState.mark_defeated(id, grade)
+	check_eq(CollectionGrid.state_for(id, grade), CollectionGrid.Cell.REVEALED,
+		"побеждённый — открытый скин")
+
+	GameState.tame(id, MonsterData.Rarity.COMMON)
+	GameState.tame(id, MonsterData.Rarity.UNCOMMON)
+	GameState.tame(id, MonsterData.Rarity.RARE)
+	GameState.tame(id, grade)
+	check_eq(CollectionGrid.state_for(id, grade), CollectionGrid.Cell.TAMED,
+		"приручённый — в рамке")
+
+	# Ступени обязаны пережить сейв: коллекция собирается неделями
+	var saved: Variant = JSON.parse_string(JSON.stringify(GameState.to_dict()))
+	GameState.reset()
+	GameState.from_dict(saved)
+	check_eq(CollectionGrid.state_for(id, grade), CollectionGrid.Cell.TAMED,
+		"после сейва состояние клетки то же")
