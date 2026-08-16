@@ -118,7 +118,7 @@ func _test_full_player_journey() -> void:
 	# запрет вместо начисления
 	var step := MonsterData.Rarity.COMMON
 	var before := GameState.get_friendship(monster.species_id, step)
-	GameState.add_friendship(monster.species_id, step, GameState.FRIENDSHIP_WIN)
+	GameState.add_friendship(monster.species_id, step, GameState.friendship_win())
 	check(GameState.get_friendship(monster.species_id, step) > before,
 		"дружба выросла после боя")
 
@@ -301,7 +301,7 @@ func _test_new_player_can_reach_first_taming() -> void:
 			continue
 		if glade.monster_id == first.species_id and glade.grade == first.grade:
 			continue
-		if GameState.add_friendship(glade.monster_id, glade.grade, GameState.FRIENDSHIP_WIN):
+		if GameState.add_friendship(glade.monster_id, glade.grade, GameState.friendship_win()):
 			tamed_new = glade.monster_id
 			break
 	RunManager.go_home()

@@ -146,7 +146,7 @@ func _test_card_shows_stakes() -> void:
 	# Дружба почти полна: следующая победа приручит — это самый дорогой
 	# для пропуска случай, и он обязан быть виден крупно
 	var threshold := GameState.friendship_threshold(COMMON)
-	GameState.add_friendship("synth_slime", COMMON, threshold - GameState.FRIENDSHIP_WIN)
+	GameState.add_friendship("synth_slime", COMMON, threshold - GameState.friendship_win())
 
 	var feed: Node = await _feed_with_battle("synth_slime", COMMON)
 	feed._show_glade(RunManager.current_glade)

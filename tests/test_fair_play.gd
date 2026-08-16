@@ -304,7 +304,7 @@ func _test_taming_goes_step_by_step() -> void:
 	# придётся заново — зато ни один фрукт не ушёл в пустоту
 	check_eq(GameState.get_friendship("banjo_moth", RARE), 0,
 		"в закрытую ступень ничего не накопилось")
-	check(not GameState.add_friendship("banjo_moth", RARE, GameState.FRIENDSHIP_WIN),
+	check(not GameState.add_friendship("banjo_moth", RARE, GameState.friendship_win()),
 		"одной победы по открывшейся ступени мало — шкала начинается с нуля")
 	check(GameState.get_friendship("banjo_moth", RARE) > 0,
 		"но теперь дружба пошла")

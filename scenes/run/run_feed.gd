@@ -269,7 +269,7 @@ func _show_scenery(glade: Glade) -> void:
 func _show_stakes(glade: Glade) -> void:
 	var value := GameState.get_friendship(glade.monster_id, glade.grade)
 	var threshold := GameState.friendship_threshold(glade.grade)
-	var after_win := mini(value + GameState.FRIENDSHIP_WIN, threshold)
+	var after_win := mini(value + GameState.friendship_win(), threshold)
 
 	var already := GameState.has_instance(glade.monster_id, glade.grade)
 
@@ -310,7 +310,7 @@ func _show_stakes(glade: Glade) -> void:
 			% MonsterData.rarity_name(step)
 	else:
 		_friendship_label.text = "Дружба %d/%d  (+%d за победу)" % [
-			value, threshold, GameState.FRIENDSHIP_WIN,
+			value, threshold, GameState.friendship_win(),
 		]
 
 	# Мелким шрифтом — остальное, что даёт победа

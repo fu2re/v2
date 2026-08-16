@@ -14,6 +14,7 @@ func run_tests() -> void:
 	_test_cosmetics_cannot_affect_gameplay()
 	_test_every_crate_item_sold_directly()
 	_test_odds_sum_to_hundred()
+	_test_crate_grades_are_consistent()
 	_test_odds_disclosed_before_purchase()
 	_test_pity_guarantees_rare()
 	_test_duplicates_never_wasted()
@@ -64,15 +65,58 @@ func _test_odds_sum_to_hundred() -> void:
 	check(absf(ShopState.odds_total() - 100.0) < 0.001,
 		"сумма шансов %.3f" % ShopState.odds_total())
 
-	for rarity: MonsterData.Rarity in ShopState.CRATE_ODDS:
-		check(ShopState.CRATE_ODDS[rarity] > 0.0,
+	for rarity: MonsterData.Rarity in ShopState.crate_odds():
+		check(ShopState.crate_odds()[rarity] > 0.0,
 			"%s имеет ненулевой шанс" % MonsterData.rarity_name(rarity))
+
+
+## Инвариант SHOP.md §4: каждый грейд из таблицы шансов — непустой пул,
+## каждый грейд из пула — строка в шансах и в таблице возврата.
+## Иначе публикуемые цифры лгут: заявленный «Редкий — 10%» указывал
+## на пустой пул, а дубль уникального возвращал меньше, чем обычного.
+func _test_crate_grades_are_consistent() -> void:
+	print("Шансы, пул и возврат согласованы")
+	var odds := ShopState.crate_odds()
+	var refunds := ShopState.duplicate_refunds()
+
+	var pool_grades: Dictionary = {}
+	for item in ShopState.crate_pool():
+		pool_grades[item.rarity] = true
+
+	for rarity: int in odds:
+		check(pool_grades.has(rarity),
+			"грейд «%s» из таблицы шансов существует в пуле"
+				% MonsterData.rarity_name(rarity))
+
+	for rarity: int in pool_grades:
+		check(odds.has(rarity),
+			"грейд «%s» из пула есть в таблице шансов"
+				% MonsterData.rarity_name(rarity))
+		check(int(refunds.get(rarity, 0)) > 0,
+			"грейд «%s» из пула есть в таблице возврата"
+				% MonsterData.rarity_name(rarity))
+
+	# Возврат растёт с редкостью: дубль ценного не может быть дешевле дубля
+	# обычного — ровно этим и был замеченный дефект (уникальный падал в 10)
+	var previous := 0
+	for rarity in range(MonsterData.Rarity.size()):
+		if not refunds.has(rarity):
+			continue
+		check(int(refunds[rarity]) > previous,
+			"возврат за «%s» выше, чем за грейд ниже (%d)"
+				% [MonsterData.rarity_name(rarity), int(refunds[rarity])])
+		previous = int(refunds[rarity])
+
+	# И всегда меньше цены прямой покупки, иначе сундук печатает золото
+	for item in ShopState.crate_pool():
+		check(Balance.crate_duplicate_refund(item.rarity) < item.price_gold,
+			"возврат за дубль «%s» меньше его прямой цены" % item.id)
 
 
 func _test_odds_disclosed_before_purchase() -> void:
 	print("Шансы раскрыты в тексте покупки")
 	var text := ShopState.odds_disclosure()
-	for rarity: MonsterData.Rarity in ShopState.CRATE_ODDS:
+	for rarity: MonsterData.Rarity in ShopState.crate_odds():
 		check(text.contains(MonsterData.rarity_name(rarity)),
 			"в раскрытии есть %s" % MonsterData.rarity_name(rarity))
 	check(text.contains("%"), "проценты показаны")
@@ -84,12 +128,12 @@ func _test_pity_guarantees_rare() -> void:
 	print("Pity гарантирует редкий предмет")
 	ShopState.reset()
 	ShopState.set_seed(99)
-	ShopState.add_gold(ShopState.CRATE_PRICE * ShopState.PITY_THRESHOLD * 2)
+	ShopState.add_gold(ShopState.crate_price() * ShopState.pity_threshold() * 2)
 	ShopState.daily_limit = 999999
 
 	var best_seen := -1
 	var opens := 0
-	while opens < ShopState.PITY_THRESHOLD:
+	while opens < ShopState.pity_threshold():
 		opens += 1
 		var id := ShopState.open_crate()
 		if id.is_empty():
@@ -97,12 +141,12 @@ func _test_pity_guarantees_rare() -> void:
 		var item := Registry.cosmetic(id)
 		best_seen = maxi(best_seen, item.rarity)
 
-	check(best_seen >= ShopState.PITY_MIN_RARITY,
+	check(best_seen >= ShopState.pity_min_rarity(),
 		"за %d открытий редкий предмет выпал гарантированно (лучшее: %s)"
-			% [ShopState.PITY_THRESHOLD, MonsterData.rarity_name(best_seen)])
+			% [ShopState.pity_threshold(), MonsterData.rarity_name(best_seen)])
 
 	# Счётчик всегда в допустимых пределах, иначе цифра в интерфейсе врёт
-	check(ShopState.pity_counter >= 0 and ShopState.pity_counter < ShopState.PITY_THRESHOLD,
+	check(ShopState.pity_counter >= 0 and ShopState.pity_counter < ShopState.pity_threshold(),
 		"счётчик pity в пределах: %d" % ShopState.pity_counter)
 
 
@@ -126,11 +170,11 @@ func _test_duplicates_never_wasted() -> void:
 
 	# Потратили CRATE_PRICE, но получили возврат — итог мягче полной потери
 	var spent := before - ShopState.gold
-	check(spent < ShopState.CRATE_PRICE,
-		"дубль вернул часть золота (потрачено %d из %d)" % [spent, ShopState.CRATE_PRICE])
+	check(spent < ShopState.crate_price(),
+		"дубль вернул часть золота (потрачено %d из %d)" % [spent, ShopState.crate_price()])
 
-	for rarity: MonsterData.Rarity in ShopState.DUPLICATE_REFUND:
-		check(ShopState.DUPLICATE_REFUND[rarity] > 0,
+	for rarity: MonsterData.Rarity in ShopState.duplicate_refunds():
+		check(ShopState.duplicate_refunds()[rarity] > 0,
 			"возврат за %s положителен" % MonsterData.rarity_name(rarity))
 
 
@@ -141,7 +185,7 @@ func _test_region_ban_blocks_crates() -> void:
 	ShopState.add_gold(100000)
 	ShopState.daily_limit = 999999
 
-	for region in ShopState.LOOTBOX_BANNED_REGIONS:
+	for region in Balance.lootbox_banned_regions():
 		ShopState.region = region
 		check(ShopState.lootboxes_banned(), "%s: сундуки запрещены" % region)
 		var before := ShopState.gold

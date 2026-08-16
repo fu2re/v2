@@ -53,7 +53,7 @@ func _refresh() -> void:
 	_odds_label.visible = allowed
 	if allowed:
 		_odds_label.text = ShopState.odds_disclosure()
-		_crate_button.text = "Пластинка — %d ♪" % ShopState.CRATE_PRICE \
+		_crate_button.text = "Пластинка — %d ♪" % ShopState.crate_price() \
 			if _pending != "__crate__" else "Точно открыть? Нажми ещё раз"
 
 	UIUtil.clear_children(_list)
@@ -128,7 +128,7 @@ func _on_crate_opened(cosmetic_id: String, was_duplicate: bool, pity_hit: bool) 
 		return
 	if was_duplicate:
 		_status.text = "%s уже есть — вернулись Золото: %d" % [
-			item.display_name, ShopState.DUPLICATE_REFUND.get(item.rarity, 0),
+			item.display_name, Balance.crate_duplicate_refund(item.rarity),
 		]
 	elif pity_hit:
 		_status.text = "Гарантия сработала: %s!" % item.display_name

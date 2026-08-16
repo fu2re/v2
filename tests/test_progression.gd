@@ -60,12 +60,12 @@ func _test_friendship_is_deterministic() -> void:
 	var wins := 0
 	while wins < 100:
 		wins += 1
-		if GameState.add_friendship("disco_sprout", common, GameState.FRIENDSHIP_WIN):
+		if GameState.add_friendship("disco_sprout", common, GameState.friendship_win()):
 			tamed_at = wins
 			break
 
 	# 100 порога при +10 за победу — ровно 10 побед, без разброса
-	check_eq(tamed_at, int(ceil(float(threshold) / GameState.FRIENDSHIP_WIN)),
+	check_eq(tamed_at, int(ceil(float(threshold) / GameState.friendship_win())),
 		"приручение ровно на расчётной победе, без броска кубика")
 	check(GameState.is_tamed("disco_sprout"), "монстр в коллекции")
 	check(GameState.has_instance("disco_sprout", common), "приручён именно обычный экземпляр")
@@ -102,13 +102,13 @@ func _test_fruit_bonus() -> void:
 		> GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
 		"любимый фрукт даёт больше нелюбимого")
 	check_eq(GameState.friendship_from_fruit("bass_bear", "drum_berry", Q.PLAIN),
-		GameState.FRIENDSHIP_OTHER_FRUIT, "нелюбимый даёт меньше, но даёт")
+		GameState.friendship_other_fruit(), "нелюбимый даёт меньше, но даёт")
 
 	# Щедрость задаёт ТИР семечка, а не качество: у любимой сливки тир 1,
 	# поэтому прибавка выше базовой ровно на его множитель
 	var plum := Registry.fruit("bass_plum")
 	check_eq(GameState.friendship_from_fruit("bass_bear", "bass_plum", Q.PLAIN),
-		int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+		int(round(GameState.friendship_favorite_fruit()
 			* FruitData.tier_friendship_scale(plum.tier))),
 		"прибавка считается от тира семечка")
 

@@ -17,12 +17,12 @@
   ],
 
   "tiers": {
+    "_price_note": "Цена семени НЕ здесь: она живёт в merchant.json → prices_silver.seeds_by_tier, третья копия уже успевала разойтись.",
     "0": {
       "name": "обычный",
       "grow_seconds": 600,
       "friendship_scale": 1.0,
       "heal": 12,
-      "seed_price_silver": 15,
       "buff": {}
     },
     "1": {
@@ -30,7 +30,6 @@
       "grow_seconds": 1800,
       "friendship_scale": 1.7,
       "heal": 22,
-      "seed_price_silver": 40,
       "buff": { "shield_reduction": 0.08 }
     },
     "2": {
@@ -38,7 +37,6 @@
       "grow_seconds": 7200,
       "friendship_scale": 2.7,
       "heal": 36,
-      "seed_price_silver": 100,
       "buff": { "power_bonus": 1.2 }
     },
     "3": {
@@ -46,7 +44,6 @@
       "grow_seconds": 28800,
       "friendship_scale": 4.0,
       "heal": 55,
-      "seed_price_silver": 250,
       "buff": { "window_scale": 0.15 }
     }
   },

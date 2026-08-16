@@ -11,33 +11,38 @@ signal cosmetic_unlocked(cosmetic_id: String)
 signal crate_opened(cosmetic_id: String, was_duplicate: bool, pity_hit: bool)
 signal purchase_blocked(reason: String)
 
-## Шансы выпадения по редкости. Публикуются в интерфейсе покупки —
-## без этого игру не пропустят ни App Store, ни Google Play.
-const CRATE_ODDS := {
-	MonsterData.Rarity.COMMON: 60.0,
-	MonsterData.Rarity.UNCOMMON: 27.0,
-	MonsterData.Rarity.RARE: 10.0,
-	MonsterData.Rarity.EPIC: 2.5,
-	MonsterData.Rarity.LEGENDARY: 0.5,
-}
+## Все числа пластинки — цена, шансы, pity, возврат за дубль, регионы —
+## живут в drop_tables.json → cosmetic_crate и читаются через Balance.
+## Пока они были константами здесь, таблица объявляла себя источником
+## истины, но не читалась, и обе копии успели разойтись (SHOP.md §4).
 
-## Гарантированный редкий предмет каждые N открытий. Счётчик виден игроку.
-const PITY_THRESHOLD := 30
-const PITY_MIN_RARITY := MonsterData.Rarity.RARE
+## Шансы выпадения по редкости: индекс грейда -> процент. Публикуются
+## в интерфейсе покупки — без этого игру не пропустят ни App Store,
+## ни Google Play.
+static func crate_odds() -> Dictionary:
+	return Balance.crate_odds()
 
-const CRATE_PRICE := 120
+
+## Гарантированный ценный предмет каждые N открытий. Счётчик виден игроку.
+static func pity_threshold() -> int:
+	return Balance.crate_pity_threshold()
+
+
+static func pity_min_rarity() -> int:
+	return Balance.crate_pity_min_rarity()
+
+
+static func crate_price() -> int:
+	return Balance.crate_price()
+
+
 ## Дубль конвертируется в Золото: открытие сундука не может пропасть впустую.
-const DUPLICATE_REFUND := {
-	MonsterData.Rarity.COMMON: 15,
-	MonsterData.Rarity.UNCOMMON: 35,
-	MonsterData.Rarity.RARE: 90,
-	MonsterData.Rarity.EPIC: 200,
-	MonsterData.Rarity.LEGENDARY: 450,
-}
+static func duplicate_refunds() -> Dictionary:
+	var out: Dictionary = {}
+	for rarity: int in crate_odds():
+		out[rarity] = Balance.crate_duplicate_refund(rarity)
+	return out
 
-## Страны, где платный рандом запрещён. Там сундуки скрываются целиком,
-## а их состав остаётся доступен прямой покупкой.
-const LOOTBOX_BANNED_REGIONS := ["BE", "NL"]
 
 ## Родительский контроль: дневной предел трат в золоте.
 const DEFAULT_DAILY_LIMIT := 500
@@ -82,13 +87,13 @@ func lootboxes_allowed() -> bool:
 
 
 func lootboxes_banned() -> bool:
-	return LOOTBOX_BANNED_REGIONS.has(region.to_upper())
+	return Balance.lootbox_banned_regions().has(region.to_upper())
 
 
 ## Сумма шансов. Обязана быть ровно 100 — иначе публикуемые цифры лгут.
 static func odds_total() -> float:
 	var total := 0.0
-	for weight: float in CRATE_ODDS.values():
+	for weight: float in crate_odds().values():
 		total += weight
 	return total
 
@@ -96,13 +101,16 @@ static func odds_total() -> float:
 ## Текст для экрана покупки. Показывается ДО оплаты, не после.
 func odds_disclosure() -> String:
 	var lines: Array[String] = ["Шансы выпадения:"]
-	for rarity: MonsterData.Rarity in CRATE_ODDS:
+	var odds := crate_odds()
+	for rarity: int in odds:
 		lines.append("  %s — %.1f%%" % [
-			MonsterData.rarity_name(rarity), CRATE_ODDS[rarity],
+			MonsterData.rarity_name(rarity), odds[rarity],
 		])
 	lines.append("")
-	lines.append("Гарантированный редкий предмет через %d открытий."
-		% (PITY_THRESHOLD - pity_counter))
+	lines.append("Гарантированный %s предмет через %d открытий." % [
+		MonsterData.rarity_name(pity_min_rarity()).to_lower(),
+		pity_threshold() - pity_counter,
+	])
 	return "\n".join(lines)
 
 
@@ -207,16 +215,16 @@ func open_crate() -> String:
 	if lootboxes_banned():
 		purchase_blocked.emit("В этом регионе сундуки недоступны. Всё есть в прямой продаже.")
 		return ""
-	if not _spend(CRATE_PRICE):
+	if not _spend(crate_price()):
 		return ""
 
 	pity_counter += 1
-	var pity_hit := pity_counter >= PITY_THRESHOLD
-	var rarity := PITY_MIN_RARITY if pity_hit else _roll_rarity()
+	var pity_hit := pity_counter >= pity_threshold()
+	var rarity := pity_min_rarity() if pity_hit else _roll_rarity()
 	if pity_hit:
 		pity_counter = 0
-	elif rarity >= PITY_MIN_RARITY:
-		# Редкий выпал сам — счётчик честно сбрасывается, а не копится дальше
+	elif rarity >= pity_min_rarity():
+		# Ценный выпал сам — счётчик честно сбрасывается, а не копится дальше
 		pity_counter = 0
 
 	var item := _pick_from(rarity)
@@ -226,7 +234,7 @@ func open_crate() -> String:
 	var duplicate := is_owned(item.id)
 	if duplicate:
 		# Дубль не пропадает: возвращается золотом (GDD §12.3, правило 3)
-		add_gold(DUPLICATE_REFUND.get(item.rarity, 10))
+		add_gold(Balance.crate_duplicate_refund(item.rarity))
 	else:
 		unlock(item.id)
 
@@ -236,11 +244,12 @@ func open_crate() -> String:
 
 
 func _roll_rarity() -> MonsterData.Rarity:
+	var odds := crate_odds()
 	var roll := _rng.randf() * odds_total()
-	for rarity: MonsterData.Rarity in CRATE_ODDS:
-		roll -= CRATE_ODDS[rarity]
+	for rarity: int in odds:
+		roll -= float(odds[rarity])
 		if roll <= 0.0:
-			return rarity
+			return rarity as MonsterData.Rarity
 	return MonsterData.Rarity.COMMON
 
 

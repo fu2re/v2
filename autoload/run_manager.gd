@@ -11,9 +11,9 @@ signal glade_entered(glade: Glade)
 signal run_ended(died: bool, kept_fruits: int, kept_seeds: int)
 signal health_changed(current: int, maximum: int)
 
-## Доля добычи, теряемая при смерти. Половина, а не всё: ребёнок должен
-## уносить домой хоть что-то с каждого забега.
-const DEATH_LOSS := 0.5
+## Доля добычи, теряемая при смерти, живёт в drop_tables.json → soft_death
+## и читается через Balance.soft_death_loss: половина, а не всё — ребёнок
+## должен уносить домой хоть что-то с каждого забега.
 
 ## Награды растут с глубиной (GDD §8.3).
 const REWARD_DEPTH_SCALE := 0.15
@@ -311,14 +311,16 @@ func _end(died: bool) -> void:
 	var kept_fruits := 0
 	for key: String in run_fruits:
 		var count: int = run_fruits[key]
-		var kept := int(floor(count * (1.0 - DEATH_LOSS))) if died else count
+		var kept := int(floor(count * (1.0 - Balance.soft_death_loss("run_fruits")))) \
+			if died else count
 		if kept <= 0:
 			continue
 		var parts := key.split(":")
 		GameState.add_fruit(parts[0], int(parts[1]) as FruitData.Quality, kept)
 		kept_fruits += kept
 
-	var kept_seeds := int(floor(run_silver * (1.0 - DEATH_LOSS))) if died else run_silver
+	var kept_seeds := int(floor(run_silver * (1.0 - Balance.soft_death_loss("run_silver")))) \
+		if died else run_silver
 	GameState.add_silver(kept_seeds)
 
 	# Семена новых культур переживают смерть целиком.

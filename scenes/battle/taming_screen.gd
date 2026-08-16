@@ -50,8 +50,8 @@ func show_for(monster: MonsterInstance, perfect_run: bool) -> void:
 
 	# Победа засчитывается СРАЗУ, до всякого угощения. Даже если игрок
 	# уйдёт с экрана ни с чем, встреча продвинула его вперёд
-	var win_bonus := GameState.FRIENDSHIP_PERFECT_WIN if perfect_run \
-		else GameState.FRIENDSHIP_WIN
+	var win_bonus := GameState.friendship_perfect_win() if perfect_run \
+		else GameState.friendship_win()
 	_gained = win_bonus
 	var tamed := GameState.add_friendship(monster.species_id, monster.grade, win_bonus)
 

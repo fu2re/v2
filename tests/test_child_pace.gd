@@ -52,7 +52,7 @@ func _fresh() -> void:
 ## без единого фрукта. Это худший случай: у новичка фермы ещё нет.
 func _victories_to_tame_common() -> int:
 	var threshold := GameState.friendship_threshold(COMMON)
-	var per_win := GameState.FRIENDSHIP_WIN
+	var per_win := GameState.friendship_win()
 	return int(ceil(float(threshold) / maxf(per_win, 1)))
 
 
@@ -82,8 +82,8 @@ func _test_first_friend_costs_no_grind() -> void:
 	# ЗАМЫСЛЕННЫЙ путь — через ферму (§6.1): одна победа плюс любимые фрукты.
 	# Он и обязан укладываться в рубеж; гринд остаётся длинным намеренно,
 	# иначе ферма никому не нужна
-	var need := GameState.friendship_threshold(COMMON) - GameState.FRIENDSHIP_WIN
-	var per_fruit := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+	var need := GameState.friendship_threshold(COMMON) - GameState.friendship_win()
+	var per_fruit := int(round(GameState.friendship_favorite_fruit()
 		* FruitData.tier_friendship_scale(3)))
 	var fruits := int(ceil(float(need) / maxf(per_fruit, 1)))
 	# Один бой ради встречи плюс поход за урожаем между ними
@@ -104,10 +104,10 @@ func _test_first_friend_costs_no_grind() -> void:
 
 	# С фермой должно становиться ЗАМЕТНО быстрее, иначе ферма — украшение,
 	# а не половина игры
-	var favorite := GameState.FRIENDSHIP_FAVORITE_FRUIT
-	check(favorite >= GameState.FRIENDSHIP_WIN * 2,
+	var favorite := GameState.friendship_favorite_fruit()
+	check(favorite >= GameState.friendship_win() * 2,
 		"любимый фрукт (+%d) должен стоить хотя бы двух побед (+%d)" % [
-			favorite, GameState.FRIENDSHIP_WIN])
+			favorite, GameState.friendship_win()])
 
 
 ## В каждый заход должно быть что собрать. Если всё зреет часами, ребёнок

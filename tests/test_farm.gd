@@ -189,7 +189,7 @@ func _test_no_tier_is_pointless() -> void:
 	var previous := -1
 	var previous_time := -1
 	for tier in range(4):
-		var value := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+		var value := int(round(GameState.friendship_favorite_fruit()
 			* FruitData.tier_friendship_scale(tier)))
 		var seconds := Balance.fruit_grow_seconds(tier)
 
@@ -203,7 +203,7 @@ func _test_no_tier_is_pointless() -> void:
 
 	# Верхний плод обязан быть событием, а не прибавкой: за восемь часов
 	# ожидания игрок должен получить целого друга, иначе ждать незачем
-	var top := int(round(GameState.FRIENDSHIP_FAVORITE_FRUIT
+	var top := int(round(GameState.friendship_favorite_fruit()
 		* FruitData.tier_friendship_scale(3)))
 	check(top >= Balance.friendship_threshold(MonsterData.Rarity.COMMON),
 		"верхний плод (%d) не закрывает обычную шкалу (%d) — ночь потрачена зря" % [

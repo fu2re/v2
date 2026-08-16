@@ -132,6 +132,23 @@ static func friendship_threshold(grade: int) -> int:
 	return int(value)
 
 
+## Запасные прибавки дружбы — копия progression.json → friendship.gains.
+## Сверяются тестом с таблицей, как и остальные fallback'и.
+const FALLBACK_FRIENDSHIP_GAINS := {
+	"victory": 10, "victory_s_rank": 15, "favorite_fruit": 35, "other_fruit": 10,
+}
+
+
+## Прибавка дружбы за событие: победа, S-ранг, угощение (GDD §6.1).
+## Ноль рандома. До этого геттера числа жили константами в GameState,
+## а таблица объявляла себя источником истины, но не читалась ни строчкой.
+static func friendship_gain(key: String) -> int:
+	ensure_loaded()
+	var friendship := _section(_progression, "friendship")
+	var gains := _section(friendship, "gains")
+	return int(gains.get(key, FALLBACK_FRIENDSHIP_GAINS.get(key, 0)))
+
+
 # --- уровни экземпляра -------------------------------------------------------
 
 static func max_level() -> int:
@@ -371,6 +388,76 @@ static func granny_ask_fraction() -> Vector2:
 	var low := float(granny.get("ask_min_fraction", 0.10))
 	var high := float(granny.get("ask_max_fraction", 0.40))
 	return Vector2(minf(low, high), maxf(low, high))
+
+
+# --- мягкая смерть -----------------------------------------------------------
+
+## Доля добычи, теряемая при обнулении здоровья (GDD §8.4).
+## Половина, а не всё: ребёнок должен уносить домой хоть что-то.
+static func soft_death_loss(kind: String) -> float:
+	ensure_loaded()
+	var death := _section(_drops, "soft_death")
+	var lost := _section(death, "lost_percent")
+	return clampf(float(lost.get(kind, 50.0)) / 100.0, 0.0, 1.0)
+
+
+# --- пластинки (платный лутбокс) ---------------------------------------------
+
+static func _crate() -> Dictionary:
+	ensure_loaded()
+	return _section(_drops, "cosmetic_crate")
+
+
+static func crate_price() -> int:
+	return int(_crate().get("price_gold", 120))
+
+
+## Шансы по грейдам: индекс грейда -> процент. В словаре ТОЛЬКО грейды,
+## записанные в таблице: строка с пустым пулом — ложь в публикуемых шансах
+## (SHOP.md §4), и её отсутствие здесь проверяется тестом магазина.
+static func crate_odds() -> Dictionary:
+	var odds := _section(_crate(), "odds_percent_by_rarity")
+	var out: Dictionary = {}
+	for i in GRADE_KEYS.size():
+		var key: String = GRADE_KEYS[i]
+		if odds.has(key):
+			out[i] = float(odds[key])
+	if out.is_empty():
+		out = {0: 60.0, 1: 27.0, 3: 13.0}
+	return out
+
+
+static func crate_pity_threshold() -> int:
+	var pity := _section(_crate(), "pity")
+	return int(pity.get("guaranteed_after_opens", 30))
+
+
+static func crate_pity_min_rarity() -> int:
+	var pity := _section(_crate(), "pity")
+	var index := grade_index(String(pity.get("min_rarity", "unique")))
+	return index if index >= 0 else 3
+
+
+## Возврат за дубль. Отсутствующая строка — ошибка данных (SHOP.md §4);
+## на этот случай берётся самая щедрая из имеющихся: обидеть игрока
+## хуже, чем переплатить ему золотом.
+static func crate_duplicate_refund(rarity: int) -> int:
+	var refunds := _section(_crate(), "duplicate_refund_gold")
+	var value: Variant = refunds.get(grade_key(rarity), null)
+	if value != null:
+		return int(value)
+	push_error("Нет возврата за дубль грейда %s" % grade_key(rarity))
+	var best := 15
+	for entry: Variant in refunds.values():
+		if typeof(entry) != TYPE_STRING:
+			best = maxi(best, int(entry))
+	return best
+
+
+static func lootbox_banned_regions() -> Array:
+	var value: Variant = _crate().get("banned_regions", [])
+	var regions: Array = value if typeof(value) == TYPE_ARRAY else []
+	return regions if not regions.is_empty() else ["BE", "NL"]
 
 
 # --- фрукты -------------------------------------------------------------------

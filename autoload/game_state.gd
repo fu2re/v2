@@ -22,11 +22,24 @@ signal guardian_changed(instance_key: String)
 ## целиком (SaveManager), миграция не пишется: игра в разработке.
 const SAVE_VERSION := 2
 
-## Прибавки к дружбе (GDD §6.1). Ноль рандома.
-const FRIENDSHIP_WIN := 10
-const FRIENDSHIP_PERFECT_WIN := 15
-const FRIENDSHIP_FAVORITE_FRUIT := 35
-const FRIENDSHIP_OTHER_FRUIT := 10
+## Прибавки к дружбе (GDD §6.1). Ноль рандома. Числа живут
+## в progression.json → friendship.gains — здесь только геттеры:
+## пока они были константами, таблица объявляла себя источником истины,
+## но не читалась ни строчкой, и разойтись они могли молча.
+static func friendship_win() -> int:
+	return Balance.friendship_gain("victory")
+
+
+static func friendship_perfect_win() -> int:
+	return Balance.friendship_gain("victory_s_rank")
+
+
+static func friendship_favorite_fruit() -> int:
+	return Balance.friendship_gain("favorite_fruit")
+
+
+static func friendship_other_fruit() -> int:
+	return Balance.friendship_gain("other_fruit")
 
 ## Дружба по ПАРЕ «вид + грейд»: ключ экземпляра -> накопленные очки.
 ##
@@ -234,8 +247,8 @@ func friendship_from_fruit(species_id: String, fruit_id: String,
 	var data := Registry.monster(species_id)
 	if data == null:
 		return 0
-	var base := FRIENDSHIP_FAVORITE_FRUIT if data.favorite_fruit_id == fruit_id \
-		else FRIENDSHIP_OTHER_FRUIT
+	var base := friendship_favorite_fruit() if data.favorite_fruit_id == fruit_id \
+		else friendship_other_fruit()
 
 	# Щедрость плода задаёт ТИР, а не качество: качеств три, а тиров четыре,
 	# и на трёх ступенях два соседних тира давали поровну — редкий инжир рос

@@ -30,14 +30,14 @@ func run_tests() -> void:
 func _test_win_always_counts() -> void:
 	print("Победа засчитывается до всякого угощения")
 	GameState.reset()
-	GameState.add_friendship("synth_slime", COMMON, GameState.FRIENDSHIP_WIN)
-	check_eq(GameState.get_friendship("synth_slime", COMMON), GameState.FRIENDSHIP_WIN,
+	GameState.add_friendship("synth_slime", COMMON, GameState.friendship_win())
+	check_eq(GameState.get_friendship("synth_slime", COMMON), GameState.friendship_win(),
 		"дружба выросла от одной победы")
 
 
 func _test_perfect_run_gives_more() -> void:
 	print("S-ранг даёт больше")
-	check(GameState.FRIENDSHIP_PERFECT_WIN > GameState.FRIENDSHIP_WIN,
+	check(GameState.friendship_perfect_win() > GameState.friendship_win(),
 		"идеальный бой ценнее обычного")
 
 
@@ -47,7 +47,7 @@ func _test_no_fruit_still_progresses() -> void:
 	check_eq(GameState.fruits.size(), 0, "сумка пуста")
 
 	var before := GameState.get_friendship("banjo_moth", COMMON)
-	GameState.add_friendship("banjo_moth", COMMON, GameState.FRIENDSHIP_WIN)
+	GameState.add_friendship("banjo_moth", COMMON, GameState.friendship_win())
 	check(GameState.get_friendship("banjo_moth", COMMON) > before,
 		"пустая сумка не отменяет прогресс — это и есть защита от фрустрации")
 
@@ -83,13 +83,13 @@ func _test_favorite_fruit_is_faster() -> void:
 	var threshold := GameState.friendship_threshold(COMMON)
 	var meetings_lazy := 0
 	while GameState.get_friendship("bass_bear", COMMON) < threshold:
-		GameState.add_friendship("bass_bear", COMMON, GameState.FRIENDSHIP_WIN)
+		GameState.add_friendship("bass_bear", COMMON, GameState.friendship_win())
 		meetings_lazy += 1
 
 	GameState.reset()
 	var meetings_smart := 0
 	while GameState.get_friendship("bass_bear", COMMON) < threshold:
-		GameState.add_friendship("bass_bear", COMMON, GameState.FRIENDSHIP_WIN + favorite)
+		GameState.add_friendship("bass_bear", COMMON, GameState.friendship_win() + favorite)
 		meetings_smart += 1
 
 	check(meetings_smart < meetings_lazy,
@@ -111,10 +111,10 @@ func _test_grade_changes_length_not_chance() -> void:
 		var tamed := false
 		while meetings < 1000 and not tamed:
 			meetings += 1
-			tamed = GameState.add_friendship("disco_sprout", grade, GameState.FRIENDSHIP_WIN)
+			tamed = GameState.add_friendship("disco_sprout", grade, GameState.friendship_win())
 
 		var expected := int(ceil(float(GameState.friendship_threshold(grade))
-			/ GameState.FRIENDSHIP_WIN))
+			/ GameState.friendship_win()))
 		check_eq(meetings, expected,
 			"%s: ровно %d встреч, без разброса"
 				% [MonsterData.rarity_name(grade), expected])
@@ -169,7 +169,7 @@ func _test_progress_never_goes_backwards() -> void:
 	GameState.reset()
 	var previous := 0
 	for i in 30:
-		GameState.add_friendship("beat_serpent", COMMON, GameState.FRIENDSHIP_WIN)
+		GameState.add_friendship("beat_serpent", COMMON, GameState.friendship_win())
 		var current := GameState.get_friendship("beat_serpent", COMMON)
 		check(current >= previous, "шаг %d: шкала не уменьшилась" % i)
 		previous = current
