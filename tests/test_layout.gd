@@ -256,18 +256,27 @@ func _test_victory_screen_comes_before_taming() -> void:
 	# и на скриншоте посреди анимации проявления монету от фона не отличить
 	var icons := 0
 	var blank := 0
+	var invisible := 0
 	for row in feed._panel_box.get_children():
 		if not row is HBoxContainer:
 			continue
 		for cell in row.get_children():
 			if not cell is TextureRect:
 				continue
-			if (cell as TextureRect).texture != null:
-				icons += 1
-			else:
+			var rect := cell as TextureRect
+			if rect.texture == null:
 				blank += 1
+				continue
+			icons += 1
+			# Непустая текстура ещё не значит видимую картинку: в контейнере
+			# размер даёт раскладка, и слот шириной ноль выглядит как «иконку
+			# забыли». Меряем то, что игрок видит
+			if rect.size.x < 32.0 or rect.size.y < 32.0:
+				invisible += 1
+				note("иконка приза схлопнулась до %s" % rect.size)
 	check(icons > 0, "у приза есть картинка")
 	check_eq(blank, 0, "ни одного приза без картинки")
+	check_eq(invisible, 0, "и ни одна не схлопнулась в точку")
 
 	# И только по нажатию открывается угощение
 	feed._open_taming()

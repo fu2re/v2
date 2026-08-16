@@ -33,6 +33,16 @@ const PRIZE_STEP := 0.65
 ## За сколько полоска опыта добегает до края.
 const XP_FILL_SECONDS := 0.5
 
+## Геометрия модальной панели. Верх постоянный, низ считается по содержимому
+## (см. `_fit_panel`), поэтому здесь только поля и границы.
+const PANEL_TOP := 300.0
+const PANEL_SIDE := 60.0
+const PANEL_PAD := 40.0
+const PANEL_MAX_BOTTOM := 1640.0
+## Ширина полоски опыта. Уже панели намеренно: на всю ширину она упиралась
+## в рамку и читалась как часть рамки, а не как шкала.
+const XP_BAR_WIDTH := 760.0
+
 const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 
 ## Ключ экземпляра, которого берём в лес. Пусто — берём выбранного в коллекции.
@@ -111,6 +121,11 @@ func _ready() -> void:
 	# во весь экран молча съедал бы клики по тому, что под ним
 	var scroll: ScrollContainer = $PanelLayer/PanelScroll
 	_panel_box.visibility_changed.connect(func(): scroll.visible = _panel_box.visible)
+	# Рамка подгоняется по сигналу, а не только вызовом после вставки узла.
+	# `get_combined_minimum_size()` отдаёт КЭШ, который пересчитывается лишь
+	# в следующем проходе раскладки: вызов сразу после add_child читал размер
+	# ПРОШЛОЙ панели, и рамка оставалась во весь экран под тремя строками
+	_panel_box.minimum_size_changed.connect(_fit_panel)
 
 	_taming = preload("res://scenes/battle/TamingScreen.tscn").instantiate()
 	add_child(_taming)
@@ -659,6 +674,28 @@ func _close_panel() -> void:
 	_refresh_buttons()
 
 
+## Рамка панели по содержимому, а не по фиксированной высоте.
+##
+## Раньше рамка была ростом 1180 всегда, и под коротким итогом висело
+## полэкрана пустоты — карточка выглядела недогруженной, будто что-то
+## не отрисовалось. Растёт вниз от постоянного верха: содержимое победы
+## добавляется по шагам, и рамка, скачущая вверх-вниз на каждом призе,
+## читалась бы как дёрганье.
+func _fit_panel() -> void:
+	var content := _panel_box.get_combined_minimum_size().y
+	var bottom := minf(PANEL_TOP + content + PANEL_PAD * 2.0, PANEL_MAX_BOTTOM)
+	_panel_frame.position = Vector2(PANEL_SIDE, PANEL_TOP)
+	_panel_frame.size = Vector2(1080.0 - PANEL_SIDE * 2.0, bottom - PANEL_TOP)
+
+	var scroll: ScrollContainer = $PanelLayer/PanelScroll
+	var inner := 1080.0 - (PANEL_SIDE + PANEL_PAD) * 2.0
+	scroll.position = Vector2(PANEL_SIDE + PANEL_PAD, PANEL_TOP + PANEL_PAD)
+	scroll.size = Vector2(inner, maxf(bottom - PANEL_TOP - PANEL_PAD * 2.0, 1.0))
+	# Ширину содержимого задаём отсюда же: разойдись она с прокруткой хоть
+	# на пиксель — и панель поедет вбок горизонтальной полосой
+	_panel_box.custom_minimum_size.x = inner
+
+
 func _add_panel_label(text: String, size: int = 34) -> void:
 	var label := Label.new()
 	label.text = text
@@ -669,6 +706,7 @@ func _add_panel_label(text: String, size: int = 34) -> void:
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", Color("DCC7A4"))
 	_panel_box.add_child(label)
+	_fit_panel()
 
 
 func _add_panel_button(text: String, callback: Callable) -> Button:
@@ -679,6 +717,7 @@ func _add_panel_button(text: String, callback: Callable) -> Button:
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(callback)
 	_panel_box.add_child(button)
+	_fit_panel()
 	return button
 
 
@@ -1124,14 +1163,21 @@ func _play_victory(monster: MonsterInstance, prizes: Array[Dictionary],
 ## так». При переходе уровня полоска добегает до края, обнуляется и идёт
 ## дальше — ровно так, как это произошло на самом деле.
 func _show_experience(before: Dictionary, after: Dictionary, levels: int) -> void:
+	# «Защитник:» здесь не украшение. Победивший и побеждённый бывают одного
+	# вида, и тогда панель показывала имя дважды подряд без объяснения, кто
+	# из них кто: «Ростик» заголовком и «Ростик · уровень 1» строкой ниже
 	var title := Label.new()
-	title.text = "%s · уровень %d" % [before["name"], before["level"]]
+	title.text = "Защитник: %s · уровень %d" % [before["name"], before["level"]]
 	title.add_theme_font_size_override("font_size", 34)
 	title.add_theme_color_override("font_color", Color("DCC7A4"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_panel_box.add_child(title)
 
 	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(0, 44)
+	# Уже панели и по центру: на всю ширину шкала упиралась в рамку
+	# и читалась как её часть, а не как полоска опыта
+	bar.custom_minimum_size = Vector2(XP_BAR_WIDTH, 44)
+	bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	bar.show_percentage = false
 	bar.max_value = maxf(float(before["xp_needed"]), 1.0)
 	bar.value = float(before["xp"])
@@ -1140,7 +1186,9 @@ func _show_experience(before: Dictionary, after: Dictionary, levels: int) -> voi
 	var caption := Label.new()
 	caption.add_theme_font_size_override("font_size", 28)
 	caption.add_theme_color_override("font_color", Color("ADA99F"))
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_panel_box.add_child(caption)
+	_fit_panel()
 
 	if bool(before.get("max_level", false)):
 		caption.text = "Опыт: максимальный уровень"
@@ -1153,7 +1201,8 @@ func _show_experience(before: Dictionary, after: Dictionary, levels: int) -> voi
 		tween.tween_property(bar, "value", bar.max_value, XP_FILL_SECONDS)
 		await tween.finished
 		bar.value = 0.0
-		title.text = "%s · уровень %d" % [before["name"], int(before["level"]) + i + 1]
+		title.text = "Защитник: %s · уровень %d" % [
+			before["name"], int(before["level"]) + i + 1]
 
 	bar.max_value = maxf(float(after["xp_needed"]), 1.0)
 	var last := create_tween()
@@ -1171,10 +1220,12 @@ func _show_experience(before: Dictionary, after: Dictionary, levels: int) -> voi
 	grew.add_theme_font_size_override("font_size", 34)
 	grew.add_theme_color_override("font_color", Color("FFD24D"))
 	grew.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grew.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	grew.text = "Новый уровень!  Здоровье %d → %d · удар %.1f → %.1f" % [
 		before["health"], after["health"], before["power"], after["power"],
 	]
 	_panel_box.add_child(grew)
+	_fit_panel()
 	await get_tree().create_timer(PRIZE_STEP).timeout
 
 
@@ -1216,6 +1267,7 @@ func _show_prize(prize: Dictionary) -> void:
 	row.add_child(text)
 
 	_panel_box.add_child(row)
+	_fit_panel()
 
 	# Приз выезжает, а не появляется: движение отделяет один приз от другого,
 	# и подряд идущие строки перестают сливаться в список
