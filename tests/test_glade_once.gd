@@ -15,6 +15,7 @@ const COMMON := MonsterData.Rarity.COMMON
 
 func run_tests() -> void:
 	await _test_glade_is_empty_after_battle()
+	await _test_hint_never_promises_a_missing_button()
 	await _test_wild_bush_gives_once()
 	await _test_loot_bush_gives_once()
 	await _test_campfire_heals_once()
@@ -96,6 +97,39 @@ func _test_glade_is_empty_after_battle() -> void:
 			% [needed.y, feed._hint.size.y])
 	check(feed._hint.position.y + needed.y <= feed._health_fill.position.y,
 		"и не наезжает на полоску здоровья")
+
+	RunManager.go_home()
+	feed.queue_free()
+	await _frames(2)
+
+
+## Подсказка не зовёт к кнопке, которой на экране нет.
+##
+## Текст подсказки ставится при показе поляны и дальше живёт сам по себе,
+## а кнопка действия исчезает по состоянию. Получался экран, зовущий нажать
+## «Танцевать», которой на нём нет: ребёнок ищет несуществующую кнопку
+## и решает, что игра сломалась.
+func _test_hint_never_promises_a_missing_button() -> void:
+	print("Подсказка не зовёт к отсутствующей кнопке")
+	var glade := _make(Glade.Type.BATTLE)
+	glade.grade = COMMON
+	var feed := await _feed_with(glade)
+
+	# До боя всё честно: и кнопка, и обещание
+	check(feed._action_button.visible, "кнопка «Танцевать» на месте")
+	check(feed._hint.text.contains("Танцевать"),
+		"и подсказка её обещает: [%s]" % feed._hint.text)
+
+	# Бой прошёл, приручение закончилось — итога в подсказке нет, и она
+	# осталась бы прежней. Именно этот случай и обнажал расхождение
+	feed._glade_cleared = true
+	feed._pending_result = ""
+	feed._refresh_buttons()
+	await _frames(2)
+
+	check(not feed._action_button.visible, "после боя кнопки действия нет")
+	check(not feed._hint.text.contains("Танцевать"),
+		"и подсказка её больше не обещает: [%s]" % feed._hint.text)
 
 	RunManager.go_home()
 	feed.queue_free()

@@ -304,9 +304,10 @@ func _show_stakes(glade: Glade) -> void:
 		# Через ступень приручать нельзя, и молчать об этом нельзя тоже:
 		# без объяснения непонятно, почему шкалы нет вовсе
 		var step := GameState.missing_step(glade.monster_id, glade.grade)
-		_friendship_label.text = "Подружиться пока нельзя.\nСначала подружись: %s" % [
-			MonsterData.rarity_name(step), value, threshold,
-		]
+		# Аргумент РОВНО один: лишние GDScript не отбрасывает, а молча
+		# оставляет шаблон как есть, и игрок читал «Сначала подружись: %s»
+		_friendship_label.text = "Подружиться пока нельзя.\nСначала подружись: %s" \
+			% MonsterData.rarity_name(step)
 	else:
 		_friendship_label.text = "Дружба %d/%d  (+%d за победу)" % [
 			value, threshold, GameState.FRIENDSHIP_WIN,
@@ -1060,9 +1061,11 @@ func _refresh_buttons() -> void:
 		_next_button.visible = true
 		_next_button.disabled = false
 		_next_button.text = "Дальше ↑"
+		_sync_hint()
 		return
 
 	_action_button.visible = not _glade_cleared or glade.type != Glade.Type.BATTLE
+	_sync_hint()
 
 	# Кнопка «дальше» гаснет там, где поляну нельзя пропустить, и это видно
 	# сразу, а не после безрезультатного свайпа.
@@ -1074,6 +1077,19 @@ func _refresh_buttons() -> void:
 	_next_button.visible = true
 	_next_button.disabled = blocked
 	_next_button.text = "Сначала бой" if blocked else "Дальше ↑"
+
+
+## Подсказка не обещает кнопки, которой нет.
+##
+## Текст подсказки ставится в `_show_glade` один раз и потом живёт сам по себе,
+## а кнопка действия исчезает по состоянию — когда поляна отдана или бой уже
+## был. Получался экран, зовущий нажать «Танцевать», которой на нём нет:
+## ребёнок ищет несуществующую кнопку и решает, что игра сломалась.
+func _sync_hint() -> void:
+	if _action_button.visible:
+		return
+	if _hint.text.contains(_action_button.text):
+		_hint.text = HINT_NEXT
 
 
 ## Съесть фрукт у костра: здоровье и баф до конца забега.

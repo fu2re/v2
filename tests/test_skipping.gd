@@ -153,6 +153,7 @@ func _test_card_shows_stakes() -> void:
 	await _frames(2)
 
 	check(feed._tame_banner.visible, "пометка «можно подружиться» показана")
+	check(feed._action_button.visible, "кнопка «Танцевать» показана")
 	check(feed._friendship_label.text.contains("%d" % threshold),
 		"на карточке виден порог дружбы: [%s]" % feed._friendship_label.text)
 	check(feed._reward_label.text.contains("серебра"),
@@ -170,6 +171,14 @@ func _test_card_shows_stakes() -> void:
 	await _frames(2)
 	check(not feed._tame_banner.visible,
 		"до легендарного далеко — обещания подружиться нет")
+	# Но подраться с ним можно: закрытая ступень запрещает ПРИРУЧЕНИЕ,
+	# а не бой — опыт и добыча за него идут обычным порядком (GDD §6.1).
+	# Подсказка внизу прямо обещает кнопку «Танцевать», и если её нет,
+	# экран врёт игроку
+	check(feed._action_button.visible,
+		"с недоступным для приручения драться всё равно можно")
+	check(feed._hint.text.contains("Танцевать"),
+		"и подсказка обещает именно её: [%s]" % feed._hint.text)
 
 	# На небоевой поляне витрина прячется целиком
 	var bush := Glade.new()
