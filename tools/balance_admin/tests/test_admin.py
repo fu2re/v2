@@ -29,6 +29,7 @@ def root(tmp_path: Path) -> Path:
     art.mkdir(parents=True)
     for sprite in (REPO / "art" / "monster").glob("*.png"):
         (art / sprite.name).touch()
+    (tmp_path / "music").mkdir()  # create_app монтирует /music статикой
     return tmp_path
 
 
@@ -162,3 +163,49 @@ def test_tres_noop_patch_is_identical(root: Path) -> None:
     fields = tres.read_fields(path)
     tres.patch_field(path, "motif_id", fields["motif_id"])
     assert path.read_bytes() == before
+
+
+# --- спрайт грейда ------------------------------------------------------------
+
+def test_grade_sprite_replace_backs_up_old_file(root: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from beatroot_balance_admin.app import create_app
+
+    target = root / "art" / "monster" / "disco_sprout_common.png"
+    source = root / "art" / "monster" / "bass_bear_common.png"
+    target.write_bytes(b"old-sprite")
+    source.write_bytes(b"new-sprite")
+
+    client = TestClient(create_app(root))
+    resp = client.post("/api/entities/monsters/disco_sprout/grade_sprite",
+                       json={"grade": "common",
+                             "source": "res://art/monster/bass_bear_common.png"})
+    assert resp.status_code == 200
+    assert target.read_bytes() == b"new-sprite"
+
+    stamp = resp.json()["backup"]
+    saved = root / "backups" / "balance" / stamp \
+        / "art" / "monster" / "disco_sprout_common.png"
+    assert saved.read_bytes() == b"old-sprite", \
+        "старый спрайт обязан уехать в точку бэкапа"
+
+    # Откат возвращает старый файл
+    backups.rollback(root, stamp)
+    assert target.read_bytes() == b"old-sprite"
+
+
+def test_grade_sprite_refuses_non_art_source(root: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from beatroot_balance_admin.app import create_app
+
+    client = TestClient(create_app(root))
+    resp = client.post("/api/entities/monsters/disco_sprout/grade_sprite",
+                       json={"grade": "common",
+                             "source": "res://data/battle.json"})
+    assert resp.status_code == 400
+    resp = client.post("/api/entities/monsters/disco_sprout/grade_sprite",
+                       json={"grade": "нет-такого",
+                             "source": "res://art/monster/bass_bear_common.png"})
+    assert resp.status_code == 400

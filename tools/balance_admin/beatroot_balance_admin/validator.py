@@ -100,8 +100,10 @@ REQUIRED = {
         "judge.effects.perfect", "judge.effects.good",
         "judge.effects.early_late", "judge.effects.miss",
         "judge.combo_steps",
-        "genre.advantage_multiplier", "genre.disadvantage_multiplier",
-        "genre.beats.rock",
+        "elements.vulnerability_outgoing", "elements.vulnerability_incoming",
+        "elements.resistance",
+        "grade_gap.outgoing_by_gap",
+        *[f"elements.matchups.{g}" for g in GENRE_KEYS],
     ],
 }
 
@@ -320,14 +322,58 @@ def _check_battle(data: dict, errors: list[str], warnings: list[str]) -> None:
             "по чуть-чуть, иначе забег перестаёт быть испытанием "
             "(tests/test_fair_play.gd)")
 
-    beats = _get(data, "genre.beats")
-    for attacker, defender in beats.items():
-        if _is_doc(attacker):
+    # Матчапы стихий: те же инварианты, что _test_element_matchups_valid
+    if float(_get(data, "elements.vulnerability_outgoing")) <= 1.0:
+        errors.append("battle.json: elements.vulnerability_outgoing — "
+                      "уязвимость обязана УСИЛИВАТЬ урон (> 1)")
+    if float(_get(data, "elements.vulnerability_incoming")) <= 1.0:
+        errors.append("battle.json: elements.vulnerability_incoming — "
+                      "уязвимость обязана быть штрафом (> 1)")
+    resistance = float(_get(data, "elements.resistance"))
+    if not 0.0 < resistance < 1.0:
+        errors.append("battle.json: elements.resistance режет, "
+                      "но не обнуляет — доля в (0..1)")
+    matchups = _get(data, "elements.matchups") or {}
+    for genre, matchup in matchups.items():
+        if _is_doc(genre):
             continue
-        if attacker not in GENRE_KEYS or str(defender) not in GENRE_KEYS:
-            errors.append(
-                f"battle.json: genre.beats {attacker} -> {defender} — "
-                f"неизвестный жанр (допустимы {', '.join(GENRE_KEYS)})")
+        if genre not in GENRE_KEYS:
+            errors.append(f"battle.json: matchups.{genre} — неизвестная стихия")
+            continue
+        vulnerable = list(matchup.get("vulnerable_to", []))
+        resists = list(matchup.get("resists", []))
+        for other in vulnerable + resists:
+            if other not in GENRE_KEYS:
+                errors.append(f"battle.json: {genre} ссылается на "
+                              f"несуществующую стихию {other}")
+            if other == genre:
+                errors.append(f"battle.json: {genre} не может быть "
+                              "в отношениях сама с собой")
+        for other in vulnerable:
+            if other in resists:
+                errors.append(
+                    f"battle.json: {genre} одновременно уязвима к {other} "
+                    "и сопротивляется — противоречие")
+
+    # Стена грейдов: первый элемент — свой грейд (×1), дальше не растёт
+    gap = _get(data, "grade_gap.outgoing_by_gap")
+    if not isinstance(gap, list) or not gap:
+        errors.append("battle.json: grade_gap.outgoing_by_gap пуст")
+    else:
+        if abs(float(gap[0]) - 1.0) > 1e-9:
+            errors.append("battle.json: grade_gap[0] — свой грейд, "
+                          "множитель обязан быть 1.0")
+        previous = None
+        for value in gap:
+            v = float(value)
+            if not 0.0 < v <= 1.0:
+                errors.append("battle.json: grade_gap — множители в (0..1]")
+                break
+            if previous is not None and v > previous:
+                errors.append("battle.json: grade_gap обязан не расти: "
+                              "выше грейд — тяжелее стена")
+                break
+            previous = v
 
 
 # --- фрукты и торговец --------------------------------------------------------

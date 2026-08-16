@@ -54,7 +54,7 @@ function playButton(label, stemGetter) {
 const GEAR_SLOTS = ["Пояс", "Плащ", "Головной убор"];
 const COSMETIC_SLOTS = ["Наряд", "Головной убор", "Инструмент",
   "Вид грядки", "Эффект нот", "Танцевальное движение"];
-const GENRE_NAMES = { rock: "Камень (рок)", disco: "Солнце (диско)",
+const GENRE_NAMES = { rock: "Трава (рок)", disco: "Солнце (диско)",
   folk: "Листва (фолк)", electro: "Искра (электро)", latin: "Ветер (латина)" };
 
 // --- запуск -----------------------------------------------------------------
@@ -554,6 +554,14 @@ function entityCard(kind, row, extras) {
   cols.appendChild(colIdentity);
 
   const identityEls = {};
+  // Выбранный грейд — общий переключатель карточки: статы, прослушка
+  // и замена спрайта работают с НИМ, а не только с коммоном
+  let selectedGrade = "common";
+  let renderMonsterStats = null;
+  let listenBtn = null;
+  let spriteBtn = null;
+  const stripFigures = {};
+
   for (const field of row.editable_identity) {
     if (!(field in row.identity)) continue;
     const value = row.identity[field];
@@ -571,9 +579,12 @@ function entityCard(kind, row, extras) {
       const currentStem = () => {
         const genreKey = REFS.genre_keys[Number(liveValue("genre"))];
         const tracks = REFS.track_index[`${genreKey}_${liveValue("motif_id")}`] || {};
-        return tracks.common || Object.values(tracks)[0];
+        // Ремикс выбранного грейда: у каждого грейда свой темп,
+        // и слушать надо именно то, что услышит игрок на этом грейде
+        return tracks[selectedGrade] || tracks.common || Object.values(tracks)[0];
       };
-      wrap.appendChild(playButton("послушать", currentStem));
+      listenBtn = playButton(`послушать · ${selectedGrade}`, currentStem);
+      wrap.appendChild(listenBtn);
       const pickBtn = document.createElement("button");
       pickBtn.className = "play-btn";
       pickBtn.textContent = "мелодии…";
@@ -591,25 +602,22 @@ function entityCard(kind, row, extras) {
   }
 
   // -- лента грейдов: спрайты открываются по конвенции <id>_<грейд>.png.
-  // Она же — переключатель: выбранный грейд задаёт, чьи статы показывает
-  // и правит правая колонка
-  let selectedGrade = "common";
-  let renderMonsterStats = null;
+  // Она же — переключатель: выбранный грейд задаёт, чьи статы, чей ремикс
+  // и чей спрайт показывает и правит остальная карточка
   if (kind === "monsters" && extras?.monsterImages) {
     const h = document.createElement("h5");
-    h.textContent = "Грейды — переключатель статов";
+    h.textContent = "Грейды — переключатель карточки";
     colIdentity.appendChild(h);
     const strip = document.createElement("div");
     strip.className = "grade-strip";
-    for (const grade of REFS.grade_keys) {
+
+    const fillFigure = (fig, grade, bust) => {
+      fig.innerHTML = "";
       const file = `${row.id}_${grade}.png`;
-      const fig = document.createElement("figure");
-      fig.dataset.grade = grade;
-      if (grade === selectedGrade) fig.classList.add("active");
       if (extras.monsterImages.has(file)) {
         const img = document.createElement("img");
         img.loading = "lazy";
-        img.src = `/art/monster/${file}`;
+        img.src = `/art/monster/${file}` + (bust ? `?v=${Date.now()}` : "");
         img.title = file;
         fig.appendChild(img);
       } else {
@@ -621,15 +629,60 @@ function entityCard(kind, row, extras) {
       const cap = document.createElement("figcaption");
       cap.textContent = grade;
       fig.appendChild(cap);
+    };
+
+    for (const grade of REFS.grade_keys) {
+      const fig = document.createElement("figure");
+      fig.dataset.grade = grade;
+      if (grade === selectedGrade) fig.classList.add("active");
+      fillFigure(fig, grade, false);
       fig.onclick = () => {
         selectedGrade = grade;
+        stopAudio();
         strip.querySelectorAll("figure").forEach(
           (f) => f.classList.toggle("active", f.dataset.grade === grade));
+        if (listenBtn) {
+          listenBtn.dataset.label = `послушать · ${grade}`;
+          listenBtn.textContent = "▶ " + listenBtn.dataset.label;
+        }
+        if (spriteBtn) spriteBtn.textContent = `заменить спрайт «${grade}»…`;
         if (renderMonsterStats) renderMonsterStats();
       };
+      stripFigures[grade] = fig;
       strip.appendChild(fig);
     }
     colIdentity.appendChild(strip);
+
+    // Замена спрайта выбранного грейда: копия выбранной картинки в слот
+    // конвенции art/monster/<id>_<грейд>.png (старый файл — в бэкап)
+    spriteBtn = document.createElement("button");
+    spriteBtn.className = "play-btn";
+    spriteBtn.textContent = `заменить спрайт «${selectedGrade}»…`;
+    spriteBtn.onclick = () => {
+      const grade = selectedGrade;
+      openImagePicker(`res://art/monster/${row.id}_${grade}.png`,
+        async (chosen) => {
+          const res = await fetch(
+            `/api/entities/monsters/${row.id}/grade_sprite`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ grade, source: chosen }),
+            });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            toast(body.detail || `Ошибка ${res.status}`, true);
+            return;
+          }
+          const body = await res.json();
+          extras.monsterImages.add(`${row.id}_${grade}.png`);
+          fillFigure(stripFigures[grade], grade, true);
+          stripFigures[grade].classList.add("active");
+          toast(body.unchanged
+            ? "Это тот же файл — ничего не изменилось"
+            : `Спрайт ${grade} заменён · бэкап ${body.backup}`);
+        });
+    };
+    colIdentity.appendChild(spriteBtn);
   }
 
   // -- статы (JSON)

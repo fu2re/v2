@@ -26,8 +26,14 @@ def _tracked_files(root: Path) -> list[Path]:
     return out
 
 
-def snapshot(root: Path, changed: list[str], note: str = "") -> str:
-    """Снять точку. Возвращает её штамп."""
+def snapshot(root: Path, changed: list[str], note: str = "",
+             extra_files: list[Path] | None = None) -> str:
+    """Снять точку. Возвращает её штамп.
+
+    extra_files — файлы вне обычного набора (например, спрайт грейда,
+    который сейчас будет перезаписан): они попадают в ту же точку
+    и восстанавливаются откатом наравне с конфигами.
+    """
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     target = root / BACKUP_DIR / stamp
     # Две записи в одну секунду — добавляем суффикс, а не затираем
@@ -37,7 +43,11 @@ def snapshot(root: Path, changed: list[str], note: str = "") -> str:
         target = root / BACKUP_DIR / f"{stamp}_{suffix}"
     target.mkdir(parents=True)
 
-    for path in _tracked_files(root):
+    files = _tracked_files(root)
+    for path in extra_files or []:
+        if path.is_file():
+            files.append(path)
+    for path in files:
         relative = path.relative_to(root)
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)

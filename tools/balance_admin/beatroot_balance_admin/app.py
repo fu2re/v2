@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-import json
+import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -173,6 +173,38 @@ def create_app(root: Path) -> FastAPI:
             tres_path.write_text(original_text, encoding="utf-8", newline="\n")
             raise HTTPException(400, str(exc)) from exc
         return {"saved": entity_id, "backup": stamp, "warnings": warnings}
+
+    @app.post("/api/entities/monsters/{entity_id}/grade_sprite")
+    def api_set_grade_sprite(entity_id: str, payload: dict) -> dict:
+        """Заменить спрайт грейда: копия выбранного файла в слот конвенции.
+
+        Спрайты грейдов игра открывает по имени art/monster/<id>_<грейд>.png —
+        никакого поля в данных нет, поэтому «поменять спрайт» означает
+        положить другой файл под это имя. Старый файл уезжает в точку
+        бэкапа и восстанавливается откатом как обычно.
+        """
+        if _entity_path(root, "monsters", entity_id) is None:
+            raise HTTPException(404, f"Нет монстра {entity_id}")
+        grade = str(payload.get("grade", ""))
+        if grade not in refs.GRADE_KEYS:
+            raise HTTPException(400, f"Неизвестный грейд: {grade}")
+
+        source_raw = str(payload.get("source", "")).removeprefix("res://")
+        source = (root / source_raw).resolve()
+        art_root = (root / "art").resolve()
+        if not source.is_file() or source.suffix != ".png" \
+                or not source.is_relative_to(art_root):
+            raise HTTPException(400, f"Источник должен быть .png из art/: "
+                                     f"{payload.get('source')}")
+
+        target = root / "art" / "monster" / f"{entity_id}_{grade}.png"
+        if source == target.resolve():
+            return {"saved": target.name, "backup": None, "unchanged": True}
+        stamp = backups.snapshot(
+            root, changed=[f"art/monster/{target.name}"],
+            note=f"спрайт {entity_id} · {grade}", extra_files=[target])
+        shutil.copyfile(source, target)
+        return {"saved": target.name, "backup": stamp}
 
     # --- картинки ------------------------------------------------------------
 
