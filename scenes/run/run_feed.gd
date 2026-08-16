@@ -520,7 +520,7 @@ func _resolve_glade() -> void:
 
 ## Куст с гостинцами: потряси — и что-нибудь упадёт.
 ##
-## Лут обычный: зелье, семя, горсть серебра, изредка — сундук со снаряжением.
+## Лут обычный: семя, горсть серебра, спелый плод, изредка — сундук со снаряжением.
 ## Пустым куст не бывает никогда: «потряс и ничего» — это обещание,
 ## которое игра не сдержала.
 func _open_loot_bush(glade: Glade) -> void:
@@ -965,7 +965,7 @@ func _on_health_changed(current: int, maximum: int) -> void:
 	_health_fill.size.x = 900.0 * ratio
 
 
-func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
+func _on_run_ended(died: bool, kept_fruits: int, kept_silver: int) -> void:
 	_card.visible = true
 	_home_button.visible = false
 	_depth_label.text = ""
@@ -973,7 +973,7 @@ func _on_run_ended(died: bool, kept_fruits: int, kept_seeds: int) -> void:
 	# а «гуардиан устал» (GDD §8.4)
 	_headline.text = "Гуардиан устал" if died else "Домой с добычей"
 	_headline.add_theme_color_override("font_color", Color("DCC7A4"))
-	_subline.text = "Принесли домой:\n%d фруктов, %d серебра" % [kept_fruits, kept_seeds]
+	_subline.text = "Принесли домой:\n%d фруктов, %d серебра" % [kept_fruits, kept_silver]
 	_hint.text = "Забег окончен"
 
 	# Кнопка, а не жест.

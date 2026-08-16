@@ -13,7 +13,6 @@ extends Node
 ##   - calibration_offset         персональная поправка игрока
 
 signal beat(index: int)
-signal bar(index: int)
 signal finished()
 
 var chart: ChartData = null
@@ -34,7 +33,6 @@ const WARMUP_FRAMES := 8
 
 var _player: AudioStreamPlayer = null
 var _last_beat: int = -1
-var _last_bar: int = -1
 var _last_position: float = 0.0
 var _frames_since_play: int = 0
 
@@ -64,7 +62,6 @@ func play(new_chart: ChartData, from_beat: float = 0.0) -> void:
 	chart = new_chart
 	_player.stream = stream
 	_last_beat = int(floor(from_beat)) - 1
-	_last_bar = int(floor(from_beat / float(chart.beats_per_bar))) - 1
 
 	var from_time := chart.beat_to_time(from_beat)
 	song_position = from_time
@@ -127,23 +124,8 @@ func now() -> float:
 	return t
 
 
-## Свежая позиция в долях. Для оценки попаданий.
-func now_beat() -> float:
-	return chart.time_to_beat(now()) if chart != null else 0.0
-
-
 func _emit_grid_signals() -> void:
 	var current_beat := int(floor(song_beat))
 	while _last_beat < current_beat:
 		_last_beat += 1
 		beat.emit(_last_beat)
-
-	var current_bar := int(floor(song_beat / float(chart.beats_per_bar)))
-	while _last_bar < current_bar:
-		_last_bar += 1
-		bar.emit(_last_bar)
-
-
-## Секунда, на которую придётся указанная доля. Нужна оценке попаданий.
-func time_of_beat(target_beat: float) -> float:
-	return chart.beat_to_time(target_beat) if chart != null else 0.0

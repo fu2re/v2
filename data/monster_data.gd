@@ -41,10 +41,6 @@ const RARITY_COLORS := [
 ## в JSON, который объявлял себя источником истины. Держать их в двух местах
 ## бессмысленно — расхождение обязательно вернётся.
 
-## Силуэты соответствуют шаблонам ригов (GDD §11.2). Монстры одного силуэта
-## делят библиотеку танцев — без этого сотня монстров недостижима.
-enum Silhouette { BIPED, QUADRUPED, FLYER, BLOB, SERPENT }
-
 ## Порог дружбы по грейду живёт в таблице (`Balance.friendship_threshold`).
 ## Грейд влияет на то, сколько встреч нужно, но НЕ на шанс — приручение
 ## гарантировано (GDD §6.3), и у каждого грейда своя шкала (GDD §6.1).
@@ -60,11 +56,13 @@ const BEATS := {
 const ADVANTAGE_MULTIPLIER := 1.4
 const DISADVANTAGE_MULTIPLIER := 0.7
 
+## Грейд НЕ здесь: он принадлежит экземпляру, а не виду (GDD §6.3) —
+## любой вид может встретиться в любом грейде. Поле rarity у вида было
+## легаси той эпохи, когда легендарным мог быть лишь тот, кого таким
+## нарисовали.
 @export var id: String = ""
 @export var display_name: String = ""
 @export var genre: Genre = Genre.DISCO
-@export var rarity: Rarity = Rarity.COMMON
-@export var silhouette: Silhouette = Silhouette.BLOB
 
 ## Что монстр просит. Показывается над ним ещё на поляне, до боя —
 ## игрок решает, стоит ли останавливаться (GDD §6.2).
@@ -87,20 +85,6 @@ var _sprite: Texture2D = null
 
 ## Порог дружбы для конкретного грейда ЭТОЙ встречи.
 ##
-## Грейд — свойство экземпляра, а не вида (GDD §6.3), поэтому порог
-## спрашивается по грейду, а не у ресурса вида.
-static func friendship_threshold_for(grade: int) -> int:
-	return Balance.friendship_threshold(grade)
-
-
-## Порог по грейду, записанному в самом ресурсе.
-##
-## Переходная обёртка: грейд переезжает на экземпляр, и после этого
-## у вида собственного порога не останется вовсе.
-func friendship_threshold() -> int:
-	return friendship_threshold_for(rarity)
-
-
 ## Множитель урона против другого жанра.
 static func genre_multiplier(attacker: Genre, defender: Genre) -> float:
 	if BEATS.get(attacker, -1) == defender:
@@ -181,22 +165,3 @@ static func rarity_name(r: Rarity) -> String:
 
 static func rarity_color(r: Rarity) -> Color:
 	return RARITY_COLORS[r]
-
-
-## Множитель статов по грейду. Одинаков для Настроя дикого монстра
-## и для базовых статов приручённого — грейд принадлежит существу,
-## а не его роли в бою (GDD §6.3).
-static func rarity_vibe_scale(r: Rarity) -> float:
-	return Balance.grade_stat_scale(r)
-
-
-## Множитель силы удара монстра по грейду. Та же шкала, что и у Настроя:
-## разводить их значило бы держать две таблицы там, где дизайн говорит
-## об одной «крепости грейда».
-static func rarity_power_scale(r: Rarity) -> float:
-	return Balance.grade_stat_scale(r)
-
-
-## Легендарный переливается: единственный грейд с особой подачей.
-static func rarity_shimmers(r: Rarity) -> bool:
-	return r == Rarity.LEGENDARY

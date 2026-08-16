@@ -9,15 +9,12 @@ extends CanvasLayer
 
 signal finished()
 
-const PANEL_COLOR := Color("24391F")
 const TEXT_COLOR := Color("DCC7A4")
-const PROGRESS_COLOR := Color("FF57C4")
 const TAMED_COLOR := Color("FFD24D")
 
 ## Побеждённый ЭКЗЕМПЛЯР: дружба копится отдельно на каждый грейд (GDD §6.1),
 ## поэтому экрану мало знать вид.
 var _monster: MonsterInstance = null
-var _perfect_run := false
 var _gained := 0
 
 ## Раскладка живёт в TamingScreen.tscn и правится в инспекторе (GDD §13.2.1).
@@ -45,7 +42,6 @@ func show_for(monster: MonsterInstance, perfect_run: bool) -> void:
 	# ещё не вернулись
 	Jukebox.play_screen("taming")
 	_monster = monster
-	_perfect_run = perfect_run
 	_done = false
 
 	# Победа засчитывается СРАЗУ, до всякого угощения. Даже если игрок

@@ -121,19 +121,6 @@ func _load_from(path: String) -> bool:
 	return true
 
 
-func has_save() -> bool:
-	return FileAccess.file_exists(SAVE_PATH)
-
-
-func delete_save() -> void:
-	for path in [SAVE_PATH, BACKUP_PATH]:
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	GameState.reset()
-	FarmState.reset()
-	ShopState.reset()
-
-
 func _notification(what: int) -> void:
 	# На телефоне приложение сворачивают, а не закрывают. Этот момент —
 	# последняя гарантированная возможность записать прогресс

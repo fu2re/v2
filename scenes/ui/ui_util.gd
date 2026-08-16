@@ -98,18 +98,6 @@ static func cover_screen(sprite: Sprite2D, screen: Vector2 = Vector2(1080, 1920)
 	sprite.position = screen * 0.5
 
 
-## Прямоугольник-подложка на весь экран для модальных панелей.
-##
-## Без неё панель висит поверх живого экрана: кнопки под ней видно, но они
-## не нажимаются, и это читается как поломка.
-static func make_backdrop(colour: Color = Color(0.05, 0.09, 0.06, 0.96)) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.size = Vector2(1080, 1920)
-	rect.color = colour
-	rect.mouse_filter = Control.MOUSE_FILTER_STOP
-	return rect
-
-
 ## Картинка любого игрового предмета.
 ##
 ## Типы предметов не связаны общим базовым классом — они разные Resource

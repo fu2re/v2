@@ -16,7 +16,6 @@ extends RefCounted
 const ROTATION_SECONDS := 600
 
 ## Сколько чего лежит на витрине усадьбы сверх постоянных семян.
-const FARM_POTION_SLOTS := 2
 const FARM_GEAR_SLOTS := 2
 
 ## Сколько товаров у лесного торговца.
@@ -115,7 +114,7 @@ static func price_of(item: Resource) -> int:
 	return int(item.price)
 
 
-## Что игрок получит: семя сажают, зелье пьют, снаряжение надевают.
+## Что игрок получит: семя сажают, снаряжение надевают.
 static func describe(item: Resource) -> String:
 	if item is FruitData:
 		return "семя · зреет %s" % _grow_time(item)

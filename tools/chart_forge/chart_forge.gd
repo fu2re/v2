@@ -289,6 +289,9 @@ func _save() -> void:
 		_status.text = "Не удалось записать %s" % path
 		return
 	file.store_string(JSON.stringify(data, "  "))
+	# Индекс чартов перечитывается тут же: без сброса свежесохранённый файл
+	# не виден load_by_id до перезапуска — а редактор обещает «сохранил и играй»
+	ChartLoader.refresh()
 	_status.text = "Сохранено: %s" % path
 
 

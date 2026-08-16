@@ -16,16 +16,6 @@ enum Quality { PLAIN, JUICY, PERFECT }
 static func tier_friendship_scale(tier: int) -> float:
 	return Balance.fruit_friendship_scale(tier)
 
-
-## Сколько здоровья вернёт плод у костра (GDD §8.2.3).
-static func tier_heal(tier: int) -> int:
-	return Balance.fruit_heal(tier)
-
-
-## Чем плод подкручивает бой до конца забега. Пусто — тир без бафа.
-static func tier_buff(tier: int) -> Dictionary:
-	return Balance.fruit_buff(tier)
-
 @export var id: String = ""
 @export var display_name: String = ""
 @export var tier: int = 0
@@ -36,16 +26,6 @@ var _sprite: Texture2D = null
 
 static func quality_name(q: Quality) -> String:
 	return ["Обычный", "Сочный", "Идеальный"][q]
-
-
-## Ярлык качества по тиру семечка — единственный источник после того,
-## как танец растению убрали.
-static func quality_for_tier(tier: int) -> Quality:
-	if tier >= 3:
-		return Quality.PERFECT
-	if tier >= 1:
-		return Quality.JUICY
-	return Quality.PLAIN
 
 
 func grow_seconds() -> int:

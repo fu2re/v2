@@ -96,17 +96,6 @@ static func all_fruits() -> Array[FruitData]:
 	return out
 
 
-## Монстры, доступные на заданной глубине забега. Чем глубже, тем выше
-## шанс редких (GDD §8.3) — здесь только фильтр пула, розыгрыш в RunManager.
-static func monsters_of_rarity(rarity: MonsterData.Rarity) -> Array[MonsterData]:
-	var out: Array[MonsterData] = []
-	for m in all_monsters():
-		if m.rarity == rarity:
-			out.append(m)
-	return out
-
-
-## Зелья, отсортированы по цене: дешёвое первым, как и снаряжение.
 static func cosmetic(id: String) -> CosmeticData:
 	ensure_loaded()
 	return _cosmetics.get(id)

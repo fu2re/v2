@@ -74,18 +74,6 @@ static func load_by_id(id: String, difficulty: String = "normal") -> ChartData:
 	return load_chart(_index[key])
 
 
-## Все доступные грейды трека, по возрастанию сложности.
-## Пустой массив означает, что трека нет вовсе, — это ошибка данных,
-## а не «монстр без музыки»: бой без чарта не начнётся.
-static func grades_for(id: String) -> PackedStringArray:
-	_build_index()
-	var out := PackedStringArray()
-	for grade in ChartData.GRADE_ORDER:
-		if _index.has("%s_%s" % [id, grade]):
-			out.append(grade)
-	return out
-
-
 static func _from_dict(d: Dictionary, source: String) -> ChartData:
 	var chart := ChartData.new()
 	chart.id = d.get("id", "")

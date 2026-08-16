@@ -137,8 +137,6 @@ var stray_run: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
 
-## Спецдвижения: сколько сработало и что они оставили после себя.
-var skills_used: int = 0
 ## Множитель следующей удавшейся атаки (Камень). Тратится при попадании.
 var next_attack_bonus: float = 1.0
 ## До какой доли трека расширены окна (Ветер). Доля передаётся снаружи:
@@ -198,7 +196,7 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 	shield_reduction = minf(shield_reduction + RunManager.buff("shield_reduction"), 0.75)
 
 	# Здоровье сквозное: между полянами само не восстанавливается,
-	# только у костра и зельями. В этом всё напряжение забега
+	# только фруктами у костра. В этом всё напряжение забега
 	max_health = (guardian.max_health() if guardian != null else 100) \
 		+ int(bonuses.get("health_bonus", 0))
 	health = clampi(starting_health, 0, max_health)
@@ -213,7 +211,6 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 	stray_run = 0
 	blocked = 0
 	strikes_taken = 0
-	skills_used = 0
 	next_attack_bonus = 1.0
 	window_boost_until_beat = -1.0
 	series_length = 0
@@ -380,7 +377,6 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 	combo += 1
 	max_combo = maxi(max_combo, combo)
 	series_length += 1
-	skills_used += 1
 
 	if guardian == null:
 		combo_changed.emit(combo, Judge.combo_multiplier(combo))
@@ -538,16 +534,3 @@ func is_perfect_run() -> bool:
 	return grade_counts[Judge.Grade.MISS] == 0 and strikes_taken == 0
 
 
-func accuracy() -> float:
-	var total := 0
-	for count: int in grade_counts.values():
-		total += count
-	if total == 0:
-		return 0.0
-	# Тип указан явно: чтение из Dictionary даёт Variant, и вывод типа через := невозможен
-	var weighted: float = (
-		grade_counts[Judge.Grade.PERFECT] * 1.0
-		+ grade_counts[Judge.Grade.GOOD] * 0.6
-		+ grade_counts[Judge.Grade.EARLY_LATE] * 0.3
-	)
-	return weighted / total

@@ -505,10 +505,3 @@ static func fruit_buff_cap(key: String) -> float:
 	var buffs := _section(_fruits, "buffs")
 	var caps := _section(buffs, "max_total")
 	return float(caps.get(key, 0.0))
-
-
-## Ярлык качества по тиру. Только для показа: числа считаются от тира.
-static func fruit_quality_label(tier: int) -> String:
-	ensure_loaded()
-	var labels := _section(_fruits, "quality_labels")
-	return String(labels.get(str(clampi(tier, 0, 3)), "Обычный"))

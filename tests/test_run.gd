@@ -83,15 +83,15 @@ func _test_glade_distribution() -> void:
 
 func _test_rarity_shifts_with_depth() -> void:
 	print("Редкость растёт с глубиной")
-	var shallow: Array = RunManager.rarity_weights(0)
-	var deep: Array = RunManager.rarity_weights(30)
+	var shallow := Balance.rarity_weights(0)
+	var deep := Balance.rarity_weights(30)
 
 	check(deep[0] < shallow[0], "обычных вглубь становится меньше")
 	check(deep[4] > shallow[4], "легендарных вглубь становится больше")
 
 	# Сдвиг ограничен: иначе редкость обесценится на большой глубине
-	var very_deep: Array = RunManager.rarity_weights(1000)
-	check_eq(very_deep, RunManager.rarity_weights(30),
+	var very_deep := Balance.rarity_weights(1000)
+	check_eq(very_deep, Balance.rarity_weights(30),
 		"сдвиг упирается в потолок и дальше не растёт")
 	check(very_deep[0] >= 10.0, "обычные не исчезают полностью")
 
@@ -262,7 +262,7 @@ func _test_seeds_survive_death() -> void:
 func _test_rare_chance_never_reaches_certainty() -> void:
 	print("Редкость растёт с глубиной, но не до 100%")
 	for depth in [0, 10, 30, 100, 1000]:
-		var weights: Array = RunManager.rarity_weights(depth)
+		var weights := Balance.rarity_weights(depth)
 		check_eq(weights.size(), MonsterData.RARITY_NAMES.size(),
 			"глубина %d: вес на каждый грейд" % depth)
 
@@ -280,8 +280,8 @@ func _test_rare_chance_never_reaches_certainty() -> void:
 			"глубина %d: вес обычных не ниже дна" % depth)
 
 	# Вглубь редкие действительно становятся чаще
-	var shallow: Array = RunManager.rarity_weights(0)
-	var deep: Array = RunManager.rarity_weights(30)
+	var shallow := Balance.rarity_weights(0)
+	var deep := Balance.rarity_weights(30)
 	var last := MonsterData.RARITY_NAMES.size() - 1
 	check(deep[last] > shallow[last], "легендарные вглубь встречаются чаще")
 	check(deep[0] < shallow[0], "обычные вглубь встречаются реже")

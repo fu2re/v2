@@ -7,7 +7,6 @@ extends Node
 ## для разработчика: инструкцию можно забыть, инвариант — нет.
 
 signal gold_changed(amount: int)
-signal cosmetic_unlocked(cosmetic_id: String)
 signal crate_opened(cosmetic_id: String, was_duplicate: bool, pity_hit: bool)
 signal purchase_blocked(reason: String)
 
@@ -171,7 +170,6 @@ func unlock(cosmetic_id: String) -> void:
 	if is_owned(cosmetic_id):
 		return
 	owned.append(cosmetic_id)
-	cosmetic_unlocked.emit(cosmetic_id)
 
 
 ## Прямая покупка. Доступна для ЛЮБОГО предмета, включая содержимое сундуков.

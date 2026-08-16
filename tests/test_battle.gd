@@ -386,7 +386,7 @@ func _test_rarity_scales_monster() -> void:
 	# Шкала грейдов монотонна: каждый следующий не слабее предыдущего
 	var previous := 0.0
 	for r in MonsterData.Rarity.values():
-		var scale: float = MonsterData.rarity_vibe_scale(r)
+		var scale: float = Balance.grade_stat_scale(r)
 		check(scale >= previous, "грейд %s не слабее предыдущего" % MonsterData.rarity_name(r))
 		previous = scale
 	check_eq(MonsterData.RARITY_NAMES.size(), 6, "грейдов шесть")

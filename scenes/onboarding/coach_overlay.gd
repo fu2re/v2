@@ -21,7 +21,6 @@ var lane_offset: float = 150.0
 var demo_lane: int = NoteRules.Lane.NORMAL
 
 var _canvas: Control = null
-var _pulse: float = 0.0
 var _hand_alpha: float = 1.0
 var _hand_scale: float = 1.0
 var _notes_hit: int = 0

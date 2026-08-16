@@ -6,9 +6,7 @@ extends Node
 ## только при выходе. Так работает мягкая смерть (GDD §8.4): при обнулении
 ## здоровья теряется половина добычи забега, но не коллекция и не дружба.
 
-signal run_started(guardian_key: String)
-signal glade_entered(glade: Glade)
-signal run_ended(died: bool, kept_fruits: int, kept_seeds: int)
+signal run_ended(died: bool, kept_fruits: int, kept_silver: int)
 signal health_changed(current: int, maximum: int)
 
 ## Доля добычи, теряемая при смерти, живёт в drop_tables.json → soft_death
@@ -17,7 +15,9 @@ signal health_changed(current: int, maximum: int)
 
 ## Награды растут с глубиной (GDD §8.3).
 const REWARD_DEPTH_SCALE := 0.15
-const BASE_SEEDS := 8
+## База серебра за поляну. Имя было BASE_SEEDS: наградой когда-то были
+## семена, потом ими стало серебро, а имя врало.
+const BASE_SILVER := 8
 
 ## Доли грейдов, сдвиг с глубиной и пол обычных живут в таблице
 ## `data/drop_tables.json` и читаются через `Balance.rarity_weights`.
@@ -85,7 +85,6 @@ func start_run(new_guardian_key: String) -> bool:
 	current_glade = null
 	is_active = true
 
-	run_started.emit(guardian_key)
 	health_changed.emit(health, max_health)
 	return true
 
@@ -96,7 +95,6 @@ func advance() -> Glade:
 		return null
 	depth += 1
 	current_glade = _generate(depth)
-	glade_entered.emit(current_glade)
 	# Автосейв между полянами: игру на телефоне закрывают посреди сессии
 	SaveManager.mark_dirty()
 	return current_glade
@@ -106,7 +104,7 @@ func _generate(for_depth: int) -> Glade:
 	var glade := Glade.new()
 	glade.depth = for_depth
 	glade.type = _pick_type()
-	glade.silver_reward = int(round(BASE_SEEDS * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
+	glade.silver_reward = int(round(BASE_SILVER * (1.0 + REWARD_DEPTH_SCALE * for_depth)))
 
 	match glade.type:
 		Glade.Type.BATTLE:
@@ -159,16 +157,6 @@ func _pick_key(weights: Dictionary) -> String:
 		if roll <= 0.0:
 			return key
 	return ""
-
-
-## Чем глубже, тем выше доля редких монстров. Сдвиг ограничен, иначе
-## на 40-й поляне встречались бы одни легендарные и редкость обесценилась бы.
-func rarity_weights(for_depth: int) -> Array:
-	var weights := Balance.rarity_weights(for_depth)
-	var out: Array = []
-	for w: float in weights:
-		out.append(w)
-	return out
 
 
 ## Какой вид встретился. Все виды равновероятны: редкость — свойство
@@ -285,13 +273,6 @@ func add_loot_silver(amount: int) -> void:
 	run_silver += amount
 
 
-func total_loot_fruits() -> int:
-	var total := 0
-	for count: int in run_fruits.values():
-		total += count
-	return total
-
-
 # --- завершение --------------------------------------------------------------
 
 ## Уйти домой по своей воле — вся добыча сохраняется.
@@ -319,9 +300,9 @@ func _end(died: bool) -> void:
 		GameState.add_fruit(parts[0], int(parts[1]) as FruitData.Quality, kept)
 		kept_fruits += kept
 
-	var kept_seeds := int(floor(run_silver * (1.0 - Balance.soft_death_loss("run_silver")))) \
+	var kept_silver := int(floor(run_silver * (1.0 - Balance.soft_death_loss("run_silver")))) \
 		if died else run_silver
-	GameState.add_silver(kept_seeds)
+	GameState.add_silver(kept_silver)
 
 	# Семена новых культур переживают смерть целиком.
 	# Потерять только что открытый вид — это откат прогресса, а не потеря
@@ -340,15 +321,7 @@ func _end(died: bool) -> void:
 	run_buffs.clear()
 
 	SaveManager.save_game()
-	run_ended.emit(died, kept_fruits, kept_seeds)
-
-
-## Шансы выпадения снаряжения за победу живут в `data/drop_tables.json`
-## (секция `victory_chest`).
-##
-## Это НЕ платный лутбокс: он не покупается и не связан с деньгами, поэтому
-## регуляторные правила лутбоксов к нему не относятся. Но принцип «открытие
-## не пропадает впустую» действует и здесь — сундук всегда что-то даёт.
+	run_ended.emit(died, kept_fruits, kept_silver)
 
 
 ## Начислить гуардиану опыт за бой. Возвращает, сколько уровней взято.

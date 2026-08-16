@@ -162,8 +162,6 @@ func _plot_label(index: int) -> String:
 
 	var percent := int(round(FarmState.growth_ratio(index) * 100.0))
 	var left := _format_time(FarmState.seconds_left(index))
-	# Значок ноты вместо слова «станцевать»: слово не влезает, а нота
-	# уже означает танец на всех остальных экранах
 	return "%d%%\n%s" % [percent, left]
 
 
@@ -225,7 +223,7 @@ func _open_seed_picker(index: int) -> void:
 func _plant_selected(fruit_id: String) -> void:
 	if FarmState.plant(_pending_plot, fruit_id):
 		var fruit := Registry.fruit(fruit_id)
-		_status.text = "Посажено: %s. Можно станцевать, чтобы росло быстрее." \
+		_status.text = "Посажено: %s. Вырастет само — загляни попозже." \
 			% (fruit.display_name if fruit != null else fruit_id)
 	_close_seed_picker()
 

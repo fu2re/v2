@@ -44,7 +44,3 @@ func release_all() -> void:
 	for note in _all:
 		note.release()
 	_free = _all.duplicate()
-
-
-func active_count() -> int:
-	return _all.size() - _free.size()

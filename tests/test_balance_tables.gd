@@ -32,11 +32,19 @@ func _test_tables_are_actually_read() -> void:
 	var legendary := Balance.grade_stat_scale(MonsterData.Rarity.LEGENDARY)
 	check_close(legendary, 2.0, "множитель легендарного берётся из progression.json")
 
-	# То же число обязано доехать до боевой формулы, а не остаться в таблице
-	check_close(MonsterData.rarity_vibe_scale(MonsterData.Rarity.LEGENDARY), 2.0,
-		"бой считает Настрой по табличному множителю")
-	check_close(MonsterData.rarity_power_scale(MonsterData.Rarity.LEGENDARY), 2.0,
-		"удар монстра считается по тому же множителю")
+	# То же число обязано доехать до боевой формулы, а не остаться в таблице.
+	# Проверяется НАБЛЮДАЕМЫЙ стат экземпляра, а не обёртка-делегат: обёртка
+	# может совпадать с таблицей и при этом не использоваться боем вовсе
+	var common_vibe := MonsterInstance.create("disco_sprout",
+		MonsterData.Rarity.COMMON).vibe()
+	var legendary_vibe := MonsterInstance.create("disco_sprout",
+		MonsterData.Rarity.LEGENDARY).vibe()
+	check_close(float(legendary_vibe) / float(common_vibe), legendary,
+		"Настрой экземпляра растёт по табличному множителю", 0.05)
+	check_close(MonsterInstance.create("disco_sprout",
+		MonsterData.Rarity.LEGENDARY).strike_scale(),
+		Balance.grade_strike_scale(MonsterData.Rarity.LEGENDARY),
+		"удар экземпляра считается по табличной шкале удара")
 
 	check_eq(Balance.max_level(), 10, "потолок уровня из таблицы")
 	check_close(Balance.level_stat_bonus(), 0.08, "прибавка за уровень из таблицы")
