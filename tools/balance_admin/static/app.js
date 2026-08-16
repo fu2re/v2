@@ -255,16 +255,23 @@ function renderObjectTable(node, rows) {
   const table = document.createElement("table");
   table.className = "obj-table";
   const columns = Object.keys((rows && rows[0]) || {});
+  const skip = new Set(node.sum_skip || []);
   const head = table.insertRow();
   for (const col of columns) {
     const th = document.createElement("th");
     th.textContent = col;
     head.appendChild(th);
   }
+  if (node.row_sum_to) {
+    const th = document.createElement("th");
+    th.textContent = "Σ";
+    head.appendChild(th);
+  }
   head.appendChild(document.createElement("th"));
 
   (rows || []).forEach((rowData, rowIndex) => {
     const tr = table.insertRow();
+    const rowInputs = {};
     for (const col of columns) {
       const td = tr.insertCell();
       const input = document.createElement("input");
@@ -275,8 +282,28 @@ function renderObjectTable(node, rows) {
         const arr = getByPath(current.data, node.path);
         arr[rowIndex][col] = parseNum(input.value, rowData[col]);
         markDirty(input);
+        updateRowSum();
       };
+      rowInputs[col] = input;
       td.appendChild(input);
+    }
+    // Бейдж суммы на КАЖДОЙ строке: строка — самостоятельное распределение
+    // (например, шансы грейдов с этой глубины) и обязана давать 100
+    let updateRowSum = () => {};
+    if (node.row_sum_to) {
+      const td = tr.insertCell();
+      const badge = document.createElement("span");
+      badge.className = "sum-badge";
+      td.appendChild(badge);
+      updateRowSum = () => {
+        let total = 0;
+        for (const [col, input] of Object.entries(rowInputs))
+          if (!skip.has(col)) total += Number(input.value) || 0;
+        badge.textContent = `${round2(total)}`;
+        badge.classList.toggle("ok", Math.abs(total - node.row_sum_to) < 0.01);
+        badge.classList.toggle("bad", Math.abs(total - node.row_sum_to) >= 0.01);
+      };
+      updateRowSum();
     }
     const actions = tr.insertCell();
     const del = document.createElement("button");
@@ -303,6 +330,7 @@ function renderObjectTable(node, rows) {
     rerenderCurrentConfig();
   };
   wrap.appendChild(add);
+  if (node.hint) wrap.appendChild(hintEl(node.hint));
   return wrap;
 }
 

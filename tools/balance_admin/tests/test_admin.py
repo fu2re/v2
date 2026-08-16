@@ -104,6 +104,32 @@ def test_crate_pool_invariant(root: Path) -> None:
     assert any("unique" in e and "in_crates" in e for e in errors)
 
 
+def test_rarity_row_must_sum_100(root: Path) -> None:
+    tables = _load_all(root)
+    tables["drop_tables.json"]["monster_rarity_by_depth"]["by_depth"][0]["common"] = 89
+    errors, _ = validator.validate(root, tables)
+    assert any("100%" in e and "by_depth" in e for e in errors)
+
+
+def test_rarity_rows_must_be_ordered(root: Path) -> None:
+    tables = _load_all(root)
+    rows = tables["drop_tables.json"]["monster_rarity_by_depth"]["by_depth"]
+    rows[1]["from_depth"] = 0
+    errors, _ = validator.validate(root, tables)
+    assert any("по возрастанию" in e for e in errors)
+
+
+def test_rarity_surface_protects_newbies(root: Path) -> None:
+    """Легендарный на нулевой поляне — ошибка: новичок не должен утыкаться
+    в непроходимый бой (зеркало tests/test_fair_play.gd)."""
+    tables = _load_all(root)
+    surface = tables["drop_tables.json"]["monster_rarity_by_depth"]["by_depth"][0]
+    surface["legendary"] = 5
+    surface["common"] = 85
+    errors, _ = validator.validate(root, tables)
+    assert any("legendary" in e and "поверхности" in e for e in errors)
+
+
 def test_widened_good_window_warns_about_charts(root: Path) -> None:
     tables = _load_all(root)
     tables["battle.json"]["judge"]["good_window"] = 0.15

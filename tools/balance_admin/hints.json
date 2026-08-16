@@ -6,10 +6,11 @@
   ],
   "widgets": [
     {
-      "match": "drop_tables.json:monster_rarity_by_depth.examples_percent*",
-      "widget": "doc",
-      "kind": "doc",
-      "hint": "Документация: валидатор пересчитывает и предупреждает о дрейфе"
+      "match": "drop_tables.json:monster_rarity_by_depth.by_depth",
+      "widget": "object_table",
+      "row_sum_to": 100.0,
+      "sum_skip": ["from_depth"],
+      "hint": "Строка действует с поляны from_depth до следующей строки; глубже последней — последняя. Проценты каждой строки дают 100."
     },
     {
       "match": "*.json:*banned_regions",

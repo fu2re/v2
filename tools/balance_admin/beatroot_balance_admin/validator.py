@@ -59,9 +59,7 @@ REQUIRED = {
         "granny.ask_min_fraction",
         "granny.ask_max_fraction",
         "granny.gift_weights_percent.seed_tier_up",
-        "monster_rarity_by_depth.depth_shift.divisor",
-        "monster_rarity_by_depth.depth_shift.max_shift",
-        "monster_rarity_by_depth.depth_shift.common_floor",
+        "monster_rarity_by_depth.by_depth",
         "wild_bush.yield.seed_of_same_fruit",
         "wild_bush.yield.fruit_chance_percent",
         "wild_bush.yield.fruits_when_lucky",
@@ -70,9 +68,6 @@ REQUIRED = {
         "cosmetic_crate.price_gold",
         "cosmetic_crate.pity.guaranteed_after_opens",
         "cosmetic_crate.pity.min_rarity",
-        *[f"monster_rarity_by_depth.base_weights.{g}" for g in GRADE_KEYS],
-        *[f"monster_rarity_by_depth.unlock_depth.{g}" for g in GRADE_KEYS],
-        *[f"monster_rarity_by_depth.depth_shift.per_shift.{g}" for g in GRADE_KEYS],
         *[f"victory_chest.drop_chance_percent_by_monster_rarity.{g}" for g in GRADE_KEYS],
         *[f"victory_chest.odds_percent_by_monster_rarity.{g}" for g in GRADE_KEYS],
     ],
@@ -222,59 +217,80 @@ def _check_drop_tables(data: dict, errors: list[str],
     if not 0 <= float(chance) <= 100:
         errors.append("drop_tables.json: fruit_chance_percent вне 0..100")
 
-    divisor = float(_get(data, "monster_rarity_by_depth.depth_shift.divisor"))
-    if divisor <= 0:
-        errors.append("drop_tables.json: depth_shift.divisor должен быть больше нуля")
-
-    _warn_examples_drift(data, warnings)
+    _check_rarity_by_depth(data, errors)
 
 
-def _warn_examples_drift(data: dict, warnings: list[str]) -> None:
-    """examples_percent — документация; она дрейфует, когда правят веса.
+def _check_rarity_by_depth(data: dict, errors: list[str]) -> None:
+    """Ступенчатая таблица редкости: строка = «с какой поляны» + проценты.
 
-    Пересчёт повторяет Balance.rarity_weights (data/balance.gd) —
-    при правке формулы там менять и здесь.
+    Инварианты зеркалят tests/test_fair_play.gd и test_balance_tables.gd:
+    первая ступень с нуля и почти вся обычная, старшие грейды открываются
+    по очереди, обычные не исчезают никогда, каждая строка даёт 100.
     """
-    examples = _get(data, "monster_rarity_by_depth.examples_percent")
-    if not isinstance(examples, dict):
+    rows = _get(data, "monster_rarity_by_depth.by_depth")
+    if not isinstance(rows, list) or not rows:
+        errors.append("drop_tables.json: by_depth пуста — лента без грейдов")
         return
-    for label, depth in [("depth_0", 0), ("depth_5", 5), ("depth_10", 10),
-                         ("depth_15", 15), ("depth_20", 20),
-                         ("depth_30_plus", 30)]:
-        recorded = examples.get(label)
-        if not isinstance(recorded, dict):
-            continue
-        actual = _rarity_percent(data, depth)
+
+    previous_depth = None
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors.append(f"drop_tables.json: by_depth[{index}] — не строка таблицы")
+            return
+        depth = int(row.get("from_depth", -1))
+        if index == 0 and depth != 0:
+            errors.append("drop_tables.json: первая строка by_depth обязана "
+                          "начинаться с поляны 0 — иначе у поверхности дыра")
+        if previous_depth is not None and depth <= previous_depth:
+            errors.append(
+                f"drop_tables.json: by_depth — from_depth {depth} не больше "
+                f"предыдущего ({previous_depth}); строки идут по возрастанию")
+        previous_depth = depth
+
+        total = 0.0
         for grade in GRADE_KEYS:
-            want = float(recorded.get(grade, 0))
-            got = actual[grade]
-            if abs(want - got) > 1.5:
-                warnings.append(
-                    "drop_tables.json: examples_percent.%s разъехались с расчётом "
-                    "(%s: записано %g, выходит %.0f) — это документация, обнови её"
-                    % (label, grade, want, got))
-                break
+            value = row.get(grade)
+            if value is None:
+                errors.append(f"drop_tables.json: by_depth (поляна {depth}) — "
+                              f"нет колонки {grade}")
+                continue
+            if float(value) < 0:
+                errors.append(f"drop_tables.json: by_depth (поляна {depth}) — "
+                              f"{grade} отрицателен")
+            total += float(value)
+        if abs(total - 100.0) > 0.01:
+            errors.append(f"drop_tables.json: строка by_depth с поляны {depth} "
+                          f"обязана давать 100% (сейчас {total:g})")
+        if float(row.get("common", 0)) <= 0:
+            errors.append(f"drop_tables.json: by_depth (поляна {depth}) — "
+                          "обычные не исчезают никогда: приручение обычного "
+                          "доступно на любой глубине (GDD §6.3)")
 
+    surface = rows[0]
+    if float(surface.get("common", 0)) < 85.0:
+        errors.append("drop_tables.json: у поверхности обычных не меньше 85% — "
+                      "новичок не должен утыкаться в непроходимый бой "
+                      "(tests/test_fair_play.gd)")
+    for grade in ("unique", "epic", "legendary"):
+        if float(surface.get(grade, 0)) > 0:
+            errors.append(f"drop_tables.json: {grade} на поверхности "
+                          "не встречается вовсе (tests/test_fair_play.gd)")
 
-def _rarity_percent(data: dict, depth: int) -> dict[str, float]:
-    table = _get(data, "monster_rarity_by_depth")
-    shift_section = table["depth_shift"]
-    shift = min(depth / float(shift_section["divisor"]),
-                float(shift_section["max_shift"]))
-    weights: dict[str, float] = {}
-    for grade in GRADE_KEYS:
-        if depth < int(table["unlock_depth"].get(grade, 0)):
-            weights[grade] = 0.0
+    # Старшие грейды открываются по очереди, а не все сразу
+    previous_first = -1
+    for grade in ("unique", "epic", "legendary"):
+        first = next((int(r.get("from_depth", 0)) for r in rows
+                      if float(r.get(grade, 0)) > 0), None)
+        if first is None:
+            errors.append(f"drop_tables.json: {grade} не встречается ни на "
+                          "одной глубине — лестница грейдов порвана")
             continue
-        value = float(table["base_weights"].get(grade, 0.0)) \
-            + float(shift_section["per_shift"].get(grade, 0.0)) * shift
-        if grade == "common":
-            value = max(value, float(shift_section["common_floor"]))
-        weights[grade] = max(value, 0.0)
-    total = sum(weights.values())
-    if total <= 0:
-        return {g: 0.0 for g in GRADE_KEYS}
-    return {g: w * 100.0 / total for g, w in weights.items()}
+        if first <= previous_first:
+            errors.append(
+                f"drop_tables.json: {grade} открывается с поляны {first}, "
+                f"не глубже предыдущего грейда ({previous_first}) — старшие "
+                "открываются по очереди (tests/test_fair_play.gd)")
+        previous_first = first
 
 
 # --- бой ----------------------------------------------------------------------
