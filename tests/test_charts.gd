@@ -86,17 +86,18 @@ func _test_real_charts_are_winnable() -> void:
 	GameState.reset()
 
 	# Подготовленный игрок: снаряжение и изученные повадки — то, ради чего
-	# собирают прогрессию (GDD §6.5)
-	var guardian := GameState.tame("disco_sprout", MonsterData.Rarity.RARE)
-	GameState.add_gear("thunder_pick")
-	GameState.equip(guardian.key(), "thunder_pick")
-
+	# собирают прогрессию (GDD §6.5). Гуардиан — ТОГО ЖЕ грейда, что монстр:
+	# здесь меряется играбельность чарта, а стена грейдов (§6.3) намеренно
+	# делает бой «через ступень» непроходимым — это не поломка чарта
 	for monster in Registry.all_monsters():
 		for grade in [MonsterData.Rarity.COMMON, MonsterData.Rarity.LEGENDARY]:
 			var chart := ChartSelect.load_for(monster, grade)
 			if chart == null:
 				continue
 
+			var guardian := GameState.tame("disco_sprout", grade)
+			GameState.add_gear("thunder_pick")
+			GameState.equip(guardian.key(), "thunder_pick")
 			for i in 15:
 				GameState.add_battle_experience(monster.id)
 

@@ -72,6 +72,8 @@ func _build_targets() -> void:
 			"setup": _played_a_while},
 		{"name": "10_run_feed", "scene": "res://scenes/run/RunFeed.tscn",
 			"setup": _played_a_while},
+		{"name": "10b_run_feed_matchup", "scene": "res://scenes/run/RunFeed.tscn",
+			"setup": _played_a_while, "after": _show_matchup_card},
 		{"name": "11_battle", "scene": "res://scenes/battle/DanceBattle.tscn",
 			"setup": _ready_for_battle, "after": _spawn_every_note},
 		{"name": "12_victory", "scene": "res://scenes/run/RunFeed.tscn",
@@ -202,6 +204,19 @@ func _spawn_every_note(battle: Node) -> void:
 ## Единственная панель игры, которая ложится на другую сцену, — и именно там
 ## кнопка «Угостить» оказалась погребена под слоем боя. Снимок нужен, чтобы
 ## видеть, что панель сверху и целиком.
+## Карточка боя с матчапом: диско-гуардиан против рока уязвим, и бэйдж
+## предупреждения обязан быть виден на снимке — это контракт GDD §8.1.2.
+func _show_matchup_card(feed: Node) -> void:
+	var glade = Glade.new()
+	glade.type = Glade.Type.BATTLE
+	glade.depth = 2
+	glade.monster_id = "bass_bear"
+	glade.grade = COMMON
+	glade.silver_reward = 9
+	RunManager.current_glade = glade
+	feed._show_glade(glade)
+
+
 func _open_victory(feed: Node) -> void:
 	var glade = RunManager.current_glade
 	if glade == null:

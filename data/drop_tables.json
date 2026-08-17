@@ -55,41 +55,64 @@
   },
 
   "monster_rarity_by_depth": {
-    "description": "Веса грейда ЭКЗЕМПЛЯРА на боевой поляне (GDD §6.3, v0.4: грейд роллится на встречу, не закреплён за видом). Главная ось сложности: сама сложность боя — свойство грейда (темп ремикса + ×Статы). Вторая, плавная ось — рост Настроя с глубиной (+5%/поляна, progression.json → battle); плотность нот и сила удара от глубины не зависят (GDD §8.3).",
-    "base_weights": { "common": 90.0, "uncommon": 9.0, "rare": 1.0, "unique": 0.0, "epic": 0.0, "legendary": 0.0 },
-    "unlock_depth": {
-      "common": 0,
-      "uncommon": 0,
-      "rare": 0,
-      "unique": 5,
-      "epic": 12,
-      "legendary": 20,
-      "note": "До этой глубины грейд не встречается ВОВСЕ. Без порогов линейный сдвиг выдавал уникального уже на второй поляне: игрок утыкался в непроходимый бой, не успев понять правила."
-    },
-    "depth_shift": {
-      "formula": "shift = min(depth / divisor, max_shift); вес = base + per_shift * shift (и 0, пока depth < unlock_depth)",
-      "divisor": 10.0,
-      "max_shift": 3.0,
-      "per_shift": {
-        "common": -18.0,
-        "uncommon": 5.0,
-        "rare": 5.0,
-        "unique": 4.0,
-        "epic": 2.5,
-        "legendary": 1.0
+    "description": "Шансы грейда ЭКЗЕМПЛЯРА на боевой поляне (GDD §6.3). Ступенчатая таблица: строка действует С поляны from_depth и до следующей строки; глубже последней — последняя. Каждая строка — проценты, сумма 100. Ноль означает «на этой глубине грейд не встречается вовсе».",
+    "_why": "Была формула (base + per_shift * min(depth/divisor, max_shift), пороги, нормализация) — семь крутилок, а картину всё равно проверяли по таблице примеров. Теперь таблица И ЕСТЬ баланс: что записано, то и выпадает. Инварианты (первая строка с нуля, старшие открываются по очереди, обычные не исчезают) сторожат валидатор админки и тесты.",
+    "by_depth": [
+      {
+        "from_depth": 0,
+        "common": 90,
+        "uncommon": 9,
+        "rare": 1,
+        "unique": 0,
+        "epic": 0,
+        "legendary": 0
       },
-      "common_floor": 15.0,
-      "note": "После сдвига веса нормализуются к 100%. Обычные не исчезают никогда: приручение обычного должно оставаться лёгким на любой глубине."
-    },
-    "examples_percent": {
-      "_note": "Замерено на текущих числах. У поверхности почти всё обычное, старшие грейды не существуют до своей глубины.",
-      "depth_0": { "common": 90, "uncommon": 9, "rare": 1, "unique": 0, "epic": 0, "legendary": 0 },
-      "depth_5": { "common": 83, "uncommon": 12, "rare": 4, "unique": 2, "epic": 0, "legendary": 0 },
-      "depth_10": { "common": 75, "uncommon": 15, "rare": 6, "unique": 4, "epic": 0, "legendary": 0 },
-      "depth_15": { "common": 64, "uncommon": 17, "rare": 9, "unique": 6, "epic": 4, "legendary": 0 },
-      "depth_20": { "common": 55, "uncommon": 19, "rare": 11, "unique": 8, "epic": 5, "legendary": 2 },
-      "depth_30_plus": { "common": 37, "uncommon": 24, "rare": 16, "unique": 12, "epic": 8, "legendary": 3 }
-    }
+      {
+        "from_depth": 5,
+        "common": 82,
+        "uncommon": 12,
+        "rare": 4,
+        "unique": 2,
+        "epic": 0,
+        "legendary": 0
+      },
+      {
+        "from_depth": 10,
+        "common": 75,
+        "uncommon": 15,
+        "rare": 6,
+        "unique": 4,
+        "epic": 0,
+        "legendary": 0
+      },
+      {
+        "from_depth": 15,
+        "common": 64,
+        "uncommon": 17,
+        "rare": 9,
+        "unique": 6,
+        "epic": 4,
+        "legendary": 0
+      },
+      {
+        "from_depth": 20,
+        "common": 55,
+        "uncommon": 19,
+        "rare": 11,
+        "unique": 8,
+        "epic": 5,
+        "legendary": 2
+      },
+      {
+        "from_depth": 30,
+        "common": 37,
+        "uncommon": 24,
+        "rare": 16,
+        "unique": 12,
+        "epic": 8,
+        "legendary": 3
+      }
+    ]
   },
 
   "victory_chest": {

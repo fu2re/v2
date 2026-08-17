@@ -26,23 +26,28 @@ func run_tests() -> void:
 func _test_level_raises_stats() -> void:
 	print("Уровень делает экземпляр сильнее")
 	var first := MonsterInstance.create("disco_sprout", COMMON)
-	var tenth := MonsterInstance.create("disco_sprout", COMMON)
-	tenth.level = Balance.max_level()
+	var maxed := MonsterInstance.create("disco_sprout", COMMON)
+	maxed.level = Balance.max_level()
 
-	check(tenth.stat_scale() > first.stat_scale(), "статы выросли")
-	check(tenth.max_health() > first.max_health(), "здоровья больше")
-	check(tenth.power() > first.power(), "удар сильнее")
+	check(maxed.stat_scale() > first.stat_scale(), "статы выросли")
+	check(maxed.max_health() > first.max_health(), "здоровья больше")
+	check(maxed.power() > first.power(), "удар сильнее")
 
-	# Заявленное в GDD «примерно вдвое» на десятом уровне
-	var ratio := tenth.stat_scale() / first.stat_scale()
+	# Заявленное в GDD §6.5: потолок уровня ≈ ×1.73 к первому, то есть
+	# примерно ×1.5 от следующего грейда — компенсирует одну ступень
+	var ratio := maxed.stat_scale() / first.stat_scale()
 	check(ratio >= 1.6 and ratio <= 2.2,
-		"десятый уровень примерно вдвое сильнее первого (x%.2f)" % ratio)
+		"потолок уровня примерно ×1.7 к первому (x%.2f)" % ratio)
+	var next_grade := MonsterInstance.create("disco_sprout",
+		MonsterData.Rarity.UNCOMMON)
+	check_close(ratio / next_grade.stat_scale(), 1.5,
+		"максимальный уровень ≈ ×1.5 следующего грейда", 0.1)
 
-	# Грейд и уровень умножаются: легендарный десятого — вершина
+	# Грейд и уровень умножаются: легендарный максимального — вершина
 	var legendary := MonsterInstance.create("disco_sprout", LEGENDARY)
 	legendary.level = Balance.max_level()
-	check(legendary.stat_scale() > tenth.stat_scale(),
-		"легендарный десятого сильнее обычного десятого")
+	check(legendary.stat_scale() > maxed.stat_scale(),
+		"легендарный максимального уровня сильнее обычного максимального")
 
 
 func _test_xp_curve_and_cap() -> void:

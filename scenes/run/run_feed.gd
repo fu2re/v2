@@ -59,6 +59,10 @@ const BATTLE_SCENE := preload("res://scenes/battle/DanceBattle.tscn")
 @onready var _friendship_fill: ColorRect = $Card/FriendshipFill
 @onready var _friendship_label: Label = $Card/FriendshipLabel
 @onready var _reward_label: Label = $Card/RewardLabel
+## Матчап стихий гуардиана против монстра — виден ДО боя (GDD §5):
+## уязвимость и сопротивление меняют урон в разы, и решение «драться или
+## пролистать» без них не решение.
+@onready var _matchup_badge: Label = $Card/MatchupBadge
 @onready var _headline: Label = $Card/Headline
 @onready var _subline: Label = $Card/Subline
 @onready var _hint: Label = $Card/Hint
@@ -321,6 +325,54 @@ func _show_stakes(glade: Glade) -> void:
 		glade.silver_reward, expensive,
 	]
 
+	_show_matchup(glade)
+
+
+## Метка уязвимости/сопротивления до боя (GDD §5).
+##
+## Сравнивается стихия ТЕКУЩЕГО гуардиана со стихией вида монстра. Обе стороны
+## отношения показываются отдельными строками, опасная — первой: в кольце
+## стихий преимущество и сопротивление часто приходят парой, и прятать одно
+## ради краткости значило бы врать о половине боя.
+func _show_matchup(glade: Glade) -> void:
+	_matchup_badge.visible = false
+	var guardian := GameState.instance(RunManager.guardian_key)
+	var monster := Registry.monster(glade.monster_id)
+	if guardian == null or monster == null:
+		return
+
+	var lines: PackedStringArray = []
+	# Входящая сторона — опаснее, поэтому первой
+	match MonsterData.matchup(monster.genre, guardian.genre()):
+		MonsterData.Matchup.VULNERABLE:
+			lines.append("⚠ Уязвимость: %s бьёт тебя ×%.0f" % [
+				MonsterData.genre_name(monster.genre),
+				Balance.element_vulnerability_incoming(),
+			])
+		MonsterData.Matchup.RESIST:
+			lines.append("Сопротивление: урон по тебе ×%.1f"
+				% Balance.element_resistance())
+	match MonsterData.matchup(guardian.genre(), monster.genre):
+		MonsterData.Matchup.VULNERABLE:
+			lines.append("Преимущество: твой урон ×%.1f"
+				% Balance.element_vulnerability_outgoing())
+		MonsterData.Matchup.RESIST:
+			lines.append("Монстр сопротивляется: урон ×%.1f"
+				% Balance.element_resistance())
+	if lines.is_empty():
+		return
+
+	_matchup_badge.text = "\n".join(lines)
+	# Цвет по худшей новости: красный тревоги, если гуардиан уязвим или его
+	# урон режется, зелёный — если расклад целиком в его пользу
+	var danger := false
+	for line in lines:
+		if line.begins_with("⚠") or line.begins_with("Монстр"):
+			danger = true
+	_matchup_badge.add_theme_color_override("font_color",
+		Color("FF8A9E") if danger else Color("97C46A"))
+	_matchup_badge.visible = true
+
 
 func _hide_stakes() -> void:
 	_tame_banner.visible = false
@@ -328,6 +380,7 @@ func _hide_stakes() -> void:
 	_friendship_fill.visible = false
 	_friendship_label.text = ""
 	_reward_label.text = ""
+	_matchup_badge.visible = false
 
 
 ## Свайп и тап по поляне ловим в _unhandled_input, а НЕ в _input.

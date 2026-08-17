@@ -38,16 +38,30 @@ func _test_registry() -> void:
 
 
 func _test_genre_triangle() -> void:
-	print("MonsterData: треугольник жанров")
+	print("MonsterData: матчапы стихий")
 	var G := MonsterData.Genre
-	check_eq(MonsterData.genre_multiplier(G.ROCK, G.DISCO), 1.4, "рок бьёт диско")
-	check_eq(MonsterData.genre_multiplier(G.DISCO, G.ROCK), 0.7, "диско слаб против рока")
-	check_eq(MonsterData.genre_multiplier(G.ROCK, G.FOLK), 1.0, "нет связи — без множителя")
+	# Кольцо явных матчапов (GDD §5): диско уязвимо к року, рок сопротивляется
+	# диско. Значения — из таблицы, тест сверяет ЧТЕНИЕ, а не переписывает числа
+	check_eq(MonsterData.matchup(G.ROCK, G.DISCO), MonsterData.Matchup.VULNERABLE,
+		"диско уязвимо к року")
+	check_eq(MonsterData.matchup(G.DISCO, G.ROCK), MonsterData.Matchup.RESIST,
+		"рок сопротивляется диско")
+	check_eq(MonsterData.matchup(G.ROCK, G.FOLK), MonsterData.Matchup.NEUTRAL,
+		"нет связи — нейтрально")
 
-	# Хип-хоп нейтрален в обе стороны
+	check_eq(MonsterData.attack_multiplier(G.ROCK, G.DISCO),
+		Balance.element_vulnerability_outgoing(), "уязвимый защитник получает бонусный урон")
+	check_eq(MonsterData.attack_multiplier(G.DISCO, G.ROCK),
+		Balance.element_resistance(), "сопротивление режет урон")
+	check_eq(MonsterData.attack_multiplier(G.ROCK, G.FOLK), 1.0,
+		"нейтральная пара — без множителя")
+
+	# Ветер (латина) нейтрален в обе стороны
 	for g in [G.ROCK, G.DISCO, G.FOLK, G.ELECTRO]:
-		check_eq(MonsterData.genre_multiplier(G.LATIN, g), 1.0, "латина не имеет преимуществ")
-		check_eq(MonsterData.genre_multiplier(g, G.LATIN), 1.0, "латина не имеет слабостей")
+		check_eq(MonsterData.matchup(G.LATIN, g), MonsterData.Matchup.NEUTRAL,
+			"латина не имеет преимуществ")
+		check_eq(MonsterData.matchup(g, G.LATIN), MonsterData.Matchup.NEUTRAL,
+			"латина не имеет слабостей")
 
 
 func _test_friendship_is_deterministic() -> void:

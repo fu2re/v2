@@ -291,47 +291,31 @@ static func granny_gift_weights() -> Dictionary:
 
 # --- грейд встреченного монстра ----------------------------------------------
 
-## Веса грейдов на глубине d. Сдвигаются к редким, но обычные не исчезают:
-## приручение обычного должно оставаться лёгким на любой глубине (GDD §6.3).
+## Веса грейдов на глубине d — ступенчатая таблица by_depth: действует
+## последняя строка, чей from_depth уже достигнут. Была формула со сдвигом
+## и порогами, но семь её крутилок всё равно проверяли по таблице примеров —
+## теперь таблица и есть баланс: что записано, то и выпадает (GDD §6.3).
 static func rarity_weights(depth: int) -> PackedFloat32Array:
 	ensure_loaded()
 	var table := _section(_drops, "monster_rarity_by_depth")
-	var base := _section(table, "base_weights")
-	var shift_section := _section(table, "depth_shift")
-	var per_shift := _section(shift_section, "per_shift")
+	var rows: Variant = table.get("by_depth", [])
+	var list: Array = rows if typeof(rows) == TYPE_ARRAY else []
 
-	# Коэффициенты — отдельные поля, а не разбор текста формулы: поле "formula"
-	# написано для человека, и правка описания не должна менять баланс
-	var divisor := float(shift_section.get("divisor", 10.0))
-	if divisor <= 0.0:
-		divisor = 10.0
-	var max_shift := float(shift_section.get("max_shift", 3.0))
-
-	var shift := minf(float(depth) / divisor, max_shift)
-	var floor_common := float(shift_section.get("common_floor", 15.0))
-	var unlocks := _section(table, "unlock_depth")
+	var row: Dictionary = {}
+	for entry: Variant in list:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		if depth >= int(entry.get("from_depth", 0)):
+			row = entry
+	if row.is_empty():
+		# Заглушка на случай битой таблицы: все встречи обычные — заметно
+		# сломанная, но играбельная лента
+		push_error("Таблица редкости by_depth пуста или не достигнута")
+		return PackedFloat32Array([100.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 	var out := PackedFloat32Array()
-	for i in GRADE_KEYS.size():
-		var key: String = GRADE_KEYS[i]
-
-		# Порог глубины: до него грейд не встречается ВОВСЕ.
-		#
-		# Без порогов линейный сдвиг выдавал уникального уже на второй поляне —
-		# игрок утыкался в непроходимый бой, не успев понять правила. У поверхности
-		# должно быть почти сплошь обычное, а редкое — наградой за то,
-		# что зашёл глубже
-		var unlock := int(unlocks.get(key, 0))
-		if depth < unlock:
-			out.append(0.0)
-			continue
-
-		var start := float(base.get(key, 0.0))
-		var step := float(per_shift.get(key, 0.0))
-		var weight := start + step * shift
-		if key == "common":
-			weight = maxf(weight, floor_common)
-		out.append(maxf(weight, 0.0))
+	for key: String in GRADE_KEYS:
+		out.append(maxf(float(row.get(key, 0.0)), 0.0))
 	return out
 
 
@@ -730,17 +714,60 @@ static func combo_multiplier(combo: int) -> float:
 	return best
 
 
-# --- бой: жанровое кольцо ----------------------------------------------------
+# --- бой: матчапы стихий -----------------------------------------------------
 
-static func genre_advantage() -> float:
-	return float(_battle_section("genre").get("advantage_multiplier", 1.4))
+## Отношение защищающегося к стихии атакующего. Значения — для читаемости
+## вызывающих: словесное имя вместо числа-множителя, потому что одному и тому же
+## отношению соответствуют РАЗНЫЕ множители в зависимости от направления
+## (уязвимость монстра ×1.4, уязвимость гуардиана ×2.0).
+enum ElementRelation { NEUTRAL, DEFENDER_VULNERABLE, DEFENDER_RESISTS }
 
 
-static func genre_disadvantage() -> float:
-	return float(_battle_section("genre").get("disadvantage_multiplier", 0.7))
+## Монстр уязвим к стихии гуардиана — урон гуардиана растёт.
+static func element_vulnerability_outgoing() -> float:
+	return float(_battle_section("elements").get("vulnerability_outgoing", 1.4))
 
 
-## Кольцо преимуществ жанров: ключ бьёт значение. Ключи строковые
-## (rock/disco/folk/electro), отсутствие жанра означает нейтральность.
-static func genre_beats() -> Dictionary:
-	return _section(_battle_section("genre"), "beats")
+## Гуардиан уязвим к стихии монстра — весь входящий урон растёт.
+static func element_vulnerability_incoming() -> float:
+	return float(_battle_section("elements").get("vulnerability_incoming", 2.0))
+
+
+## Сопротивление режет урон в ту сторону, где оно есть.
+static func element_resistance() -> float:
+	return float(_battle_section("elements").get("resistance", 0.5))
+
+
+## Явные матчапы стихий: ключ -> {vulnerable_to: [...], resists: [...]}.
+## Списки, а не кольцо: при сотне видов граф станет произвольным.
+static func element_matchups() -> Dictionary:
+	return _section(_battle_section("elements"), "matchups")
+
+
+## Как защищающийся относится к стихии атакующего — по СПИСКАМ защищающегося:
+## уязвимость и сопротивление принадлежат тому, кто их испытывает.
+static func element_relation(attacker_key: String, defender_key: String) -> ElementRelation:
+	var row := _section(element_matchups(), defender_key)
+	var vulnerable: Variant = row.get("vulnerable_to", [])
+	if typeof(vulnerable) == TYPE_ARRAY and (vulnerable as Array).has(attacker_key):
+		return ElementRelation.DEFENDER_VULNERABLE
+	var resists: Variant = row.get("resists", [])
+	if typeof(resists) == TYPE_ARRAY and (resists as Array).has(attacker_key):
+		return ElementRelation.DEFENDER_RESISTS
+	return ElementRelation.NEUTRAL
+
+
+# --- бой: штраф урона по грейдам ---------------------------------------------
+
+## Множитель урона гуардиана по монстру, чей грейд выше на gap ступеней.
+## Свой грейд и ниже — без штрафа; за концом таблицы действует последнее
+## значение: стена не может кончиться от того, что таблицу забыли дописать.
+static func grade_gap_scale(gap: int) -> float:
+	ensure_loaded()
+	var table: Variant = _section(_battle, "grade_gap").get("outgoing_by_gap", [])
+	var scales: Array = table if typeof(table) == TYPE_ARRAY else []
+	if scales.is_empty():
+		return 1.0
+	if gap <= 0:
+		return float(scales[0])
+	return float(scales[clampi(gap, 0, scales.size() - 1)])

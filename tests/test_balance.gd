@@ -63,6 +63,14 @@ func _simulate(chart: ChartData, monster_id: String, accuracy: float) -> float:
 ## монстр не падал никогда.
 func _test_clean_run_wins_late() -> void:
 	print("Чистое прохождение выбивает монстра к концу трека")
+	# Гуардиан каждой паре подобран НЕЙТРАЛЬНЫЙ по стихии: обещание «чистая
+	# игра побеждает» живёт на ровном матчапе. Контр-пара — отдельная проверка
+	# ниже: сопротивление ×0.5 (GDD §5) делает её непроходимой намеренно
+	var neutral_guardian := {
+		"synth_slime": "disco_sprout",
+		"bass_bear": "bass_bear",
+		"beat_serpent": "disco_sprout",
+	}
 	for species_id in ["synth_slime", "bass_bear", "beat_serpent"]:
 		var difficulty: String = species_id
 		var chart := ChartSelect.load_for(Registry.monster(species_id),
@@ -72,7 +80,11 @@ func _test_clean_run_wins_late() -> void:
 			continue
 
 		var state := BattleState.new()
-		state.setup(MonsterInstance.create(species_id, MonsterData.Rarity.COMMON), GameState.tame("disco_sprout", MonsterData.Rarity.COMMON), 100, 0)
+		state.setup(MonsterInstance.create(species_id, MonsterData.Rarity.COMMON),
+			GameState.tame(neutral_guardian[species_id], MonsterData.Rarity.COMMON),
+			100, 0)
+		check_eq(state.outgoing_matchup(), MonsterData.Matchup.NEUTRAL,
+			"%s: пара для замера действительно нейтральна" % difficulty)
 		var win_at := -1.0
 
 		for i in chart.note_count():
@@ -97,6 +109,20 @@ func _test_clean_run_wins_late() -> void:
 				% [difficulty, MIN_CLEAN_PROGRESS * 100, win_at * 100])
 		check(win_at <= MAX_CLEAN_PROGRESS,
 			"%s: победа укладывается в трек (%d%%)" % [difficulty, win_at * 100])
+
+	# Контр-пара: диско против рока режется сопротивлением до ×0.5 (GDD §5),
+	# и даже идеальная игра монстра не выбивает. Это намеренно — цена выхода
+	# неудачным гуардианом, о которой предупреждает бэйдж на карточке.
+	# Здоровье при этом цело (чистая игра не пропускает ударов): монстр просто
+	# устоял, забег продолжается
+	var countered_chart := ChartSelect.load_for(Registry.monster("bass_bear"),
+		MonsterData.Rarity.COMMON)
+	var countered := _play_clean(countered_chart, "bass_bear", "disco_sprout", 0)
+	check_eq(countered.outgoing_matchup(), MonsterData.Matchup.RESIST,
+		"диско против рока — сопротивление")
+	check(not countered.did_win,
+		"сопротивление не пробивается даже чистой игрой (Настрой %d из %d)"
+			% [countered.vibe, countered.max_vibe])
 
 
 ## Неряшливая игра не должна побеждать: иначе точность ни на что не влияет.
@@ -170,52 +196,70 @@ func _test_new_player_beats_shallow_monsters() -> void:
 					% [id, depth, state.vibe, state.max_vibe])
 
 
-## А вглубь без снаряжения и опыта уже не вытянуть — и это правильно.
+## А вглубь без прокачки уже не вытянуть — и это правильно.
+##
+## С v0.4 глубина требует не только уровня и снаряжения, но и ГРЕЙДА:
+## урон по монстру выше своего грейда режется таблицей grade_gap, и обычным
+## гуардианом легендарного не выбить вообще — хоть восемнадцатого уровня.
+## Стена намеренная: охота идёт по лестнице грейдов (GDD §6.3) — приручи
+## соседний грейд, вырасти его, поднимись ещё на ступень.
 func _test_deep_monsters_need_progression() -> void:
-	print("Глубина требует снаряжения и опыта")
+	print("Глубина требует грейда, снаряжения и опыта")
 	GameState.reset()
 	# Тот самый чарт, который зазвучит в этом бою: у легендарного он свой,
 	# быстрый и с другим числом атак (GDD §10.1.1)
 	var chart := ChartSelect.load_for(Registry.monster("beat_serpent"),
 		MonsterData.Rarity.LEGENDARY)
 
-	# Трудность глубины проявляется НЕ в том, что идеальная игра не побеждает:
-	# чистое прохождение обязано добивать кого угодно, иначе мастерство
-	# перестаёт быть решением (§4.3). Трудность в том, что глубоко перестаёт
-	# хватать РЕАЛЬНОЙ игры — с промахами, — и вот её-то и вытягивает прокачка
 	var top := MonsterData.Rarity.LEGENDARY
 	var bare := _play_sloppy(chart, "beat_serpent", 12, top, 0.85)
 	check(not bare.did_win,
 		"легендарный на глубине 12 без прокачки устоял при 85%% попаданий")
 
-	# Даём ВСЮ прокачку — уровень, снаряжение и изученность вида. Прогрессия
-	# стоит на двух опорах сразу (GDD §6.5), и вершина сложности не обязана
-	# сдаваться одному плащу
-	var guardian := GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
-	guardian.add_xp(Balance.xp_for_level(Balance.max_level()))
+	# Стена грейдов: обычный гуардиан не выбивает легендарного НИКОГДА —
+	# ни потолок уровня, ни снаряжение, ни изученность вида не пробивают ×0.01
+	var common_guardian := GameState.tame("disco_sprout", MonsterData.Rarity.COMMON)
+	common_guardian.add_xp(Balance.xp_for_level(Balance.max_level()))
 	GameState.add_gear("thunder_pick")
-	GameState.equip(guardian.key(), "thunder_pick")
+	GameState.equip(common_guardian.key(), "thunder_pick")
 	for i in 15:
 		GameState.add_battle_experience("beat_serpent")
+	var maxed_common := _play_sloppy(chart, "beat_serpent", 12, top, 0.85)
+	check(not maxed_common.did_win,
+		"обычный гуардиан с ПОЛНОЙ прокачкой всё равно не пробивает легендарного")
 
-	var ready := _play_sloppy(chart, "beat_serpent", 12, top, 0.85)
+	# А гуардиан ТОГО ЖЕ круга с прокачкой вытягивает: стена пропускает того,
+	# кто поднялся по лестнице, а не отгораживает всех. Легендарный на глубине
+	# 12 — вершина игры, и требует легендарного же: эпик восемнадцатого уровня
+	# в полном снаряжении доводит его до последних очков Настроя, но умирает
+	# от накопленных промахов — ступень «на грейд вверх» берётся ближе
+	# к поверхности, где Настрой не раздут глубиной (§8.3).
+	# Снаряжение — полные три слота (GDD §6.5 «в лучшем снаряжении»)
+	var ready_guardian := GameState.tame("disco_sprout", top)
+	ready_guardian.add_xp(Balance.xp_for_level(Balance.max_level()))
+	for gear_id in ["thunder_pick", "heartwood_amulet", "cloud_shoes"]:
+		GameState.add_gear(gear_id)
+		GameState.equip(ready_guardian.key(), gear_id)
+
+	var ready := _play_sloppy(chart, "beat_serpent", 12, top, 0.85, top)
 	note("здоровье %d/%d, щит %d, принято ударов %d, крит бьёт %d, обычный %d"
 		% [ready.health, ready.max_health, ready.shield, ready.strikes_taken,
 			int(BattleState.heavy_strike_damage() * ready.strike_scale),
 			int(BattleState.strike_damage() * ready.strike_scale)])
 	check(ready.did_win,
-		"с плащом и опытом та же игра побеждает (Настрой %d из %d)"
+		"легендарный гуардиан с прокачкой той же игрой побеждает (Настрой %d из %d)"
 			% [ready.vibe, ready.max_vibe])
 	GameState.reset()
 
 
 ## Проиграть чарт с промахами — так, как играет живой человек.
 func _play_sloppy(chart: ChartData, monster_id: String, depth: int,
-		monster_grade: int, accuracy: float) -> BattleState:
+		monster_grade: int, accuracy: float,
+		guardian_grade := MonsterData.Rarity.COMMON) -> BattleState:
 	var state := BattleState.new()
 	state.setup(
 		MonsterInstance.create(monster_id, monster_grade),
-		GameState.tame("disco_sprout", MonsterData.Rarity.COMMON),
+		GameState.tame("disco_sprout", guardian_grade),
 		100, depth)
 
 	var rng := RandomNumberGenerator.new()

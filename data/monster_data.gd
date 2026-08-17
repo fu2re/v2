@@ -15,7 +15,9 @@ extends Resource
 ## живёт в `tools/chartgen/beatroot_chartgen/arrange.py`.
 enum Genre { ROCK, DISCO, FOLK, ELECTRO, LATIN }
 
-const ELEMENT_NAMES := ["Камень", "Солнце", "Листва", "Искра", "Ветер"]
+## Rock показывается как «Трава» (решение v0.4): классическая стихия понятнее
+## ребёнку, чем камень. Внутренний ключ rock и рок-аранжировка не меняются.
+const ELEMENT_NAMES := ["Трава", "Солнце", "Листва", "Искра", "Ветер"]
 
 ## Грейды монстра. Порядок = сила: чем выше, тем крепче и опаснее.
 enum Rarity { COMMON, UNCOMMON, RARE, UNIQUE, EPIC, LEGENDARY }
@@ -45,10 +47,13 @@ const RARITY_COLORS := [
 ## Грейд влияет на то, сколько встреч нужно, но НЕ на шанс — приручение
 ## гарантировано (GDD §6.3), и у каждого грейда своя шкала (GDD §6.1).
 
-## Кто кого бьёт и насколько — в data/battle.json → genre (читает Balance).
-## Ключи там строковые (rock/disco/...), общие с чартами: enum — деталь
-## GDScript, а таблицу правит дизайнер. Ветер нейтрален: его нет в кольце.
+## Уязвимости и сопротивления стихий — в data/battle.json → elements (читает
+## Balance). Ключи там строковые (rock/disco/...), общие с чартами: enum —
+## деталь GDScript, а таблицу правит дизайнер. Ветер нейтрален: пустые списки.
 const GENRE_KEYS := ["rock", "disco", "folk", "electro", "latin"]
+
+## Отношение защищающегося к стихии атакующего — с точки зрения защищающегося.
+enum Matchup { NEUTRAL, VULNERABLE, RESIST }
 
 ## Грейд НЕ здесь: он принадлежит экземпляру, а не виду (GDD §6.3) —
 ## любой вид может встретиться в любом грейде. Поле rarity у вида было
@@ -80,16 +85,29 @@ const GENRE_KEYS := ["rock", "disco", "folk", "electro", "latin"]
 var _sprite: Texture2D = null
 
 
-## Множитель урона против другого жанра.
-static func genre_multiplier(attacker: Genre, defender: Genre) -> float:
-	var beats := Balance.genre_beats()
-	var attacker_key: String = GENRE_KEYS[attacker]
-	var defender_key: String = GENRE_KEYS[defender]
-	if String(beats.get(attacker_key, "")) == defender_key:
-		return Balance.genre_advantage()
-	if String(beats.get(defender_key, "")) == attacker_key:
-		return Balance.genre_disadvantage()
-	return 1.0
+## Как защищающийся переносит стихию атакующего: уязвим, сопротивляется
+## или нейтрален. Одно отношение — разные множители по направлению
+## (Balance.element_vulnerability_outgoing/incoming/resistance), поэтому
+## наружу отдаётся именно отношение, а не число.
+static func matchup(attacker: Genre, defender: Genre) -> Matchup:
+	match Balance.element_relation(GENRE_KEYS[attacker], GENRE_KEYS[defender]):
+		Balance.ElementRelation.DEFENDER_VULNERABLE:
+			return Matchup.VULNERABLE
+		Balance.ElementRelation.DEFENDER_RESISTS:
+			return Matchup.RESIST
+		_:
+			return Matchup.NEUTRAL
+
+
+## Множитель урона атакующего против этой стихии защищающегося.
+static func attack_multiplier(attacker: Genre, defender: Genre) -> float:
+	match matchup(attacker, defender):
+		Matchup.VULNERABLE:
+			return Balance.element_vulnerability_outgoing()
+		Matchup.RESIST:
+			return Balance.element_resistance()
+		_:
+			return 1.0
 
 
 func sprite() -> Texture2D:

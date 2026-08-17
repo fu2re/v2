@@ -21,6 +21,7 @@ func run_tests() -> void:
 	_test_fruit_buffs_raise_attack_damage()
 	_test_attack_quality_matters()
 	_test_genre_advantage()
+	_test_grade_gap_wall()
 	_test_depth_scaling()
 	_test_victory_and_defeat()
 	_test_perfect_run()
@@ -281,24 +282,83 @@ func _test_attack_quality_matters() -> void:
 
 
 func _test_genre_advantage() -> void:
-	print("Преимущество жанра")
-	# disco_sprout (диско) против bass_bear (рок): диско слабо против рока
+	print("Матчапы стихий в бою")
+	# Чистое состояние: опыт против вида равен единице, и урон отражает
+	# только матчап, а не хвосты предыдущих тестов
+	GameState.reset()
+	# disco_sprout (диско) против bass_bear (рок): рок сопротивляется диско,
+	# а сам гуардиан-диско уязвим к року — расклад плох с обеих сторон
 	var weak := _make("bass_bear", "disco_sprout")
-	check_eq(weak.genre_multiplier(), Balance.genre_disadvantage(),
-		"диско в невыгоде против рока")
+	check_eq(weak.outgoing_matchup(), MonsterData.Matchup.RESIST,
+		"рок сопротивляется урону диско")
+	check_eq(weak.incoming_matchup(), MonsterData.Matchup.VULNERABLE,
+		"диско-гуардиан уязвим к року")
 
-	# bass_bear (рок) против disco_sprout (диско): рок бьёт диско
+	# bass_bear (рок) против disco_sprout (диско): зеркально хороший расклад
 	var strong := _make("disco_sprout", "bass_bear")
-	check_eq(strong.genre_multiplier(), Balance.genre_advantage(),
-		"рок в преимуществе над диско")
+	check_eq(strong.outgoing_matchup(), MonsterData.Matchup.VULNERABLE,
+		"диско-монстр уязвим к року")
+	check_eq(strong.incoming_matchup(), MonsterData.Matchup.RESIST,
+		"рок-гуардиан сопротивляется диско")
 
 	# Урон приходит только с атакой, поэтому сравниваем её, а не обычный бит
 	for i in BattleState.min_series_length():
 		strong.register_hit(Judge.Grade.PERFECT)
 		weak.register_hit(Judge.Grade.PERFECT)
-	check(strong.register_attack(Judge.Grade.PERFECT)
-		> weak.register_attack(Judge.Grade.PERFECT),
-		"выгодный жанр бьёт сильнее")
+	var strong_hit := strong.register_attack(Judge.Grade.PERFECT)
+	var weak_hit := weak.register_attack(Judge.Grade.PERFECT)
+	check(strong_hit > weak_hit, "выгодная стихия бьёт сильнее")
+	# Урон сверяется с формулой по НАБЛЮДАЕМОМУ результату: сила своего
+	# гуардиана × базовый множитель атаки × множитель матчапа из таблицы.
+	# Гуардианы в паре разных видов, поэтому голое отношение 1.4/0.5
+	# здесь не работает — у каждого своя базовая сила
+	check_eq(strong_hit, int(round(strong.guardian.power()
+		* Balance.attack_multiplier() * Balance.element_vulnerability_outgoing())),
+		"уязвимый монстр получает ровно ×%.1f" % Balance.element_vulnerability_outgoing())
+	check_eq(weak_hit, int(round(weak.guardian.power()
+		* Balance.attack_multiplier() * Balance.element_resistance())),
+		"сопротивление режет ровно до ×%.1f" % Balance.element_resistance())
+
+	# Входящая сторона: та же пара, но урон ПО гуардиану. Уязвимый диско
+	# получает от рока вдвое больше, чем рок от диско (×2 против ×0.5)
+	var incoming_weak := weak.take_strike()
+	var incoming_strong := strong.take_strike()
+	check(incoming_weak > incoming_strong,
+		"уязвимый гуардиан получает больнее (%d против %d)"
+			% [incoming_weak, incoming_strong])
+	var incoming_ratio := Balance.element_vulnerability_incoming() \
+		/ Balance.element_resistance()
+	check_close(float(incoming_weak) / float(incoming_strong), incoming_ratio,
+		"разрыв входящего урона соответствует таблице", 0.3)
+
+
+## Стена грейдов (GDD §6.3): урон гуардиана тает с каждым грейдом монстра
+## выше его собственного, и дальше второго — практически в ноль.
+func _test_grade_gap_wall() -> void:
+	print("Штраф урона по грейду выше своего")
+	check_eq(Balance.grade_gap_scale(0), 1.0, "свой грейд — без штрафа")
+	check_eq(Balance.grade_gap_scale(-2), 1.0, "грейд ниже — без штрафа")
+	check(Balance.grade_gap_scale(1) < 1.0, "на грейд выше — урон режется")
+	check(Balance.grade_gap_scale(2) < Balance.grade_gap_scale(1),
+		"на два выше — сильнее")
+	check(Balance.grade_gap_scale(2) <= 0.1, "на два выше бой уже безнадёжен")
+	check(Balance.grade_gap_scale(3) <= 0.01, "на три выше — стена")
+	check_eq(Balance.grade_gap_scale(5), Balance.grade_gap_scale(3),
+		"за концом таблицы действует последнее значение")
+
+	# Наблюдаемым результатом: одна и та же атака по монстру на грейд выше
+	# и на два выше. Пара стихий нейтральная, чтобы мерить только грейд
+	var damages: Array[int] = []
+	for grade in [MonsterData.Rarity.COMMON, MonsterData.Rarity.UNCOMMON,
+			MonsterData.Rarity.RARE]:
+		var s := _make("beat_serpent", "disco_sprout", 100, 0, grade)
+		for i in BattleState.min_series_length():
+			s.register_hit(Judge.Grade.PERFECT)
+		damages.append(s.register_attack(Judge.Grade.PERFECT))
+	check(damages[0] > damages[1], "на грейд выше урон меньше (%d → %d)"
+		% [damages[0], damages[1]])
+	check(damages[1] > damages[2], "на два выше — ещё меньше (%d → %d)"
+		% [damages[1], damages[2]])
 
 
 func _test_depth_scaling() -> void:

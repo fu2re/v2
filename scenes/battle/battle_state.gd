@@ -112,6 +112,13 @@ var shield_reduction: float = 0.0
 var strike_scale: float = 1.0
 var experience_scale: float = 1.0
 
+## Матчап стихий и грейд-штраф. Считаются один раз на бой в setup():
+## стихии и грейды внутри боя не меняются, а множители нужны на каждом ударе.
+## outgoing_scale = множитель матчапа гуардиан→монстр × штраф за грейд выше;
+## incoming_scale = множитель матчапа монстр→гуардиан (на ВЕСЬ входящий урон).
+var outgoing_scale: float = 1.0
+var incoming_scale: float = 1.0
+
 var combo: int = 0
 var max_combo: int = 0
 ## Сколько лишних тапов подряд без единой взятой ноты (см. stray_tap_damage).
@@ -119,7 +126,7 @@ var stray_run: int = 0
 var blocked: int = 0
 var strikes_taken: int = 0
 
-## Множитель следующей удавшейся атаки (Камень). Тратится при попадании.
+## Множитель следующей удавшейся атаки (Трава). Тратится при попадании.
 var next_attack_bonus: float = 1.0
 ## До какой доли трека расширены окна (Ветер). Доля передаётся снаружи:
 ## BattleState остаётся чистым классом и ничего не знает про Conductor.
@@ -163,6 +170,17 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 	# Это то, что делает повторные встречи осмысленными, а не рутиной
 	experience_scale = GameState.experience_multiplier(monster.species_id)
 
+	# Матчап стихий (GDD §5) и штраф за грейд выше своего (GDD §6.3).
+	# Уязвимость монстра растит наш урон, его сопротивление — режет; грейд-штраф
+	# перемножается сверху: стихия помогает, но стену грейдов не отменяет
+	outgoing_scale = _matchup_scale(outgoing_matchup(),
+		Balance.element_vulnerability_outgoing()) \
+		* Balance.grade_gap_scale(monster.grade - (guardian.grade if guardian != null else 0))
+	# Входящая сторона: уязвимый гуардиан получает вдвое больнее — по всем
+	# источникам урона сразу, как и strike_scale: монстр наказывает ошибки
+	incoming_scale = _matchup_scale(incoming_matchup(),
+		Balance.element_vulnerability_incoming())
+
 	var bonuses := GameState.gear_bonuses(guardian.key()) if guardian != null else {}
 	window_scale = bonuses.get("window_scale", 1.0)
 	power_bonus = bonuses.get("power_bonus", 0.0)
@@ -205,11 +223,28 @@ func setup(new_monster: MonsterInstance, new_guardian: MonsterInstance,
 		grade_counts[key] = 0
 
 
-## Множитель урона гуардиана против жанра монстра.
-func genre_multiplier() -> float:
+## Как монстр переносит стихию гуардиана: его уязвимость — наш бонус.
+func outgoing_matchup() -> MonsterData.Matchup:
 	if guardian == null or monster == null:
-		return 1.0
-	return MonsterData.genre_multiplier(guardian.genre(), monster.genre())
+		return MonsterData.Matchup.NEUTRAL
+	return MonsterData.matchup(guardian.genre(), monster.genre())
+
+
+## Как гуардиан переносит стихию монстра: наша уязвимость — двойная боль.
+func incoming_matchup() -> MonsterData.Matchup:
+	if guardian == null or monster == null:
+		return MonsterData.Matchup.NEUTRAL
+	return MonsterData.matchup(monster.genre(), guardian.genre())
+
+
+static func _matchup_scale(relation: MonsterData.Matchup, vulnerability: float) -> float:
+	match relation:
+		MonsterData.Matchup.VULNERABLE:
+			return vulnerability
+		MonsterData.Matchup.RESIST:
+			return Balance.element_resistance()
+		_:
+			return 1.0
 
 
 ## Учесть оценку обычной ноты.
@@ -278,12 +313,16 @@ func register_attack(grade: int) -> int:
 	# способ бить сильнее (GDD §9.1)
 	# Сила удара экземпляра уже включает грейд и уровень
 	var power := (guardian.power() if guardian != null else 4.0) + power_bonus
-	var amount := int(round(
+	# Пол в единицу: удавшаяся атака всегда наносит хоть что-то. Стена грейдов
+	# (×0.01) иначе округляла урон в ноль — бой не мог кончиться в принципе,
+	# а цифра над монстром не вылетала, и атака выглядела сломанной. Единица
+	# стену не отменяет: у легендарного сотни Настроя против ~20 атак за трек
+	var amount := maxi(int(round(
 		power * Balance.attack_multiplier() * Judge.effect(grade)
-			* Judge.combo_multiplier(combo) * genre_multiplier() * experience_scale
+			* Judge.combo_multiplier(combo) * outgoing_scale * experience_scale
 			* next_attack_bonus
-	))
-	# Топот Камня усиливает ОДИН удар и тратится на нём: иначе спецдвижение
+	)), 1)
+	# Топот Травы усиливает ОДИН удар и тратится на нём: иначе спецдвижение
 	# в начале боя тихо усиливало бы весь бой целиком
 	next_attack_bonus = 1.0
 	attacks_landed += 1
@@ -366,7 +405,7 @@ func use_skill(grade: int, current_beat: float = 0.0, beats_per_bar: int = 4) ->
 
 	match guardian.genre():
 		MonsterData.Genre.ROCK:
-			# Камень: топот — следующая удавшаяся атака бьёт сильнее
+			# Трава: топот — следующая удавшаяся атака бьёт сильнее
 			next_attack_bonus = Balance.skill_attack_bonus()
 		MonsterData.Genre.DISCO:
 			# Солнце: вспышка чинит буфер прощения
@@ -444,8 +483,11 @@ func take_strike(heavy: bool = false) -> int:
 ## второй источник правды.
 func _take_damage(amount: int) -> int:
 	# Амулет смягчает урон, но никогда не обнуляет его: механика,
-	# за которой не надо следить, перестаёт быть механикой
-	var damage := maxi(int(round(amount * strike_scale * (1.0 - shield_reduction))), 1)
+	# за которой не надо следить, перестаёт быть механикой.
+	# incoming_scale — матчап стихий: уязвимый гуардиан получает вдвое,
+	# сопротивляющийся — вполовину, и это касается всех источников урона
+	var damage := maxi(int(round(
+		amount * strike_scale * incoming_scale * (1.0 - shield_reduction))), 1)
 	var total := damage
 
 	var absorbed := mini(shield, damage)

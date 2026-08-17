@@ -604,6 +604,30 @@ func _popup_damage(amount: int, at: Vector2, to_monster: bool, crit := false) ->
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_damage_layer.add_child(label)
 
+	# Подпись матчапа стихий (GDD §5): цифра обязана объяснять, ПОЧЕМУ она
+	# больше или меньше обычной, иначе ×2 по уязвимому герою читается как
+	# случайность. Отдельный узел, а не вторая строка: у Label один размер
+	# шрифта, а подпись должна быть заметно мельче числа
+	var relation: MonsterData.Matchup = state.outgoing_matchup() if to_monster \
+		else state.incoming_matchup()
+	if relation != MonsterData.Matchup.NEUTRAL:
+		var tag := Label.new()
+		tag.text = "уязвимость" if relation == MonsterData.Matchup.VULNERABLE \
+			else "сопротивление"
+		tag.add_theme_font_size_override("font_size", 40)
+		tag.add_theme_color_override("font_color", label.get_theme_color("font_color"))
+		tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+		tag.add_theme_constant_override("outline_size", 8)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.size = Vector2(500, 60)
+		tag.position = Vector2(label.position.x, label.position.y + size * 1.05)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_damage_layer.add_child(tag)
+		var tag_tween := create_tween()
+		tag_tween.tween_property(tag, "position:y", tag.position.y - 190.0, 0.85)
+		tag_tween.parallel().tween_property(tag, "modulate:a", 0.0, 0.85)
+		tag_tween.tween_callback(tag.queue_free)
+
 	# Крит ещё и вспыхивает: рывок вверх заметнее плавного всплытия
 	if crit:
 		label.scale = Vector2(0.6, 0.6)

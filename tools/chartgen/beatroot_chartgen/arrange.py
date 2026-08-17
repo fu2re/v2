@@ -103,7 +103,7 @@ class GenreSpec:
 # с кем встретился.
 GENRES: dict[str, GenreSpec] = {
     "rock": GenreSpec(
-        element="Камень", bpm=104.0, lead="guitar", bass="bass",
+        element="Трава", bpm=104.0, lead="guitar", bass="bass",
         lead_tonic=65, bass_tonic=41,
         kick=(0.0, 2.5), snare=(1.0, 3.0), snare_voice="snare",
         hat=(0.0, 1.0, 2.0, 3.0), bass_figure="fifths",

@@ -57,7 +57,7 @@ func _test_miss_costs_more_than_beat() -> void:
 
 
 func _test_stone_boosts_next_attack() -> void:
-	print("Камень: топот усиливает следующий удар")
+	print("Трава: топот усиливает следующий удар")
 	var plain := _battle_with(MonsterData.Genre.ROCK)
 	var plain_damage := _clean_attack(plain)
 

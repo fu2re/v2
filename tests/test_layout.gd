@@ -80,24 +80,34 @@ func _test_card_widgets_do_not_overlap_buttons() -> void:
 	add_child(feed)
 	await _frames(3)
 
+	# bass_bear (рок) против диско-гуардиана: у пары есть матчап, и бэйдж
+	# уязвимости виден — самый населённый вариант карточки
 	var glade := Glade.new()
 	glade.type = Glade.Type.BATTLE
 	glade.depth = 1
-	glade.monster_id = "synth_slime"
+	glade.monster_id = "bass_bear"
 	glade.grade = COMMON
 	glade.silver_reward = 9
 	RunManager.current_glade = glade
 	feed._show_glade(glade)
 	await _frames(2)
 
+	# Метка матчапа обязана быть на карточке ДО боя (GDD §5): игрок решает,
+	# драться ли, зная, что получит вдвое больнее
+	check(feed._matchup_badge.visible, "бэйдж матчапа показан")
+	check(feed._matchup_badge.text.contains("Уязвимость"),
+		"диско-гуардиан предупреждён об уязвимости: [%s]" % feed._matchup_badge.text)
+
 	var buttons := {
 		"Танцевать": feed._action_button,
 		"Дальше": feed._next_button,
+		"Домой": feed._home_button,
 	}
 	var widgets := {
 		"полоска дружбы": feed._friendship_track,
 		"подпись дружбы": feed._friendship_label,
 		"строка награды": feed._reward_label,
+		"бэйдж матчапа": feed._matchup_badge,
 		"подсказка": feed._hint,
 	}
 
@@ -149,6 +159,8 @@ func _test_labels_do_not_overlap_each_other() -> void:
 		["полоска дружбы", feed._friendship_track, "подпись дружбы", feed._friendship_label],
 		["подпись дружбы", feed._friendship_label, "строка награды", feed._reward_label],
 		["строка награды", feed._reward_label, "подсказка", feed._hint],
+		["номер поляны", feed._depth_label, "бэйдж матчапа", feed._matchup_badge],
+		["бэйдж матчапа", feed._matchup_badge, "заголовок", feed._headline],
 	]
 	for pair: Array in pairs:
 		var first: Control = pair[1]

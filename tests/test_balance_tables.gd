@@ -16,6 +16,7 @@ func run_tests() -> void:
 	_test_grade_scale_is_monotonic()
 	_test_friendship_thresholds_grow()
 	_test_level_curve()
+	_test_element_matchups_valid()
 	_test_weights_sum_to_hundred()
 	_test_rarity_weights_shift_with_depth()
 	_test_victory_chest_odds()
@@ -117,6 +118,39 @@ func _test_level_curve() -> void:
 	check(Balance.xp_for_victory(MonsterData.Rarity.COMMON, true) > over_common,
 		"S-ранг добавляет опыт")
 
+	# Потолок — долгосрочная цель, а не побочный эффект пары забегов:
+	# фарм обычных до максимума обязан стоить хотя бы сотню побед. Иначе
+	# уровень обгоняет и грейды, и снаряжение, и вся лестница прогрессии
+	# схлопывается в «просто подерись ещё вечер» (GDD §6.5)
+	check(Balance.xp_for_level(Balance.max_level()) >= 100 * over_common,
+		"потолок уровня не берётся быстрее ~ста побед над обычными")
+
+
+## Таблица матчапов обязана ссылаться только на существующие стихии
+## и не противоречить сама себе: «уязвим к X и сопротивляюсь X» — это два
+## множителя на одну пару, и бой молча выбрал бы один из них.
+func _test_element_matchups_valid() -> void:
+	var matchups := Balance.element_matchups()
+	check(not matchups.is_empty(), "матчапы стихий прочитались")
+	for key: String in matchups:
+		check(MonsterData.GENRE_KEYS.has(key), "стихия %s существует" % key)
+		var row: Dictionary = matchups[key]
+		var vulnerable: Array = row.get("vulnerable_to", [])
+		var resists: Array = row.get("resists", [])
+		for other: String in vulnerable + resists:
+			check(MonsterData.GENRE_KEYS.has(other),
+				"%s ссылается на существующую стихию %s" % [key, other])
+			check(other != key, "%s не в отношениях сама с собой" % key)
+		for other: String in vulnerable:
+			check(not resists.has(other),
+				"%s не может одновременно быть уязвимой к %s и сопротивляться" % [key, other])
+
+	# Множители читаются и осмысленны: уязвимость усиливает, сопротивление режет
+	check(Balance.element_vulnerability_outgoing() > 1.0, "исходящая уязвимость — бонус")
+	check(Balance.element_vulnerability_incoming() > 1.0, "входящая уязвимость — штраф")
+	check(Balance.element_resistance() < 1.0 and Balance.element_resistance() > 0.0,
+		"сопротивление режет, но не обнуляет")
+
 
 ## Публикуемые доли обязаны складываться в сто процентов: таблица, которая
 ## не сходится, лжёт и дизайнеру, и игроку.
@@ -158,10 +192,28 @@ func _test_rarity_weights_shift_with_depth() -> void:
 		"обычные реже на глубине")
 	check(deep[MonsterData.Rarity.COMMON] > 0.0, "обычные не исчезают совсем")
 
-	# Сдвиг ограничен: иначе на сороковой поляне встречались бы одни легендарные
-	var deepest := Balance.rarity_weights(400)
-	check_close(deepest[MonsterData.Rarity.LEGENDARY], deep[MonsterData.Rarity.LEGENDARY],
-		"сдвиг упирается в потолок", 0.01)
+	# За последней строкой таблица не меняется: сколько ни иди глубже,
+	# действует её последняя ступень
+	var drops := _load_json("res://data/drop_tables.json")
+	var rarity: Dictionary = drops.get("monster_rarity_by_depth", {})
+	var rows: Array = rarity.get("by_depth", [])
+	if rows.is_empty():
+		check(false, "таблица by_depth пуста")
+	else:
+		var last: Dictionary = rows[rows.size() - 1]
+		var last_depth := int(last.get("from_depth", 0))
+		check_eq(Balance.rarity_weights(last_depth + 1000),
+			Balance.rarity_weights(last_depth),
+			"за последней строкой ничего не меняется")
+		# И каждая строка обязана давать 100: публикуемая таблица не лжёт
+		for entry: Variant in rows:
+			var table_row: Dictionary = entry
+			var total := 0.0
+			for key: String in GRADES:
+				total += float(table_row.get(key, 0.0))
+			check(absf(total - 100.0) < 0.01,
+				"строка from_depth=%d даёт 100%% (сейчас %.1f)"
+					% [int(table_row.get("from_depth", -1)), total])
 
 
 func _test_victory_chest_odds() -> void:
@@ -232,9 +284,7 @@ func _required_paths() -> Dictionary:
 			"granny.ask_min_fraction",
 			"granny.ask_max_fraction",
 			"granny.gift_weights_percent.seed_tier_up",
-			"monster_rarity_by_depth.depth_shift.divisor",
-			"monster_rarity_by_depth.depth_shift.max_shift",
-			"monster_rarity_by_depth.depth_shift.common_floor",
+			"monster_rarity_by_depth.by_depth",
 			"wild_bush.yield.seed_of_same_fruit",
 			"wild_bush.yield.fruit_chance_percent",
 			"wild_bush.yield.fruits_when_lucky",
@@ -283,18 +333,21 @@ func _required_paths() -> Dictionary:
 			"judge.effects.early_late",
 			"judge.effects.miss",
 			"judge.combo_steps",
-			"genre.advantage_multiplier",
-			"genre.disadvantage_multiplier",
-			"genre.beats.rock",
+			"elements.vulnerability_outgoing",
+			"elements.vulnerability_incoming",
+			"elements.resistance",
+			"elements.matchups.rock",
+			"elements.matchups.disco",
+			"elements.matchups.folk",
+			"elements.matchups.electro",
+			"elements.matchups.latin",
+			"grade_gap.outgoing_by_gap",
 		],
 	}
 	for grade: String in GRADES:
 		paths["res://data/progression.json"].append("grade_multipliers.stat_scale.%s" % grade)
 		paths["res://data/progression.json"].append("grade_multipliers.strike_scale.%s" % grade)
 		paths["res://data/progression.json"].append("friendship.thresholds.%s" % grade)
-		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.base_weights.%s" % grade)
-		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.unlock_depth.%s" % grade)
-		paths["res://data/drop_tables.json"].append("monster_rarity_by_depth.depth_shift.per_shift.%s" % grade)
 		paths["res://data/drop_tables.json"].append("victory_chest.drop_chance_percent_by_monster_rarity.%s" % grade)
 		paths["res://data/drop_tables.json"].append("victory_chest.odds_percent_by_monster_rarity.%s" % grade)
 	for tier in 4:

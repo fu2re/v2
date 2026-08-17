@@ -89,10 +89,11 @@ func _test_rarity_shifts_with_depth() -> void:
 	check(deep[0] < shallow[0], "обычных вглубь становится меньше")
 	check(deep[4] > shallow[4], "легендарных вглубь становится больше")
 
-	# Сдвиг ограничен: иначе редкость обесценится на большой глубине
-	var very_deep := Balance.rarity_weights(1000)
-	check_eq(very_deep, Balance.rarity_weights(30),
-		"сдвиг упирается в потолок и дальше не растёт")
+	# За последней ступенью таблицы ничего не меняется: иначе редкость
+	# обесценится на большой глубине
+	var very_deep := Balance.rarity_weights(100000)
+	check_eq(very_deep, Balance.rarity_weights(1000),
+		"глубже последней ступени таблица не меняется")
 	check(very_deep[0] >= 10.0, "обычные не исчезают полностью")
 
 
